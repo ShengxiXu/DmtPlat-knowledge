@@ -1,0 +1,18 @@
+- [x] Checkpoint 1: 文档管理 - 拖拽文件到上传区域显示上传提示
+- [x] Checkpoint 2: 文档管理 - 点击预览按钮弹出预览窗口
+- [x] Checkpoint 3: 文档管理 - 点击删除按钮弹出确认对话框
+- [x] Checkpoint 4: 训练配置 - 点击开始训练按钮状态更新
+- [x] Checkpoint 5: 训练配置 - 训练过程中日志实时显示
+- [x] Checkpoint 6: 训练配置 - 修改配置后保存显示成功提示
+- [x] Checkpoint 7: 问答测试 - 输入问题并发送显示用户消息
+- [x] Checkpoint 8: 问答测试 - AI 回复延迟显示模拟真实交互
+- [x] Checkpoint 9: 问答测试 - 消息气泡样式正确（用户在右，AI 在左）
+- [x] Checkpoint 10: 效果评估 - 选择评分筛选条件列表正确筛选
+- [x] Checkpoint 11: 效果评估 - 点击查看按钮弹出详情窗口
+- [x] Checkpoint 12: 效果评估 - 统计卡片数据正确显示
+- [x] Checkpoint 13: 应用绑定 - 点击复制按钮密钥复制成功并显示提示
+- [x] Checkpoint 14: 应用绑定 - 点击新建密钥按钮弹出创建窗口
+- [x] Checkpoint 15: 应用绑定 - 切换密钥状态显示正确的启用/禁用状态
+- [ ] Checkpoint 16: 样式优化 - 标签页图标统一美观
+- [ ] Checkpoint 17: 样式优化 - 深色模式下各组件显示正常
+- [ ] Checkpoint 18: 样式优化 - 按钮、卡片等元素有悬停动画

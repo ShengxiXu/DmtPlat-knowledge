@@ -1,0 +1,11 @@
+- [ ] Checkpoint 1: 显示新对话按钮
+- [ ] Checkpoint 2: 显示个人知识库入口
+- [ ] Checkpoint 3: 显示共享知识库（可折叠）
+- [ ] Checkpoint 4: 显示知识库广场入口
+- [ ] Checkpoint 5: 显示创建共享知识库入口
+- [ ] Checkpoint 6: 显示历史对话列表
+- [ ] Checkpoint 7: 搜索框筛选历史对话
+- [ ] Checkpoint 8: 点击新对话清空聊天
+- [ ] Checkpoint 9: 点击知识库切换聊天
+- [ ] Checkpoint 10: 点击历史对话加载记录
+- [ ] Checkpoint 11: 折叠/展开有平滑动画
