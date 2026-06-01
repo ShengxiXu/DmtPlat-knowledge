@@ -12,6 +12,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     open: true,
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:;",
+    },
   },
   build: {
     outDir: '../dist',

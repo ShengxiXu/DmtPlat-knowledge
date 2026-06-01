@@ -40,8 +40,7 @@ export class Modal {
       existingModal.remove();
     }
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    this.bindEvents();
+    document.body.insertAdjacentHTML('beforeend', modalHTML);    this.bindEvents();
   }
 
   bindEvents() {
@@ -161,12 +160,12 @@ export class CreateKBModal extends Modal {
 
           <div class="mode-selector">
             <div class="mode-card ${this.createMode === 'blank' ? 'active' : ''}" data-mode="blank">
-              <div class="mode-icon">📝</div>
+              <i class="fa-solid fa-file-lines"></i>
               <div class="mode-title">空白创建</div>
               <div class="mode-desc">从空白开始，自定义配置知识库</div>
             </div>
             <div class="mode-card ${this.createMode === 'template' ? 'active' : ''}" data-mode="template">
-              <div class="mode-icon">🎯</div>
+              <i class="fa-solid fa-grid"></i>
               <div class="mode-title">按模板创建</div>
               <div class="mode-desc">选择预设模板，快速创建知识库</div>
             </div>
@@ -186,10 +185,10 @@ export class CreateKBModal extends Modal {
 
   renderTypeSelection() {
     const types = [
-      { id: 'document', name: '文档知识库', icon: '📄', desc: '管理PDF、Word等文档', color: 'bg-blue' },
-      { id: 'web', name: '网页知识库', icon: '🌐', desc: '自动采集网页内容', color: 'bg-green' },
-      { id: 'database', name: '数据库知识库', icon: '🗄️', desc: '连接数据库同步数据', color: 'bg-purple' },
-      { id: 'qa', name: '问答知识库', icon: '💬', desc: '智能问答与对话', color: 'bg-orange' }
+      { id: 'document', name: '文档知识库', icon: 'file-lines', desc: '管理PDF、Word等文档', color: 'bg-blue' },
+      { id: 'web', name: '网页知识库', icon: 'globe', desc: '自动采集网页内容', color: 'bg-green' },
+      { id: 'database', name: '数据库知识库', icon: 'database', desc: '连接数据库同步数据', color: 'bg-purple' },
+      { id: 'qa', name: '问答知识库', icon: 'message', desc: '智能问答与对话', color: 'bg-orange' }
     ];
 
     return `
@@ -198,7 +197,7 @@ export class CreateKBModal extends Modal {
         <div class="type-grid">
           ${types.map(type => `
             <div class="type-card ${this.selectedType === type.id ? 'selected' : ''}" data-type="${type.id}">
-              <div class="type-icon ${type.color}">${type.icon}</div>
+              <i class="fa-solid fa-${type.icon}"></i>
               <div class="type-name">${type.name}</div>
               <div class="type-desc">${type.desc}</div>
               ${this.selectedType === type.id ? '<div class="type-check">✓</div>' : ''}
@@ -248,7 +247,7 @@ export class CreateKBModal extends Modal {
           <p style="color:var(--kb-text-muted);font-size:14px;margin-bottom:24px;">填写基本信息和配置选项</p>
 
           <div class="form-section">
-            <h4>📋 基本信息</h4>
+            <h4><i class="fa-solid fa-file-lines"></i> 基本信息</h4>
             <div class="form-row">
               <div class="form-group flex-1">
                 <label class="form-label">知识库名称 *</label>
@@ -270,7 +269,7 @@ export class CreateKBModal extends Modal {
           </div>
 
           <div class="form-section">
-            <h4>⚙️ 专项配置</h4>
+            <h4><i class="fa-solid fa-gear"></i> 专项配置</h4>
             <div id="config-form-container">${this.renderConfigForm()}</div>
           </div>
         </div>
@@ -491,7 +490,7 @@ export class CreateKBModal extends Modal {
           <label class="form-label">问答对导入</label>
           <div class="upload-area" id="qa-upload">
             <div style="text-align:center;padding:16px;">
-              <div style="font-size:24px;margin-bottom:8px;">📁</div>
+              <i class="fa-solid fa-folder-open" style="font-size:24px;margin-bottom:8px;"></i>
               <div style="font-size:13px;">点击或拖拽上传 CSV/JSON 文件</div>
             </div>
           </div>

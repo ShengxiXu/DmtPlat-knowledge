@@ -17,12 +17,12 @@ export class UserChat {
 
   getHistoryConversations() {
     return [
-      { id: '1', title: '这个知识库对我有什么好处？', icon: '' },
-      { id: '2', title: '数智化互通平台核心信息汇总', icon: '' },
-      { id: '3', title: '如何用AI做短剧？', icon: '📹' },
-      { id: '4', title: '文档管理、训练配置、问答测试...', icon: '' },
-      { id: '5', title: '有哪些好用的Skill？', icon: '⚡' },
-      { id: '6', title: 'OKR与KPI有何不同？', icon: '' },
+      { id: '1', title: '这个知识库对我有什么好处？', icon: 'help-circle' },
+      { id: '2', title: '数智化互通平台核心信息汇总', icon: 'info' },
+      { id: '3', title: '如何用AI做短剧？', icon: 'video' },
+      { id: '4', title: '文档管理、训练配置、问答测试...', icon: 'layers' },
+      { id: '5', title: '有哪些好用的Skill？', icon: 'zap' },
+      { id: '6', title: 'OKR与KPI有何不同？', icon: 'bar-chart' },
     ];
   }
 
@@ -54,20 +54,20 @@ export class UserChat {
               id="personal-kb"
               data-id="personal"
             >
-              <span>📚</span>
+              <i class="fa-solid fa-book-open"></i>
               <span>个人知识库</span>
             </div>
           </div>
 
           <div class="sidebar-section">
             <div class="kb-group-header" data-group="shared">
-              <span>📤</span>
+              <i class="fa-solid fa-share-nodes"></i>
               <span>共享知识库</span>
-              <span class="expand-arrow">${this.expandedGroups.shared ? '▼' : '▶'}</span>
+              <i class="fa-solid fa-${this.expandedGroups.shared ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
             </div>
             <div class="kb-group-content ${this.expandedGroups.shared ? '' : 'collapsed'}">
               <div class="kb-item featured">
-                <span>🔥</span>
+                <i class="fa-solid fa-fire-flame-curved"></i>
                 <span>知识库广场</span>
               </div>
               <div class="kb-item add">
@@ -76,7 +76,7 @@ export class UserChat {
               </div>
               <div class="kb-group-sub" data-group="joined">
                 <div class="kb-group-sub-header">
-                  <span>${this.expandedGroups.joined ? '▼' : '▶'}</span>
+                  <i class="fa-solid fa-${this.expandedGroups.joined ? 'chevron-down' : 'chevron-right'}"></i>
                   <span>我加入的</span>
                 </div>
                 <div class="kb-group-sub-content ${this.expandedGroups.joined ? '' : 'collapsed'}">
@@ -91,7 +91,7 @@ export class UserChat {
               </div>
               <div class="kb-group-sub" data-group="profile">
                 <div class="kb-group-sub-header">
-                  <span>${this.expandedGroups.profile ? '▼' : '▶'}</span>
+                  <i class="fa-solid fa-${this.expandedGroups.profile ? 'chevron-down' : 'chevron-right'}"></i>
                   <span>个人中心</span>
                 </div>
                 <div class="kb-group-sub-content ${this.expandedGroups.profile ? '' : 'collapsed'}">
@@ -112,7 +112,7 @@ export class UserChat {
           <div class="sidebar-section">
             <div class="history-header">
               <span>历史对话</span>
-              <button class="search-btn" id="history-search-btn">🔍</button>
+              <button class="search-btn" id="history-search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
             <div class="search-box ${this.searchQuery ? 'active' : ''}" id="history-search-box">
               <input 
@@ -126,7 +126,7 @@ export class UserChat {
               ${filteredConversations.length > 0
                 ? filteredConversations.map((conv) => `
                   <div class="history-item" data-id="${conv.id}">
-                    <span class="history-icon">${conv.icon || '💬'}</span>
+                    <i class="fa-solid fa-${conv.icon || 'message-square'} history-icon"></i>
                     <span class="history-title">${conv.title}</span>
                   </div>
                 `).join('')
@@ -146,8 +146,8 @@ export class UserChat {
               </div>
             </div>
             <div class="user-chat-actions">
-              <button class="btn btn-sm btn-ghost">🌙</button>
-              <button class="btn btn-sm btn-ghost">📞</button>
+              <button class="btn btn-sm btn-ghost"><i class="fa-solid fa-moon"></i></button>
+              <button class="btn btn-sm btn-ghost"><i class="fa-solid fa-phone"></i></button>
             </div>
           </header>
 

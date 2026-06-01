@@ -1,5 +1,7 @@
 import * as mockData from '../data/mockData.js';
 import { ChatContainer } from '../components/ChatContainer.js';
+import { FeedbackModal } from '../components/FeedbackModal.js';
+import { TuningModal } from '../components/TuningModal.js';
 import { getRatingStars } from '../utils/helpers.js';
 
 export class KBDetail {
@@ -48,16 +50,16 @@ export class KBDetail {
     ];
 
     const tabConfig = {
-      document: { tabId: 'tab-docs', icon: '📄', label: '文档管理' },
-      web: { tabId: 'tab-crawl', icon: '🌐', label: '网页爬取' },
-      database: { tabId: 'tab-database', icon: '🗄️', label: '数据库连接' },
-      qa: { tabId: 'tab-qa', icon: '💬', label: '问答管理' }
+      document: { tabId: 'tab-docs', icon: 'file-lines', label: '文档管理' },
+      web: { tabId: 'tab-crawl', icon: 'globe', label: '网页爬取' },
+      database: { tabId: 'tab-database', icon: 'database', label: '数据库连接' },
+      qa: { tabId: 'tab-qa', icon: 'message', label: '问答管理' }
     };
 
     return dataSources.map((ds, index) => {
       const config = tabConfig[ds.type];
       if (!config) return '';
-      return `<div class="tab ${index === 0 ? 'active' : ''}" data-tab="${config.tabId}">${config.icon} ${config.label}</div>`;
+      return `<div class="tab ${index === 0 ? 'active' : ''}" data-tab="${config.tabId}"><i class="fa-solid fa-${config.icon}"></i> ${config.label}</div>`;
     }).join('');
   }
 
@@ -80,8 +82,8 @@ export class KBDetail {
           <h1 class="header-title">知识库详情</h1>
         </div>
         <div class="header-actions">
-          <button class="btn btn-secondary">⚙️ 设置</button>
-          <button class="btn btn-primary">▶️ 开始训练</button>
+          <button class="btn btn-secondary"><i class="fa-solid fa-gear"></i> 设置</button>
+          <button class="btn btn-primary"><i class="fa-solid fa-play"></i> 开始训练</button>
         </div>
       </header>
 
@@ -100,10 +102,10 @@ export class KBDetail {
 
         <div class="tabs" id="kb-tabs">
           ${this.renderDataSourceTabs()}
-          <div class="tab" data-tab="tab-train">🎯 训练配置</div>
-          <div class="tab" data-tab="tab-chat">💬 问答测试</div>
-          <div class="tab" data-tab="tab-eval">📊 效果评估</div>
-          <div class="tab" data-tab="tab-bindings">🔗 应用绑定</div>
+          <div class="tab" data-tab="tab-train"><i class="fa-solid fa-bullseye"></i> 训练配置</div>
+          <div class="tab" data-tab="tab-chat"><i class="fa-solid fa-message"></i> 问答测试</div>
+          <div class="tab" data-tab="tab-eval"><i class="fa-solid fa-chart-bar"></i> 效果评估</div>
+          <div class="tab" data-tab="tab-bindings"><i class="fa-solid fa-link"></i> 应用绑定</div>
         </div>
 
         <div id="tab-content-container"></div>
@@ -165,15 +167,17 @@ export class KBDetail {
     return `
       <div id="tab-docs" class="tab-content active">
         <div class="card" style="margin-bottom:16px;">
-          <div class="search-bar-container">
-            <div class="search-wrapper">
-              <span class="search-icon">🔍</span>
-              <input type="text" id="doc-search-input" class="search-input" placeholder="搜索文档...">
-              <button class="search-clear" id="search-clear-btn" style="display:none;">✕</button>
+          <div class="doc-search-header">
+            <div class="doc-search-input-wrapper">
+              <i class="fa-solid fa-magnifying-glass doc-search-icon"></i>
+              <input type="text" id="doc-search-input" class="doc-search-input" placeholder="搜索文档...">
+              <button class="doc-search-clear" id="search-clear-btn" style="display:none;">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
             </div>
-            <button class="upload-btn" id="advanced-search-btn">
-              <span class="upload-icon">⚙️</span>
-              <span class="upload-text">高级搜索</span>
+            <button class="doc-search-advanced-btn" id="advanced-search-btn">
+              <i class="fa-solid fa-sliders"></i>
+              <span>高级搜索</span>
             </button>
           </div>
         </div>
@@ -186,7 +190,7 @@ export class KBDetail {
             ondragover="dragOverHandler(event)"
             ondragleave="dragLeaveHandler(event)"
           >
-            <div style="font-size:48px;margin-bottom:16px;">📁</div>
+            <i class="fa-solid fa-folder-open" style="font-size:48px;margin-bottom:16px;"></i>
             <div style="font-size:16px;font-weight:500;margin-bottom:8px;color:var(--kb-text);">拖拽文件到此处上传</div>
             <div style="font-size:13px;color:var(--kb-text-muted);">支持 PDF、Word、TXT、Markdown，单个文件最大 50MB</div>
             <button class="btn btn-secondary" style="margin-top:16px;" id="select-file-btn">选择文件</button>
@@ -197,7 +201,7 @@ export class KBDetail {
               .map(
                 (doc) => `
               <div class="doc-item">
-                <div class="doc-icon">📄</div>
+                <i class="fa-solid fa-file-lines doc-icon"></i>
                 <div class="doc-info">
                   <div class="doc-name">${doc.name}</div>
                   <div class="doc-meta">${doc.size} · ${doc.type} · 上传于 ${doc.uploadTime}</div>
@@ -206,8 +210,8 @@ export class KBDetail {
                 <div class="doc-progress">
                   <div class="doc-progress-bar" style="width:${doc.progress}%"></div>
                 </div>
-                <button class="btn btn-sm btn-ghost doc-preview-btn" data-id="${doc.id}">👁</button>
-                <button class="btn btn-sm btn-ghost doc-delete-btn" data-id="${doc.id}">🗑</button>
+                <button class="btn btn-sm btn-ghost doc-preview-btn" data-id="${doc.id}"><i class="fa-solid fa-eye"></i></button>
+                <button class="btn btn-sm btn-ghost doc-delete-btn" data-id="${doc.id}"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             `
               )
@@ -233,11 +237,11 @@ export class KBDetail {
             <div style="flex:1;">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
                 <div style="grid-column:1/-1;">
-                  <label class="form-label" style="font-size:15px;font-weight:600;margin-bottom:10px;">📋 爬取URL <span style="color:#ff4d4f;">*</span></label>
+                  <label class="form-label" style="font-size:15px;font-weight:600;margin-bottom:10px;"><i class="fa-solid fa-link"></i> 爬取URL <span style="color:#ff4d4f;">*</span></label>
                   <textarea class="textarea" id="crawl-url-input" placeholder="每行一个URL&#10;例如:&#10;https://example.com&#10;https://docs.example.com" rows="4" style="width:100%;"></textarea>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;">
-                  <label class="form-label" style="font-size:14px;font-weight:500;">🔍 爬取深度 <span style="color:#ff4d4f;">*</span></label>
+                  <label class="form-label" style="font-size:14px;font-weight:500;"><i class="fa-solid fa-magnifying-glass"></i> 爬取深度 <span style="color:#ff4d4f;">*</span></label>
                   <div style="display:flex;align-items:center;gap:12px;">
                     <div style="position:relative;">
                       <input type="number" id="crawl-depth-input" class="input" min="1" max="10" value="2" style="width:90px;height:38px;font-size:15px;text-align:center;">
@@ -253,7 +257,7 @@ export class KBDetail {
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;">
-                  <label class="form-label" style="font-size:14px;font-weight:500;">⏱️ 请求间隔(秒)</label>
+                  <label class="form-label" style="font-size:14px;font-weight:500;"><i class="fa-solid fa-clock"></i> 请求间隔(秒)</label>
                   <div style="display:flex;align-items:flex-start;gap:12px;">
                     <input type="number" id="crawl-interval-input" class="input" min="1" max="60" value="3" style="width:90px;height:38px;font-size:15px;text-align:center;">
                     <div style="flex:1;">
@@ -267,10 +271,10 @@ export class KBDetail {
               </div>
               <div style="display:flex;gap:14px;margin-top:24px;padding-top:20px;border-top:1px solid var(--kb-border-light);">
                 <button class="btn btn-primary" id="start-crawl-btn" style="padding:10px 24px;font-size:14px;font-weight:500;">
-                  ▶️ 开始爬取
+                  <i class="fa-solid fa-play"></i> 开始爬取
                 </button>
                 <button class="btn btn-secondary" id="save-crawl-btn" style="padding:10px 24px;font-size:14px;">
-                  💾 保存配置
+                  <i class="fa-solid fa-floppy-disk"></i> 保存配置
                 </button>
               </div>
             </div>
@@ -281,7 +285,7 @@ export class KBDetail {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <h3 style="font-size:16px;font-weight:600;">爬取任务历史</h3>
             <div class="search-box" style="width:250px;">
-              <span>🔍</span>
+              <i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" id="crawl-search-input" placeholder="搜索URL...">
             </div>
           </div>
@@ -312,9 +316,9 @@ export class KBDetail {
                   <div class="crawl-td">${task.size}</div>
                   <div class="crawl-td">${task.time}</div>
                   <div class="crawl-td">
-                    <button class="btn btn-sm btn-ghost crawl-view-btn" data-id="${task.id}">👁️</button>
-                    <button class="btn btn-sm btn-ghost crawl-retry-btn" data-id="${task.id}">🔄</button>
-                    <button class="btn btn-sm btn-ghost crawl-delete-btn" data-id="${task.id}">🗑</button>
+                    <button class="btn btn-sm btn-ghost crawl-view-btn" data-id="${task.id}"><i class="fa-solid fa-eye"></i></button>
+                    <button class="btn btn-sm btn-ghost crawl-retry-btn" data-id="${task.id}"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button class="btn btn-sm btn-ghost crawl-delete-btn" data-id="${task.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
               `).join('')}
@@ -331,7 +335,7 @@ export class KBDetail {
             <div class="modal-body" style="padding:20px;">
               <div id="crawl-progress-content">
                 <div style="text-align:center;margin-bottom:20px;">
-                  <div style="font-size:32px;margin-bottom:8px;">🌐</div>
+                  <i class="fa-solid fa-globe" style="font-size:32px;margin-bottom:8px;"></i>
                   <div style="font-size:14px;color:var(--kb-text);">正在爬取网页...</div>
                 </div>
                 <div class="progress-bar">
@@ -347,7 +351,7 @@ export class KBDetail {
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-danger" id="stop-crawl-btn">⏹️ 停止爬取</button>
+              <button class="btn btn-danger" id="stop-crawl-btn"><i class="fa-solid fa-square"></i> 停止爬取</button>
             </div>
           </div>
         </div>
@@ -365,53 +369,55 @@ export class KBDetail {
     return `
       <div id="tab-database" class="tab-content">
         <div class="card" style="margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-            <div style="flex:1;">
-              <h3 style="font-size:16px;font-weight:600;margin-bottom:16px;">新建数据库连接</h3>
-              <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">连接名称 <span style="color:#ff4d4f;">*</span></label>
-                  <input type="text" class="input" id="db-name-input" placeholder="请输入连接名称" style="width:250px;">
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">数据库类型 <span style="color:#ff4d4f;">*</span></label>
-                  <select class="input" id="db-type-select" style="width:200px;">
-                    <option value="mysql">MySQL</option>
-                    <option value="postgresql">PostgreSQL</option>
-                    <option value="oracle">Oracle</option>
-                    <option value="sqlserver">SQL Server</option>
-                    <option value="sqlite">SQLite</option>
-                  </select>
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">数据库地址 <span style="color:#ff4d4f;">*</span></label>
-                  <input type="text" class="input" id="db-host-input" placeholder="localhost" style="width:200px;">
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">端口 <span style="color:#ff4d4f;">*</span></label>
-                  <input type="number" class="input" id="db-port-input" min="1" max="65535" value="3306" style="width:100px;">
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">数据库名 <span style="color:#ff4d4f;">*</span></label>
-                  <input type="text" class="input" id="db-database-input" placeholder="database_name" style="width:200px;">
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">用户名</label>
-                  <input type="text" class="input" id="db-username-input" placeholder="username" style="width:200px;">
-                </div>
-                <div style="flex:1;min-width:200px;">
-                  <label class="form-label">密码</label>
-                  <input type="password" class="input" id="db-password-input" placeholder="password" style="width:200px;">
-                </div>
+          <h3 style="font-size:16px;font-weight:600;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--kb-border);">新建数据库连接</h3>
+          <div class="db-form-container">
+            <div class="db-form-row">
+              <div class="db-form-group">
+                <label class="db-form-label">连接名称 <span class="required">*</span></label>
+                <input type="text" class="input" id="db-name-input" placeholder="请输入连接名称">
               </div>
-              <div style="margin-top:16px;">
-                <label class="form-label">查询语句（可选）</label>
-                <textarea class="textarea" id="db-query-input" placeholder="SELECT * FROM table_name WHERE ..." rows="3" style="width:600px;"></textarea>
+              <div class="db-form-group">
+                <label class="db-form-label">数据库类型 <span class="required">*</span></label>
+                <select class="input" id="db-type-select">
+                  <option value="mysql">MySQL</option>
+                  <option value="postgresql">PostgreSQL</option>
+                  <option value="oracle">Oracle</option>
+                  <option value="sqlserver">SQL Server</option>
+                  <option value="sqlite">SQLite</option>
+                </select>
               </div>
-              <div style="display:flex;gap:12px;margin-top:16px;">
-                <button class="btn btn-primary" id="test-db-btn">🔌 测试连接</button>
-                <button class="btn btn-secondary" id="save-db-btn">💾 保存连接</button>
+              <div class="db-form-group">
+                <label class="db-form-label">数据库地址 <span class="required">*</span></label>
+                <input type="text" class="input" id="db-host-input" placeholder="localhost">
               </div>
+              <div class="db-form-group">
+                <label class="db-form-label">端口 <span class="required">*</span></label>
+                <input type="number" class="input" id="db-port-input" min="1" max="65535" value="3306">
+              </div>
+            </div>
+            <div class="db-form-row">
+              <div class="db-form-group">
+                <label class="db-form-label">数据库名 <span class="required">*</span></label>
+                <input type="text" class="input" id="db-database-input" placeholder="database_name">
+              </div>
+              <div class="db-form-group">
+                <label class="db-form-label">用户名</label>
+                <input type="text" class="input" id="db-username-input" placeholder="username">
+              </div>
+              <div class="db-form-group">
+                <label class="db-form-label">密码</label>
+                <input type="password" class="input" id="db-password-input" placeholder="password">
+              </div>
+            </div>
+            <div class="db-form-row db-form-row-full">
+              <div class="db-form-group-full">
+                <label class="db-form-label">查询语句（可选）</label>
+                <textarea class="textarea" id="db-query-input" placeholder="SELECT * FROM table_name WHERE ..." rows="3"></textarea>
+              </div>
+            </div>
+            <div class="db-form-actions">
+              <button class="btn btn-primary" id="test-db-btn"><i class="fa-solid fa-plug"></i> 测试连接</button>
+              <button class="btn btn-secondary" id="save-db-btn"><i class="fa-solid fa-floppy-disk"></i> 保存连接</button>
             </div>
           </div>
         </div>
@@ -420,7 +426,7 @@ export class KBDetail {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <h3 style="font-size:16px;font-weight:600;">数据库连接列表</h3>
             <div class="search-box" style="width:250px;">
-              <span>🔍</span>
+              <i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" id="db-search-input" placeholder="搜索连接...">
             </div>
           </div>
@@ -449,9 +455,9 @@ export class KBDetail {
                   </div>
                   <div class="db-td">${conn.lastSync}</div>
                   <div class="db-td">
-                    <button class="btn btn-sm btn-ghost db-sync-btn" data-id="${conn.id}">🔄</button>
-                    <button class="btn btn-sm btn-ghost db-edit-btn" data-id="${conn.id}">✏️</button>
-                    <button class="btn btn-sm btn-ghost db-delete-btn" data-id="${conn.id}">🗑</button>
+                    <button class="btn btn-sm btn-ghost db-sync-btn" data-id="${conn.id}"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button class="btn btn-sm btn-ghost db-edit-btn" data-id="${conn.id}"><i class="fa-solid fa-pencil"></i></button>
+                    <button class="btn btn-sm btn-ghost db-delete-btn" data-id="${conn.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
               `).join('')}
@@ -473,16 +479,23 @@ export class KBDetail {
     return `
       <div id="tab-qa" class="tab-content">
         <div class="card" style="margin-bottom:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div style="display:flex;gap:12px;">
-              <div class="search-box" style="width:300px;">
-                <span>🔍</span>
-                <input type="text" id="qa-search-input" placeholder="搜索问答...">
-              </div>
+          <div class="qa-search-header">
+            <div class="qa-search-input-wrapper">
+              <i class="fa-solid fa-magnifying-glass qa-search-icon"></i>
+              <input type="text" id="qa-search-input" class="qa-search-input" placeholder="搜索问答...">
+              <button class="qa-search-clear" id="qa-search-clear" style="display:none;">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
             </div>
-            <div style="display:flex;gap:12px;">
-              <button class="btn btn-secondary" id="import-qa-btn">📥 导入问答</button>
-              <button class="btn btn-primary" id="add-qa-btn">➕ 添加问答</button>
+            <div class="qa-search-actions">
+              <button class="qa-btn-import" id="import-qa-btn">
+                <i class="fa-solid fa-download"></i>
+                <span>导入问答</span>
+              </button>
+              <button class="qa-btn-add" id="add-qa-btn">
+                <i class="fa-solid fa-plus"></i>
+                <span>添加问答</span>
+              </button>
             </div>
           </div>
         </div>
@@ -521,8 +534,8 @@ export class KBDetail {
                   </div>
                   <div class="qa-td">${qa.createdAt}</div>
                   <div class="qa-td">
-                    <button class="btn btn-sm btn-ghost qa-edit-btn" data-id="${qa.id}">✏️</button>
-                    <button class="btn btn-sm btn-ghost qa-delete-btn" data-id="${qa.id}">🗑</button>
+                    <button class="btn btn-sm btn-ghost qa-edit-btn" data-id="${qa.id}"><i class="fa-solid fa-pencil"></i></button>
+                    <button class="btn btn-sm btn-ghost qa-delete-btn" data-id="${qa.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
               `).join('')}
@@ -530,7 +543,7 @@ export class KBDetail {
           </div>
         </div>
 
-        <div class="modal-overlay" id="qa-modal" style="display:none;">
+        <div class="modal-overlay" id="qa-modal">
           <div class="modal" style="width:500px;">
             <div class="modal-header">
               <h3 id="qa-modal-title">添加问答</h3>
@@ -553,7 +566,7 @@ export class KBDetail {
           </div>
         </div>
 
-        <div class="modal-overlay" id="import-qa-modal" style="display:none;">
+        <div class="modal-overlay" id="import-qa-modal">
           <div class="modal" style="width:500px;">
             <div class="modal-header">
               <h3>导入问答</h3>
@@ -563,7 +576,7 @@ export class KBDetail {
               <div class="form-group">
                 <label class="form-label">选择文件</label>
                 <div class="upload-zone" id="qa-upload-zone" style="border:2px dashed var(--kb-border);border-radius:8px;padding:32px;text-align:center;cursor:pointer;">
-                  <div style="font-size:32px;margin-bottom:12px;">📁</div>
+                  <i class="fa-solid fa-folder-open" style="font-size:32px;margin-bottom:12px;"></i>
                   <div style="font-size:14px;color:var(--kb-text);margin-bottom:4px;">点击或拖拽文件到此处</div>
                   <div style="font-size:12px;color:var(--kb-text-muted);">支持 CSV、Excel、JSON 格式</div>
                   <input type="file" id="qa-file-input" accept=".csv,.xlsx,.json" style="display:none;">
@@ -592,49 +605,58 @@ export class KBDetail {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
             <h3 style="font-size:16px;font-weight:600;">训练配置</h3>
             <div style="display:flex;gap:12px;">
-              <button class="btn btn-secondary" id="save-config-btn">💾 保存配置</button>
-              <button class="btn btn-primary" id="start-train-btn">▶️ 开始训练</button>
+              <button class="btn btn-secondary" id="save-config-btn"><i class="fa-solid fa-floppy-disk"></i> 保存配置</button>
+              <button class="btn btn-primary" id="start-train-btn"><i class="fa-solid fa-play"></i> 开始训练</button>
             </div>
           </div>
 
-          <div class="config-section">
-            <div class="config-section-title">分段策略</div>
-            <div class="form-group">
-              <label class="form-label">分段方式</label>
-              <div class="radio-group" id="segmentation-type-group">
-                <div class="radio-btn active" data-type="auto">🤖 自动分段</div>
-                <div class="radio-btn" data-type="paragraph">📝 按段落</div>
-                <div class="radio-btn" data-type="length">🔢 按字数</div>
-                <div class="radio-btn" data-type="marker">🏷️ 按标记</div>
+          <div class="segment-strategy">
+            <div class="strategy-title">
+              <i class="fa-solid fa-layer-group"></i>
+              <span>分段策略</span>
+            </div>
+
+            <div class="segment-tabs">
+              <div class="tab-item active" data-type="auto">
+                <i class="fa-solid fa-brain"></i>
+                <span>自动分段</span>
+              </div>
+              <div class="tab-item" data-type="paragraph">
+                <i class="fa-solid fa-file-lines"></i>
+                <span>按段落</span>
+              </div>
+              <div class="tab-item" data-type="length">
+                <i class="fa-solid fa-hashtag"></i>
+                <span>按字数</span>
+              </div>
+              <div class="tab-item" data-type="marker">
+                <i class="fa-solid fa-tag"></i>
+                <span>按标记</span>
               </div>
             </div>
 
             <div id="segmentation-config">
               <div class="config-panel" id="config-auto">
-                <div class="form-group">
-                  <label class="form-label">智能分段策略</label>
-                  <div class="radio-group">
-                    <div class="radio-btn active">平衡模式</div>
-                    <div class="radio-btn">精准模式</div>
-                    <div class="radio-btn">快速模式</div>
-                  </div>
-                  <div class="form-tip">平衡模式：兼顾速度与精度；精准模式：更细粒度分段；快速模式：适合大规模文档</div>
+                <div class="mode-options">
+                  <div class="mode-option active">平衡模式</div>
+                  <div class="mode-option">精准模式</div>
+                  <div class="mode-option">快速模式</div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">目标分段长度</label>
-                  <div class="slider-wrap">
-                    <input type="range" class="slider" min="300" max="1500" value="600" oninput="this.nextElementSibling.textContent=this.value">
-                    <span class="slider-val">600</span>
+
+                <div class="slider-row">
+                  <label class="slider-label">目标分段长度</label>
+                  <div class="slider-control">
+                    <input type="range" class="range-slider" min="300" max="1500" value="600" oninput="this.nextElementSibling.textContent=this.value">
+                    <span class="slider-value">600</span>
                   </div>
-                  <div class="form-tip">系统将尽量接近此长度进行智能分段</div>
                 </div>
-                <div class="form-group">
-                  <label class="form-label">重叠长度</label>
-                  <div class="slider-wrap">
-                    <input type="range" class="slider" min="0" max="200" value="80" oninput="this.nextElementSibling.textContent=this.value">
-                    <span class="slider-val">80</span>
+
+                <div class="slider-row">
+                  <label class="slider-label">重叠长度</label>
+                  <div class="slider-control">
+                    <input type="range" class="range-slider" min="0" max="200" value="80" oninput="this.nextElementSibling.textContent=this.value">
+                    <span class="slider-value">80</span>
                   </div>
-                  <div class="form-tip">相邻分段之间的重叠字符数，提高上下文连贯性</div>
                 </div>
               </div>
 
@@ -816,6 +838,7 @@ export class KBDetail {
                   <th>问题</th>
                   <th>回答摘要</th>
                   <th>评分</th>
+                  <th>状态</th>
                   <th>时间</th>
                   <th>操作</th>
                 </tr>
@@ -828,8 +851,12 @@ export class KBDetail {
                       <td>${record.question}</td>
                       <td>${record.answer}</td>
                       <td>${getRatingStars(record.rating)}</td>
+                      <td><span class="eval-status ${this.getStatusClass(record.rating)}">${this.getStatusText(record.rating)}</span></td>
                       <td>${record.time}</td>
-                      <td><button class="btn btn-sm btn-ghost view-detail-btn" data-id="${record.id}">查看</button></td>
+                      <td>
+                        <button class="btn btn-sm btn-ghost view-detail-btn" data-id="${record.id}">查看</button>
+                        ${record.rating <= 2 && record.status !== 'completed' ? `<button class="btn btn-sm btn-primary tuning-btn" data-id="${record.id}">调优</button>` : ''}
+                      </td>
                     </tr>
                   `
                   )
@@ -840,6 +867,18 @@ export class KBDetail {
         </div>
       </div>
     `;
+  }
+
+  getStatusClass(rating) {
+    if (rating <= 2) return 'status-pending';
+    if (rating === 3) return 'status-processing';
+    return 'status-completed';
+  }
+
+  getStatusText(rating) {
+    if (rating <= 2) return '需要优化';
+    if (rating === 3) return '待评估';
+    return '已达标';
   }
 
   renderBindingsTab() {
@@ -955,6 +994,25 @@ export class KBDetail {
         });
       });
     });
+
+    const segmentTabs = this.container.querySelector('.segment-tabs');
+    if (segmentTabs) {
+      const tabItems = segmentTabs.querySelectorAll('.tab-item');
+      tabItems.forEach((item) => {
+        item.addEventListener('click', () => {
+          tabItems.forEach((tab) => tab.classList.remove('active'));
+          item.classList.add('active');
+          
+          const type = item.dataset.type;
+          const panels = document.querySelectorAll('.config-panel');
+          panels.forEach((panel) => panel.classList.add('hidden'));
+          const activePanel = document.getElementById(`config-${type}`);
+          if (activePanel) {
+            activePanel.classList.remove('hidden');
+          }
+        });
+      });
+    }
 
     const docSearchInput = document.getElementById('doc-search-input');
     if (docSearchInput) {
@@ -1111,6 +1169,17 @@ export class KBDetail {
       });
     });
 
+    const tuningBtns = this.container.querySelectorAll('.tuning-btn');
+    tuningBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const recordId = btn.dataset.id;
+        const record = this.evaluationRecords.find((r) => r.id === recordId);
+        if (record) {
+          this.showTuningModal(record);
+        }
+      });
+    });
+
     const copyKeyBtns = this.container.querySelectorAll('.copy-key-btn');
     copyKeyBtns.forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -1129,6 +1198,65 @@ export class KBDetail {
       newKeyBtn.addEventListener('click', () => {
         this.showNewKeyModal();
       });
+    }
+
+    const addQABtn = document.getElementById('add-qa-btn');
+    if (addQABtn) {
+      addQABtn.addEventListener('click', () => {
+        const modal = document.getElementById('qa-modal');
+        if (modal) {
+          modal.classList.add('active');
+        }
+      });
+    }
+
+    const importQABtn = document.getElementById('import-qa-btn');
+    if (importQABtn) {
+      importQABtn.addEventListener('click', () => {
+        const modal = document.getElementById('import-qa-modal');
+        if (modal) {
+          modal.classList.add('active');
+        }
+      });
+    }
+
+    const modalCloseBtns = this.container.querySelectorAll('.modal-close');
+    modalCloseBtns.forEach((btn) => {
+      btn.removeEventListener('click', this.modalCloseHandler);
+      btn.addEventListener('click', this.modalCloseHandler);
+    });
+
+    const qaModalCancel = document.getElementById('qa-modal-cancel');
+    if (qaModalCancel) {
+      qaModalCancel.removeEventListener('click', this.qaModalCancelHandler);
+      qaModalCancel.addEventListener('click', this.qaModalCancelHandler);
+    }
+
+    const importQACancel = document.getElementById('import-qa-cancel');
+    if (importQACancel) {
+      importQACancel.removeEventListener('click', this.importQACancelHandler);
+      importQACancel.addEventListener('click', this.importQACancelHandler);
+    }
+  }
+
+  modalCloseHandler = (e) => {
+    const modal = e.target.closest('.modal-overlay');
+    if (modal) {
+      modal.classList.remove('active');
+    }
+  }
+
+  qaModalCancelHandler = () => {
+    const modal = document.getElementById('qa-modal');
+    if (modal) {
+      modal.classList.remove('active');
+    }
+  }
+
+  importQACancelHandler = () => {
+    const modal = document.getElementById('import-qa-modal');
+    if (modal) {
+      modal.classList.remove('active');
     }
   }
 
@@ -1150,8 +1278,8 @@ export class KBDetail {
     modal.innerHTML = `
       <div class="modal" style="width:500px;">
         <div class="modal-header">
-          <h3 style="font-size:18px;font-weight:600;">⚙️ 高级搜索</h3>
-          <button class="btn btn-circle btn-ghost" id="adv-search-close">✕</button>
+          <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-sliders"></i> 高级搜索</h3>
+          <button class="btn btn-circle btn-ghost" id="adv-search-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="display:flex;flex-direction:column;gap:16px;">
@@ -1223,8 +1351,8 @@ export class KBDetail {
     modal.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h3 style="font-size:18px;font-weight:600;">📄 ${doc.name}</h3>
-          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-file-lines"></i> ${doc.name}</h3>
+          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
           <div style="padding:16px;background:var(--kb-hover-bg);border-radius:8px;">
@@ -1254,8 +1382,8 @@ export class KBDetail {
     modal.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h3 style="font-size:18px;font-weight:600;">🗑 删除确认</h3>
-          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-trash-can"></i> 删除确认</h3>
+          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
           <div style="padding:16px;">
@@ -1308,7 +1436,7 @@ export class KBDetail {
         if (index === steps.length - 1) {
           if (startBtn) {
             startBtn.disabled = false;
-            startBtn.innerHTML = '▶️ 开始训练';
+            startBtn.innerHTML = '<i class="fa-solid fa-play"></i> 开始训练';
           }
           this.showToast('训练完成！', 'success');
         }
@@ -1475,8 +1603,8 @@ export class KBDetail {
     modal.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h3 style="font-size:18px;font-weight:600;">📊 评价详情</h3>
-          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-chart-bar"></i> 评价详情</h3>
+          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
           <div style="padding:16px;">
@@ -1502,14 +1630,37 @@ export class KBDetail {
     document.body.appendChild(modal);
   }
 
+  showTuningModal(record) {
+    const tuningModal = new TuningModal({
+      record: record,
+      onSubmit: (tuningData) => {
+        this.handleTuningSubmit(tuningData);
+      }
+    });
+    tuningModal.show();
+  }
+
+  handleTuningSubmit(tuningData) {
+    const recordIndex = this.evaluationRecords.findIndex(r => r.id === tuningData.recordId);
+    if (recordIndex !== -1) {
+      this.evaluationRecords[recordIndex].status = tuningData.status;
+      if (tuningData.type === 'update') {
+        this.evaluationRecords[recordIndex].answer = tuningData.answer;
+        this.evaluationRecords[recordIndex].rating = 5;
+      }
+    }
+    this.switchTab('tab-eval');
+    this.showToast('知识库优化完成', 'success');
+  }
+
   showNewKeyModal() {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay active';
     modal.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <h3 style="font-size:18px;font-weight:600;">🔑 新建 API 密钥</h3>
-          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-key"></i> 新建 API 密钥</h3>
+          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -1525,17 +1676,23 @@ export class KBDetail {
           </div>
           <div style="padding:12px;background:var(--kb-primary-subtle);border-radius:8px;">
             <div style="font-size:13px;color:var(--kb-primary-dark);">
-              🔒 密钥将在创建后显示一次，请妥善保管
+              <i class="fa-solid fa-lock"></i> 密钥将在创建后显示一次，请妥善保管
             </div>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-          <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove(); document.body.insertAdjacentHTML('beforeend', '<div class=\"toast toast-success show\">密钥已创建</div>'); setTimeout(() => document.querySelector('.toast')?.remove(), 3000);">创建密钥</button>
+          <button class="btn btn-primary" id="create-key-btn">创建密钥</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+    
+    document.getElementById('create-key-btn').addEventListener('click', () => {
+      modal.remove();
+      document.body.insertAdjacentHTML('beforeend', '<div class="toast toast-success show"><i class="fa-solid fa-check"></i> 密钥已创建</div>');
+      setTimeout(() => document.querySelector('.toast')?.remove(), 3000);
+    });
   }
 
   setOnBack(callback) {

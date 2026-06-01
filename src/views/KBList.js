@@ -50,7 +50,7 @@ export class KBList {
         <h1 class="header-title">知识库管理</h1>
         <div class="header-actions">
           <div class="search-box">
-            <span>🔍</span>
+            <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="kb-search-input" class="input" placeholder="搜索知识库..." value="${this.searchQuery}">
           </div>
           <button class="btn btn-primary" id="create-kb-btn">
@@ -62,10 +62,10 @@ export class KBList {
       <div class="content">
         <div class="kb-toolbar">
           <div class="filter-tags" id="type-filter">
-            <button class="filter-tag ${this.filterType === '全部' ? 'active' : ''}" data-type="全部">📁 全部</button>
-            <button class="filter-tag ${this.filterType === '文档' ? 'active' : ''}" data-type="文档">📄 文档</button>
-            <button class="filter-tag ${this.filterType === '问答' ? 'active' : ''}" data-type="问答">💬 问答</button>
-            <button class="filter-tag ${this.filterType === '网页' ? 'active' : ''}" data-type="网页">🌐 网页</button>
+            <button class="filter-tag ${this.filterType === '全部' ? 'active' : ''}" data-type="全部"><i class="fa-solid fa-folder-open"></i> 全部</button>
+            <button class="filter-tag ${this.filterType === '文档' ? 'active' : ''}" data-type="文档"><i class="fa-solid fa-file-lines"></i> 文档</button>
+            <button class="filter-tag ${this.filterType === '问答' ? 'active' : ''}" data-type="问答"><i class="fa-solid fa-message"></i> 问答</button>
+            <button class="filter-tag ${this.filterType === '网页' ? 'active' : ''}" data-type="网页"><i class="fa-solid fa-globe"></i> 网页</button>
           </div>
           <div style="color:var(--kb-text-muted);font-size:14px;">共 ${this.getFilteredKBs().length} 个知识库</div>
         </div>

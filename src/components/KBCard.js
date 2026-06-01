@@ -23,9 +23,9 @@ export class KBCard {
         </div>
         <div class="kb-card-desc">${description}</div>
         <div class="kb-card-meta">
-          <span>📄 ${documentCount} ${type === '问答' ? '问答' : '文档'}</span>
-          <span>🕐 ${lastUpdate}</span>
-          <span>👁 ${views} 访问</span>
+          <span><i class="fa-solid fa-file-lines"></i> ${documentCount} ${type === '问答' ? '问答' : '文档'}</span>
+          <span><i class="fa-solid fa-clock"></i> ${lastUpdate}</span>
+          <span><i class="fa-solid fa-eye"></i> ${views} 访问</span>
         </div>
         <div class="kb-card-actions">
           <button class="btn btn-sm btn-ghost" data-action="edit">编辑</button>

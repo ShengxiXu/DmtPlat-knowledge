@@ -45,19 +45,19 @@ export class DataSourceForm {
 
   getTypeIcon(type) {
     const icons = {
-      document: '📄',
-      web: '🌐',
-      database: '🗄️',
-      qa: '💬'
+      document: 'file-text',
+      web: 'globe',
+      database: 'database',
+      qa: 'message-square'
     };
-    return icons[type] || '📦';
+    return icons[type] || 'package';
   }
 
   render(container) {
     container.innerHTML = `
       <div class="ds-form">
         <div class="ds-form-header">
-          <span class="ds-icon">${this.getTypeIcon(this.type)}</span>
+          <i class="fa-solid fa-${this.getTypeIcon(this.type)} ds-icon"></i>
           <span class="ds-title">配置${this.getTypeLabel(this.type)}</span>
         </div>
         <div class="ds-form-body">

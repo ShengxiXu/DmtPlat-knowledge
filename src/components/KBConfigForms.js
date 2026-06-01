@@ -226,6 +226,7 @@ export class DatabaseConfigForm {
       enableFullText: config.enableFullText !== undefined ? config.enableFullText : true,
       syncInterval: config.syncInterval || 'daily',
       batchSize: config.batchSize || 1000,
+      query: config.query || '',
       ...config
     };
     this.container = null;
@@ -237,9 +238,9 @@ export class DatabaseConfigForm {
       <div class="config-form">
         <div class="form-section">
           <h4>数据库连接</h4>
-          <div class="form-row">
+          <div class="form-row col-4">
             <div class="form-group">
-              <label class="form-label">数据库类型</label>
+              <label class="form-label required">数据库类型</label>
               <select class="select">
                 <option value="mysql" ${this.config.dbType === 'mysql' ? 'selected' : ''}>MySQL</option>
                 <option value="postgresql" ${this.config.dbType === 'postgresql' ? 'selected' : ''}>PostgreSQL</option>
@@ -248,35 +249,33 @@ export class DatabaseConfigForm {
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">主机地址</label>
-              <input type="text" class="input" value="${this.config.host}" />
+              <label class="form-label required">主机地址</label>
+              <input type="text" class="input" value="${this.config.host}" placeholder="localhost" />
             </div>
-          </div>
-          <div class="form-row">
             <div class="form-group">
               <label class="form-label">端口</label>
               <input type="number" class="input" value="${this.config.port}" />
             </div>
             <div class="form-group">
-              <label class="form-label">数据库名称</label>
-              <input type="text" class="input" value="${this.config.database}" />
+              <label class="form-label required">数据库名称</label>
+              <input type="text" class="input" value="${this.config.database}" placeholder="database_name" />
             </div>
           </div>
-          <div class="form-row">
+          <div class="form-row col-2">
             <div class="form-group">
               <label class="form-label">用户名</label>
-              <input type="text" class="input" value="${this.config.username}" />
+              <input type="text" class="input" value="${this.config.username}" placeholder="username" />
             </div>
             <div class="form-group">
               <label class="form-label">密码</label>
-              <input type="password" class="input" value="${this.config.password}" />
+              <input type="password" class="input" value="${this.config.password}" placeholder="password" />
             </div>
           </div>
         </div>
         
         <div class="form-section">
           <h4>同步设置</h4>
-          <div class="form-row">
+          <div class="form-row col-2">
             <div class="form-group">
               <label class="form-label">同步频率</label>
               <select class="select">
@@ -301,10 +300,24 @@ export class DatabaseConfigForm {
         </div>
         
         <div class="form-section">
-          <h4>表白名单</h4>
-          <div class="form-group">
-            <label class="form-label">允许同步的表名（逗号分隔）</label>
-            <input type="text" class="input" placeholder="table1, table2, table3" value="${this.config.tableWhitelist.join(', ')}" />
+          <h4>白名单</h4>
+          <div class="form-row col-1">
+            <div class="form-group">
+              <label class="form-label">允许同步的表名（逗号分隔）</label>
+              <input type="text" class="input" placeholder="table1, table2, table3" value="${this.config.tableWhitelist.join(', ')}" />
+              <div class="form-hint">留空则同步所有表</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-section">
+          <h4>高级配置</h4>
+          <div class="form-row col-1">
+            <div class="form-group">
+              <label class="form-label">查询语句（可选）</label>
+              <textarea class="textarea" placeholder="SELECT * FROM table_name WHERE ...">${this.config.query || ''}</textarea>
+              <div class="form-hint">自定义SQL查询，用于筛选需要同步的数据</div>
+            </div>
           </div>
         </div>
       </div>
@@ -320,8 +333,9 @@ export class DatabaseConfigForm {
   }
 
   getData() {
-    const tablesInput = this.container.querySelector('.form-section:last-child input').value;
+    const tablesInput = this.container.querySelector('.form-section:nth-child(3) input').value;
     const tables = tablesInput ? tablesInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const query = this.container.querySelector('.form-section:nth-child(4) textarea').value;
     
     return {
       type: 'database',
@@ -335,7 +349,8 @@ export class DatabaseConfigForm {
         syncInterval: this.container.querySelector('.select:nth-child(2)').value,
         batchSize: parseInt(this.container.querySelector('.range').value),
         enableFullText: this.container.querySelector('.toggle-group input').checked,
-        tableWhitelist: tables
+        tableWhitelist: tables,
+        query: query || ''
       }
     };
   }

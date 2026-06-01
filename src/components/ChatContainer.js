@@ -13,8 +13,8 @@ export class ChatContainer {
     this.container.innerHTML = `
       <div class="chat-container">
         <div class="chat-header">
-          <div class="chat-title">💬 智能问答</div>
-          <button class="btn btn-sm btn-ghost" id="clear-chat-${this.container.id}" title="清空聊天">🗑</button>
+          <div class="chat-title"><i class="fa-solid fa-message"></i> 智能问答</div>
+          <button class="btn btn-sm btn-ghost" id="clear-chat-${this.container.id}" title="清空聊天"><i class="fa-solid fa-trash-can"></i></button>
         </div>
         
         <div class="chat-messages" id="chat-messages-${this.container.id}">
@@ -42,7 +42,7 @@ export class ChatContainer {
     if (this.messages.length === 0) {
       return `
         <div class="empty-chat">
-          <div style="font-size:48px;margin-bottom:16px;">🤖</div>
+          <i class="fa-solid fa-robot" style="font-size:48px;margin-bottom:16px;"></i>
           <div style="font-size:16px;color:var(--kb-text);margin-bottom:8px;">您好！我是智能助手</div>
           <div style="font-size:14px;color:var(--kb-text-muted);">有什么我可以帮助您的吗？</div>
           <div style="margin-top:20px;">
@@ -63,11 +63,11 @@ export class ChatContainer {
         const time = msg.time || new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
         return `
           <div class="chat-message" style="flex-direction:${isUser ? 'row-reverse' : 'row'}">
-            <div class="chat-avatar ${isUser ? 'user' : ''}">${isUser ? '👤' : '🤖'}</div>
+            <div class="chat-avatar ${isUser ? 'user' : ''}">${isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>'}</div>
             <div class="chat-bubble-wrapper">
               <div class="chat-bubble ${isUser ? 'user' : ''}">${msg.content}</div>
               <div class="chat-time">${time} 
-                <button class="copy-btn" data-content="${encodeURIComponent(msg.content)}">📋</button>
+                <button class="copy-btn" data-content="${encodeURIComponent(msg.content)}"><i class="fa-solid fa-copy"></i></button>
               </div>
             </div>
           </div>

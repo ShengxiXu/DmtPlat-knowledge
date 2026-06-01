@@ -5,7 +5,7 @@ export const kbTemplates = [
     description: '整合产品文档、常见问题、帮助中心的综合客服知识库',
     category: '业务场景',
     subCategory: '客服',
-    icon: '💬',
+    icon: 'message',
     preset: {
       kbName: '智能客服知识库',
       kbDescription: '整合产品文档、常见问题、业务指南的客服知识库'
@@ -46,7 +46,7 @@ export const kbTemplates = [
     description: '产品文档与在线帮助的整合知识库',
     category: '业务场景',
     subCategory: '产品',
-    icon: '📚',
+    icon: 'book-open',
     preset: {
       kbName: '产品手册知识库',
       kbDescription: '产品文档与在线帮助的整合知识库'
@@ -78,7 +78,7 @@ export const kbTemplates = [
     description: '整合数据库数据与分析文档的知识库',
     category: '业务场景',
     subCategory: '数据',
-    icon: '📊',
+    icon: 'chart-bar',
     preset: {
       kbName: '数据分析知识库',
       kbDescription: '整合数据库数据与分析文档的知识库'
@@ -113,7 +113,7 @@ export const kbTemplates = [
     description: '包含培训文档和常见问题的员工知识库',
     category: '业务场景',
     subCategory: '培训',
-    icon: '🎓',
+    icon: 'graduation-cap',
     preset: {
       kbName: '员工培训知识库',
       kbDescription: '包含培训文档和常见问题的员工知识库'
@@ -144,7 +144,7 @@ export const kbTemplates = [
     description: '整合营销文档和常见问题的知识库',
     category: '业务场景',
     subCategory: '营销',
-    icon: '📣',
+    icon: 'bullhorn',
     preset: {
       kbName: '营销FAQ知识库',
       kbDescription: '整合营销文档和常见问题的知识库'
@@ -175,7 +175,7 @@ export const kbTemplates = [
     description: '包含金融法规文档和合规问答的知识库',
     category: '行业解决方案',
     subCategory: '金融',
-    icon: '💰',
+    icon: 'building-columns',
     preset: {
       kbName: '金融合规知识库',
       kbDescription: '包含金融法规文档和合规问答的知识库'
@@ -216,7 +216,7 @@ export const kbTemplates = [
     description: '整合医疗文档和健康问答的知识库',
     category: '行业解决方案',
     subCategory: '医疗',
-    icon: '🏥',
+    icon: 'hospitals',
     preset: {
       kbName: '医疗指南知识库',
       kbDescription: '整合医疗文档和健康问答的知识库'
@@ -247,7 +247,7 @@ export const kbTemplates = [
     description: '整合产品信息、订单问题、售后政策的知识库',
     category: '行业解决方案',
     subCategory: '电商',
-    icon: '🛒',
+    icon: 'cart',
     preset: {
       kbName: '电商客服知识库',
       kbDescription: '整合产品信息、订单问题、售后政策的知识库'

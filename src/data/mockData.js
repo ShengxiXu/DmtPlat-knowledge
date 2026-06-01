@@ -142,6 +142,7 @@ export const evaluationRecords = [
     answer: '进入登录页点击「忘记密码」...',
     rating: 5,
     time: '2分钟前',
+    status: 'completed',
   },
   {
     id: 'eval_002',
@@ -149,6 +150,7 @@ export const evaluationRecords = [
     answer: '支持 PDF、Word、TXT、Markdown...',
     rating: 4,
     time: '1小时前',
+    status: 'completed',
   },
   {
     id: 'eval_003',
@@ -156,6 +158,37 @@ export const evaluationRecords = [
     answer: '免费版 100次/分钟，专业版 1000次...',
     rating: 5,
     time: '3小时前',
+    status: 'completed',
+  },
+  {
+    id: 'eval_004',
+    question: '如何导出知识库数据？',
+    answer: '在设置页面找到导出按钮...',
+    rating: 2,
+    time: '5小时前',
+    reasons: ['incomplete', 'confusing'],
+    feedback: '回答太简略了，找不到导出按钮的具体位置',
+    suggestion: '应该在知识库列表页面，每个知识库卡片上有导出按钮，或者在知识库详情页面的右上角有导出选项',
+    status: 'pending',
+  },
+  {
+    id: 'eval_005',
+    question: '如何设置访问权限？',
+    answer: '管理员可以设置用户权限...',
+    rating: 1,
+    time: '昨天',
+    reasons: ['wrong', 'incomplete'],
+    feedback: '回答完全错误，根本找不到所谓的权限设置入口',
+    suggestion: '正确的路径应该是：系统设置 -> 用户管理 -> 选择用户 -> 设置权限',
+    status: 'pending',
+  },
+  {
+    id: 'eval_006',
+    question: '支持多语言吗？',
+    answer: '目前支持中文和英文...',
+    rating: 3,
+    time: '昨天',
+    status: 'pending',
   },
 ];
 

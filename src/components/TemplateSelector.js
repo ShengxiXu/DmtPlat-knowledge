@@ -52,7 +52,7 @@ export class TemplateSelector {
             const isSelected = this.selectedTemplate?.id === template.id;
             return `
               <div class="template-card-new ${isSelected ? 'selected' : ''}" data-template-id="${template.id}">
-                <div class="template-icon-new">${template.icon}</div>
+                <i class="fa-solid fa-${template.icon} template-icon-new"></i>
                 <div class="template-info">
                   <div class="template-name">${template.name}</div>
                   <div class="template-desc">${template.description}</div>
@@ -69,7 +69,7 @@ export class TemplateSelector {
   renderPreview(template) {
     return `
       <div class="preview-title">
-        <span class="preview-icon">${template.icon}</span>
+        <i class="fa-solid fa-${template.icon} preview-icon"></i>
         <span class="preview-name">${template.name}</span>
       </div>
       <p class="preview-desc">${template.description}</p>

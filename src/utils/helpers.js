@@ -73,17 +73,19 @@ export function showToast(message, type = 'info') {
 }
 
 export function getRatingStars(rating) {
-  return '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
+  const filled = `<i class="fa-solid fa-star" style="color:#FFD700;"></i>`.repeat(rating);
+  const empty = `<i class="fa-solid fa-star" style="color:#DDD;"></i>`.repeat(5 - rating);
+  return filled + empty;
 }
 
 export function getTypeIcon(type) {
   const icons = {
-    文档: '📄',
-    网页: '🌐',
-    数据库: '🗄️',
-    问答: '💬',
+    文档: 'file-lines',
+    网页: 'globe',
+    数据库: 'database',
+    问答: 'message',
   };
-  return icons[type] || '📄';
+  return `<i class="fa-solid fa-${icons[type] || 'file-lines'}"></i>`;
 }
 
 export function getStatusClass(status) {
@@ -92,4 +94,8 @@ export function getStatusClass(status) {
 
 export function getStatusText(status) {
   return status === 'active' ? '已启用' : '已禁用';
+}
+
+export function icon(name, className = '') {
+  return `<i class="fa-solid fa-${name} ${className}"></i>`;
 }

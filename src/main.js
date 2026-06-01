@@ -46,8 +46,8 @@ class App {
           <main class="main" id="main-content"></main>
           <aside class="ai-sidebar" id="ai-sidebar">
             <div class="ai-sidebar-header">
-              <div class="ai-sidebar-title">🤖 AI 助手</div>
-              <button class="btn btn-sm btn-ghost" id="close-ai-sidebar">✕</button>
+              <div class="ai-sidebar-title"><i class="fa-solid fa-robot"></i> AI 助手</div>
+              <button class="btn btn-sm btn-ghost" id="close-ai-sidebar"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="ai-chat">
               <div class="ai-message">
@@ -226,9 +226,9 @@ class App {
           <div class="config-section">
             <div class="config-section-title">主题模式</div>
             <div class="radio-group">
-              <div class="radio-btn active" onclick="toggleTheme('light')">☀️ 浅色模式</div>
-              <div class="radio-btn" onclick="toggleTheme('dark')">🌙 深色模式</div>
-              <div class="radio-btn" onclick="toggleTheme('auto')">🔄 自动切换</div>
+              <div class="radio-btn active" onclick="toggleTheme('light')"><i class="fa-solid fa-sun"></i> 浅色模式</div>
+              <div class="radio-btn" onclick="toggleTheme('dark')"><i class="fa-solid fa-moon"></i> 深色模式</div>
+              <div class="radio-btn" onclick="toggleTheme('auto')"><i class="fa-solid fa-rotate-right"></i> 自动切换</div>
             </div>
           </div>
           <div class="config-section">

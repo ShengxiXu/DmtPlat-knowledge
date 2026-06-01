@@ -19,8 +19,7 @@ export class EditKBModal {
     this.modal.id = 'edit-kb-modal';
     this.modal.className = 'modal-overlay';
     this.modal.innerHTML = this.renderModal();
-    document.body.appendChild(this.modal);
-    setTimeout(() => this.modal.classList.add('active'), 10);
+    document.body.appendChild(this.modal);    setTimeout(() => this.modal.classList.add('active'), 10);
     this.bindEvents();
   }
 
@@ -102,7 +101,7 @@ export class EditKBModal {
 
   renderStep2() {
     const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: '📄', web: '🌐', database: '🗄️', qa: '💬' };
+    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
 
     return `
       <div class="kb-step2">
@@ -114,7 +113,7 @@ export class EditKBModal {
         <div class="ds-list" id="edit-ds-list">
           ${this.dataSources.length === 0 ? `
             <div class="ds-empty">
-              <div class="empty-icon">📥</div>
+              <i class="fa-solid fa-inbox empty-icon"></i>
               <p>暂无数据源</p>
               <p class="empty-hint">点击上方按钮添加数据源</p>
             </div>
@@ -130,12 +129,12 @@ export class EditKBModal {
 
   renderDataSourceItem(ds, index) {
     const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: '📄', web: '🌐', database: '🗄️', qa: '💬' };
+    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
 
     return `
       <div class="ds-item" data-index="${index}">
         <div class="ds-item-header">
-          <span class="ds-item-icon">${typeIcons[ds.type]}</span>
+          <i class="fa-solid fa-${typeIcons[ds.type]} ds-item-icon"></i>
           <div class="ds-item-info">
             <div class="ds-item-name">${ds.name || typeLabels[ds.type]}</div>
             <div class="ds-item-type">${typeLabels[ds.type]}</div>
@@ -256,10 +255,10 @@ export class EditKBModal {
 
   showAddDataSourceModal() {
     const types = [
-      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: '📄' },
-      { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: '🌐' },
-      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: '🗄️' },
-      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: '💬' }
+      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: 'file-lines' },
+      { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: 'globe' },
+      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: 'database' },
+      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' }
     ];
 
     const modal = document.createElement('div');
@@ -274,7 +273,7 @@ export class EditKBModal {
           <div class="ds-type-grid">
             ${types.map(t => `
               <div class="ds-type-card" data-type="${t.type}">
-                <div class="ds-type-icon">${t.icon}</div>
+                <i class="fa-solid fa-${t.icon} ds-type-icon"></i>
                 <div class="ds-type-name">${t.name}</div>
                 <div class="ds-type-desc">${t.desc}</div>
               </div>
@@ -284,8 +283,7 @@ export class EditKBModal {
       </div>
     `;
     
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('active'), 10);
+    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
@@ -319,8 +317,7 @@ export class EditKBModal {
       </div>
     `;
     
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('active'), 10);
+    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);

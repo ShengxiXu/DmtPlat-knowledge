@@ -20,8 +20,7 @@ export class CreateKBModal {
     this.modal.id = 'create-kb-modal';
     this.modal.className = 'modal-overlay';
     this.modal.innerHTML = this.renderModal();
-    document.body.appendChild(this.modal);
-    
+    document.body.appendChild(this.modal);    
     setTimeout(() => this.modal.classList.add('active'), 10);
     this.bindEvents();
   }
@@ -93,14 +92,14 @@ export class CreateKBModal {
           <h4>选择创建方式</h4>
           <div class="mode-cards">
             <div class="mode-card ${this.createMode === 'blank' ? 'selected' : ''}" data-mode="blank">
-              <div class="mode-icon">📋</div>
+              <div class="mode-icon"><i class="fa-solid fa-file-lines"></i></div>
               <div class="mode-info">
                 <div class="mode-name">空白知识库</div>
                 <div class="mode-desc">从空白开始创建，自由配置所有参数</div>
               </div>
             </div>
             <div class="mode-card ${this.createMode === 'template' ? 'selected' : ''}" data-mode="template">
-              <div class="mode-icon">🎨</div>
+              <div class="mode-icon"><i class="fa-solid fa-grid"></i></div>
               <div class="mode-info">
                 <div class="mode-name">使用模板</div>
                 <div class="mode-desc">选择预设模板快速创建，配置已优化</div>
@@ -142,7 +141,7 @@ export class CreateKBModal {
         <div class="template-list">
           ${kbTemplates.map(template => `
             <div class="template-item ${this.selectedTemplate?.id === template.id ? 'selected' : ''}" data-template-id="${template.id}">
-              <div class="template-icon">${template.icon}</div>
+              <i class="fa-solid fa-${template.icon} template-icon"></i>
               <div class="template-info">
                 <div class="template-name">${template.name}</div>
                 <div class="template-desc">${template.description}</div>
@@ -169,7 +168,7 @@ export class CreateKBModal {
         <div class="ds-list" id="ds-list">
           ${this.dataSources.length === 0 ? `
             <div class="ds-empty">
-              <div class="empty-icon">📥</div>
+              <i class="fa-solid fa-inbox empty-icon"></i>
               <p>暂无数据源</p>
               <p class="empty-hint">点击上方按钮添加数据源</p>
             </div>
@@ -185,12 +184,12 @@ export class CreateKBModal {
 
   renderDataSourceItem(ds, index) {
     const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: '📄', web: '🌐', database: '🗄️', qa: '💬' };
+    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
 
     return `
       <div class="ds-item" data-index="${index}">
         <div class="ds-item-header">
-          <span class="ds-item-icon">${typeIcons[ds.type]}</span>
+          <i class="fa-solid fa-${typeIcons[ds.type]} ds-item-icon"></i>
           <div class="ds-item-info">
             <div class="ds-item-name">${ds.name || typeLabels[ds.type]}</div>
             <div class="ds-item-type">${typeLabels[ds.type]}</div>
@@ -225,7 +224,7 @@ export class CreateKBModal {
 
   renderStep3() {
     const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: '📄', web: '🌐', database: '🗄️', qa: '💬' };
+    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
 
     return `
       <div class="kb-step3">
@@ -242,7 +241,7 @@ export class CreateKBModal {
             </div>
             <div class="summary-item">
               <span class="summary-label">创建方式</span>
-              <span class="summary-value">${this.createMode === 'template' ? `${this.selectedTemplate?.icon} ${this.selectedTemplate?.name}` : '空白知识库'}</span>
+              <span class="summary-value">${this.createMode === 'template' ? `<i class="fa-solid fa-${this.selectedTemplate?.icon}"></i> ${this.selectedTemplate?.name}` : '空白知识库'}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">数据源数量</span>
@@ -256,7 +255,7 @@ export class CreateKBModal {
           <div class="ds-summary-list">
             ${this.dataSources.map((ds, index) => `
               <div class="ds-summary-item">
-                <span class="ds-summary-icon">${typeIcons[ds.type]}</span>
+                <i class="fa-solid fa-${typeIcons[ds.type]} ds-summary-icon"></i>
                 <div class="ds-summary-info">
                   <div class="ds-summary-name">${ds.name || typeLabels[ds.type]}</div>
                   <div class="ds-summary-type">${typeLabels[ds.type]}</div>
@@ -267,7 +266,7 @@ export class CreateKBModal {
         </div>
 
         <div class="tip-box">
-          <span class="tip-icon">💡</span>
+          <i class="fa-solid fa-lightbulb tip-icon"></i>
           <span class="tip-text">创建后仍可添加或修改数据源配置</span>
         </div>
       </div>
@@ -439,10 +438,10 @@ export class CreateKBModal {
 
   showAddDataSourceModal() {
     const types = [
-      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: '📄' },
-      { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: '🌐' },
-      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: '🗄️' },
-      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: '💬' }
+      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: 'file-lines' },
+      { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: 'globe' },
+      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: 'database' },
+      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' }
     ];
 
     const modal = document.createElement('div');
@@ -457,7 +456,7 @@ export class CreateKBModal {
           <div class="ds-type-grid">
             ${types.map(t => `
               <div class="ds-type-card" data-type="${t.type}">
-                <div class="ds-type-icon">${t.icon}</div>
+                <i class="fa-solid fa-${t.icon} ds-type-icon"></i>
                 <div class="ds-type-name">${t.name}</div>
                 <div class="ds-type-desc">${t.desc}</div>
               </div>
@@ -467,8 +466,7 @@ export class CreateKBModal {
       </div>
     `;
     
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('active'), 10);
+    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
@@ -502,8 +500,7 @@ export class CreateKBModal {
       </div>
     `;
     
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('active'), 10);
+    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);

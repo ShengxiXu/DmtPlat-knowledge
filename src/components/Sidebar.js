@@ -2,13 +2,13 @@ export class Sidebar {
   constructor(container) {
     this.container = container;
     this.navItems = [
-      { id: 'list', label: '知识库列表', icon: '📚' },
-      { id: 'detail', label: '知识库详情', icon: '📄' },
-      { id: 'userChat', label: '用户聊天', icon: '💬' },
+      { id: 'list', label: '知识库列表', icon: 'folder-open' },
+      { id: 'detail', label: '知识库详情', icon: 'file-lines' },
+      { id: 'userChat', label: '用户聊天', icon: 'message' },
     ];
     this.systemItems = [
-      { id: 'settings', label: '设置', icon: '⚙️' },
-      { id: 'theme', label: '主题', icon: '🎨' },
+      { id: 'settings', label: '设置', icon: 'gear' },
+      { id: 'theme', label: '主题', icon: 'palette' },
     ];
     this.activeItem = 'list';
     this.render();
@@ -30,7 +30,7 @@ export class Sidebar {
               class="nav-item ${this.activeItem === item.id ? 'active' : ''}"
               data-id="${item.id}"
             >
-              ${item.icon} ${item.label}
+              <i class="fa-solid fa-${item.icon}"></i> ${item.label}
             </div>
           `
             )
@@ -43,7 +43,7 @@ export class Sidebar {
               class="nav-item ${this.activeItem === item.id ? 'active' : ''}"
               data-id="${item.id}"
             >
-              ${item.icon} ${item.label}
+              <i class="fa-solid fa-${item.icon}"></i> ${item.label}
             </div>
           `
             )
