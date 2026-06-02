@@ -8,9 +8,9 @@ export class UserChat {
     this.activeKB = knowledgeBases[0];
     this.searchQuery = '';
     this.expandedGroups = {
-      shared: true,
-      joined: false,
-      profile: false,
+      personal: false,
+      shared: false,
+      history: false,
     };
     this.render();
   }
@@ -49,89 +49,67 @@ export class UserChat {
           </div>
 
           <div class="sidebar-section">
-            <div 
-              class="kb-item" 
-              id="personal-kb"
-              data-id="personal"
-            >
+            <div class="nav-item expandable" data-group="personal">
               <i class="fa-solid fa-book-open"></i>
               <span>个人知识库</span>
+              <i class="fa-solid fa-${this.expandedGroups.personal ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
+            </div>
+            <div class="nav-submenu ${this.expandedGroups.personal ? '' : 'collapsed'}">
+              ${knowledgeBases.slice(0, 5).map((kb, index) => `
+                <div class="nav-subitem ${index === 0 ? 'default-active' : ''}" data-id="${kb.id}">
+                  <i class="fa-solid fa-${kb.type === '问答' ? 'comments' : 'file-text'}"></i>
+                  <span>${kb.name}</span>
+                  <span class="kb-count">${kb.documentCount}</span>
+                </div>
+              `).join('')}
             </div>
           </div>
 
           <div class="sidebar-section">
-            <div class="kb-group-header" data-group="shared">
+            <div class="nav-item expandable" data-group="shared">
               <i class="fa-solid fa-share-nodes"></i>
               <span>共享知识库</span>
               <i class="fa-solid fa-${this.expandedGroups.shared ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
             </div>
-            <div class="kb-group-content ${this.expandedGroups.shared ? '' : 'collapsed'}">
-              <div class="kb-item featured">
+            <div class="nav-submenu ${this.expandedGroups.shared ? '' : 'collapsed'}">
+              <div class="nav-subitem featured">
                 <i class="fa-solid fa-fire-flame-curved"></i>
                 <span>知识库广场</span>
               </div>
-              <div class="kb-item add">
-                <span>+</span>
-                <span>创建共享知识库</span>
-              </div>
-              <div class="kb-group-sub" data-group="joined">
-                <div class="kb-group-sub-header">
-                  <i class="fa-solid fa-${this.expandedGroups.joined ? 'chevron-down' : 'chevron-right'}"></i>
-                  <span>我加入的</span>
-                </div>
-                <div class="kb-group-sub-content ${this.expandedGroups.joined ? '' : 'collapsed'}">
-                  ${knowledgeBases.slice(0, 3).map(kb => `
-                    <div class="kb-sub-item" data-id="${kb.id}">
-                      <span>${getTypeIcon(kb.type)}</span>
-                      <span>${kb.name}</span>
-                      <span class="kb-sub-count">${kb.documentCount} ${kb.type === '问答' ? '问答' : '文档'}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-              <div class="kb-group-sub" data-group="profile">
-                <div class="kb-group-sub-header">
-                  <i class="fa-solid fa-${this.expandedGroups.profile ? 'chevron-down' : 'chevron-right'}"></i>
-                  <span>个人中心</span>
-                </div>
-                <div class="kb-group-sub-content ${this.expandedGroups.profile ? '' : 'collapsed'}">
-                  ${knowledgeBases.slice(3).map(kb => `
-                    <div class="kb-sub-item" data-id="${kb.id}">
-                      <span>${getTypeIcon(kb.type)}</span>
-                      <span>${kb.name}</span>
-                      <span class="kb-sub-count">${kb.documentCount} ${kb.type === '问答' ? '问答' : '文档'}</span>
-                    </div>
-                  `).join('')}
-                </div>
+              <div class="nav-subitem">
+                <i class="fa-solid fa-users"></i>
+                <span>我加入的</span>
               </div>
             </div>
           </div>
 
-          <div class="sidebar-divider"></div>
-
           <div class="sidebar-section">
-            <div class="history-header">
-              <span>历史对话</span>
-              <button class="search-btn" id="history-search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <div class="nav-item expandable" data-group="history">
+              <i class="fa-solid fa-history"></i>
+              <span>历史会话</span>
+              <i class="fa-solid fa-${this.expandedGroups.history ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
             </div>
-            <div class="search-box ${this.searchQuery ? 'active' : ''}" id="history-search-box">
-              <input 
-                type="text" 
-                placeholder="搜索历史对话..." 
-                value="${this.searchQuery}"
-                id="history-search-input"
-              >
-            </div>
-            <div class="history-list">
-              ${filteredConversations.length > 0
-                ? filteredConversations.map((conv) => `
-                  <div class="history-item" data-id="${conv.id}">
-                    <i class="fa-solid fa-${conv.icon || 'message-square'} history-icon"></i>
-                    <span class="history-title">${conv.title}</span>
-                  </div>
-                `).join('')
-                : `<div class="empty-history">暂无历史对话</div>`
-              }
+            
+            <div class="nav-submenu history-submenu ${this.expandedGroups.history ? '' : 'collapsed'}">
+              <div class="search-box ${this.searchQuery ? 'active' : ''}" id="history-search-box">
+                <input 
+                  type="text" 
+                  placeholder="搜索历史对话..." 
+                  value="${this.searchQuery}"
+                  id="history-search-input"
+                >
+              </div>
+
+              <div class="history-list">
+                ${filteredConversations.length > 0
+                  ? filteredConversations.map((conv) => `
+                    <div class="history-item" data-id="${conv.id}">
+                      <span class="history-title">${conv.title}</span>
+                    </div>
+                  `).join('')
+                  : `<div class="empty-history">暂无历史对话</div>`
+                }
+              </div>
             </div>
           </div>
         </aside>
@@ -204,36 +182,35 @@ export class UserChat {
       });
     }
 
-    const groupHeaders = this.container.querySelectorAll('.kb-group-header');
-    groupHeaders.forEach((header) => {
-      header.addEventListener('click', () => {
-        const groupId = header.dataset.group;
-        this.expandedGroups[groupId] = !this.expandedGroups[groupId];
-        this.render();
-      });
-    });
-
-    const subGroupHeaders = this.container.querySelectorAll('.kb-group-sub-header');
-    subGroupHeaders.forEach((header) => {
-      const parentGroup = header.parentElement;
-      const groupId = parentGroup.dataset.group;
-      header.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.expandedGroups[groupId] = !this.expandedGroups[groupId];
-        this.render();
-      });
-    });
-
-    const kbSubItems = this.container.querySelectorAll('.kb-sub-item');
-    kbSubItems.forEach((item) => {
+    const expandableNavItems = this.container.querySelectorAll('.nav-item.expandable');
+    expandableNavItems.forEach((item) => {
       item.addEventListener('click', () => {
-        const kbId = item.dataset.id;
-        this.activeKB = knowledgeBases.find((kb) => kb.id === kbId);
-        
-        const titleEl = this.container.querySelector('.user-chat-title h2');
-        if (titleEl) {
-          titleEl.textContent = this.activeKB.name;
+        const groupId = item.dataset.group;
+        this.expandedGroups[groupId] = !this.expandedGroups[groupId];
+        this.render();
+      });
+    });
+
+    const navSubItems = this.container.querySelectorAll('.nav-subitem');
+    navSubItems.forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const kbList = knowledgeBases;
+        if (kbList.length > 0) {
+          this.activeKB = kbList[0];
+          const titleEl = this.container.querySelector('.user-chat-title h2');
+          if (titleEl) {
+            titleEl.textContent = this.activeKB.name;
+          }
         }
+      });
+    });
+
+    const navItems = this.container.querySelectorAll('.nav-item:not(.expandable)');
+    navItems.forEach((item) => {
+      item.addEventListener('click', () => {
+        navItems.forEach((nav) => nav.classList.remove('active'));
+        item.classList.add('active');
       });
     });
 

@@ -4,8 +4,6 @@ export class ChatSidebar {
     this.searchQuery = '';
     this.expandedGroups = {
       shared: true,
-      joined: false,
-      profile: false,
     };
     this.render();
   }
@@ -51,38 +49,26 @@ export class ChatSidebar {
         </div>
 
         <div class="sidebar-section">
-          <div class="kb-item" id="personal-kb">
+          <div class="nav-item" id="personal-kb">
             <i class="fa-solid fa-book-open"></i>
             <span>个人知识库</span>
           </div>
         </div>
 
         <div class="sidebar-section">
-          <div class="kb-group-header" data-group="shared">
+          <div class="nav-item expandable" data-group="shared">
             <i class="fa-solid fa-share-nodes"></i>
             <span>共享知识库</span>
             <i class="fa-solid fa-${this.expandedGroups.shared ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
           </div>
-          <div class="kb-group-content ${this.expandedGroups.shared ? '' : 'collapsed'}">
-            <div class="kb-item featured">
+          <div class="nav-submenu ${this.expandedGroups.shared ? '' : 'collapsed'}">
+            <div class="nav-subitem featured">
               <i class="fa-solid fa-fire-flame-curved"></i>
               <span>知识库广场</span>
             </div>
-            <div class="kb-item add">
-              <span>+</span>
-              <span>创建共享知识库</span>
-            </div>
-            <div class="kb-group-sub" data-group="joined">
-              <div class="kb-group-sub-header">
-                <i class="fa-solid fa-chevron-right"></i>
-                <span>我加入的</span>
-              </div>
-            </div>
-            <div class="kb-group-sub" data-group="profile">
-              <div class="kb-group-sub-header">
-                <i class="fa-solid fa-chevron-right"></i>
-                <span>个人中心</span>
-              </div>
+            <div class="nav-subitem">
+              <i class="fa-solid fa-users"></i>
+              <span>我加入的</span>
             </div>
           </div>
         </div>
@@ -90,8 +76,15 @@ export class ChatSidebar {
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-section">
-          <div class="history-header">
+          <div class="nav-item" id="history-nav">
+            <i class="fa-solid fa-history"></i>
             <span>历史对话</span>
+          </div>
+        </div>
+
+        <div class="sidebar-section history-section">
+          <div class="history-header">
+            <span>历史记录</span>
             <button class="search-btn" id="history-search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
           </div>
           <div class="search-box ${this.searchQuery ? 'active' : ''}" id="history-search-box">
@@ -148,7 +141,7 @@ export class ChatSidebar {
       });
     }
 
-    const groupHeaders = this.container.querySelectorAll('.kb-group-header');
+    const groupHeaders = this.container.querySelectorAll('.nav-item.expandable');
     groupHeaders.forEach((header) => {
       header.addEventListener('click', () => {
         const groupId = header.dataset.group;
@@ -168,15 +161,27 @@ export class ChatSidebar {
       });
     });
 
-    const kbItems = this.container.querySelectorAll('.kb-item');
-    kbItems.forEach((item) => {
+    const navItems = this.container.querySelectorAll('.nav-item');
+    navItems.forEach((item) => {
       item.addEventListener('click', () => {
-        if (!item.classList.contains('add')) {
-          const kbList = this.getKBList();
-          const firstKB = kbList[0];
-          if (firstKB) {
-            this.onSelectKB?.(firstKB);
-          }
+        navItems.forEach((nav) => nav.classList.remove('active'));
+        item.classList.add('active');
+        
+        const id = item.id;
+        if (id === 'personal-kb') {
+          this.onSelectKB?.({ id: 'personal', name: '个人知识库' });
+        }
+      });
+    });
+
+    const subItems = this.container.querySelectorAll('.nav-subitem');
+    subItems.forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const kbList = this.getKBList();
+        const firstKB = kbList[0];
+        if (firstKB) {
+          this.onSelectKB?.(firstKB);
         }
       });
     });
@@ -186,11 +191,11 @@ export class ChatSidebar {
     this.onNewChat = callback;
   }
 
-  setOnSelectKB(callback) {
-    this.onSelectKB = callback;
-  }
-
   setOnSelectConversation(callback) {
     this.onSelectConversation = callback;
+  }
+
+  setOnSelectKB(callback) {
+    this.onSelectKB = callback;
   }
 }
