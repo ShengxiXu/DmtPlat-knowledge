@@ -5,6 +5,7 @@ import { EditKBModal } from './components/EditKBModal.js';
 import { KBList } from './views/KBList.js';
 import { KBDetail } from './views/KBDetail.js';
 import { UserChat } from './views/UserChat.js';
+import { WorkAssistant } from './views/WorkAssistant.js';
 import { knowledgeBases } from './data/mockData.js';
 
 class App {
@@ -44,7 +45,7 @@ class App {
         <div class="app-body">
           <div id="sidebar-container"></div>
           <main class="main" id="main-content"></main>
-          <aside class="ai-sidebar" id="ai-sidebar">
+          <aside class="ai-sidebar collapsed" id="ai-sidebar">
             <div class="ai-sidebar-header">
               <div class="ai-sidebar-title"><i class="fa-solid fa-robot"></i> AI 助手</div>
               <button class="btn btn-sm btn-ghost" id="close-ai-sidebar"><i class="fa-solid fa-xmark"></i></button>
@@ -68,6 +69,9 @@ class App {
               <button class="btn btn-primary">➤</button>
             </div>
           </aside>
+          <button class="ai-sidebar-toggle" id="ai-sidebar-toggle" title="打开 AI 助手">
+            <i class="fa-solid fa-robot"></i>
+          </button>
         </div>
       </div>
     `;
@@ -109,6 +113,9 @@ class App {
         break;
       case 'userChat':
         this.renderUserChat(mainContent);
+        break;
+      case 'workAssistant':
+        this.renderWorkAssistant(mainContent);
         break;
       case 'settings':
         this.renderSettings(mainContent);
@@ -176,6 +183,11 @@ class App {
   renderUserChat(container) {
     container.innerHTML = '';
     new UserChat(container);
+  }
+
+  renderWorkAssistant(container) {
+    container.innerHTML = '';
+    new WorkAssistant(container);
   }
 
   renderSettings(container) {
@@ -249,11 +261,18 @@ class App {
 
   bindAISidebarEvents() {
     const closeBtn = document.getElementById('close-ai-sidebar');
+    const toggleBtn = document.getElementById('ai-sidebar-toggle');
     const sidebar = document.getElementById('ai-sidebar');
 
     if (closeBtn && sidebar) {
       closeBtn.addEventListener('click', () => {
-        sidebar.style.display = 'none';
+        sidebar.classList.add('collapsed');
+      });
+    }
+
+    if (toggleBtn && sidebar) {
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.remove('collapsed');
       });
     }
   }

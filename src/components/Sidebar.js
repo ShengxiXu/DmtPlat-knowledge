@@ -6,6 +6,9 @@ export class Sidebar {
       { id: 'detail', label: '知识库详情', icon: 'file-lines' },
       { id: 'userChat', label: '用户聊天', icon: 'message' },
     ];
+    this.workItems = [
+      { id: 'workAssistant', label: '智能工作助手', icon: 'briefcase' },
+    ];
     this.systemItems = [
       { id: 'settings', label: '设置', icon: 'gear' },
       { id: 'theme', label: '主题', icon: 'palette' },
@@ -17,13 +20,22 @@ export class Sidebar {
   render() {
     this.container.innerHTML = `
       <aside class="sidebar">
-        <div class="logo">
-          <div class="logo-icon">S</div>
-          SSO Hub
-        </div>
         <nav class="nav">
           <div class="nav-section">知识库</div>
           ${this.navItems
+            .map(
+              (item) => `
+            <div
+              class="nav-item ${this.activeItem === item.id ? 'active' : ''}"
+              data-id="${item.id}"
+            >
+              <i class="fa-solid fa-${item.icon}"></i> ${item.label}
+            </div>
+          `
+            )
+            .join('')}
+          <div class="nav-section">智能工作</div>
+          ${this.workItems
             .map(
               (item) => `
             <div
