@@ -43,6 +43,10 @@ export class Header {
     if (themeBtn) {
       themeBtn.addEventListener('click', () => {
         document.documentElement.classList.toggle('dark');
+        const isDark = document.documentElement.classList.contains('dark');
+        try {
+          localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        } catch (e) {}
         updateThemeIcon();
       });
     }

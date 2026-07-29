@@ -6,6 +6,8 @@ import { KBList } from './views/KBList.js';
 import { KBDetail } from './views/KBDetail.js';
 import { UserChat } from './views/UserChat.js';
 import { WorkAssistant } from './views/WorkAssistant.js';
+import { ContentTemplateManager } from './views/ContentTemplateManager.js';
+import { DocumentManager } from './views/DocumentManager.js';
 import { knowledgeBases } from './data/mockData.js';
 
 class App {
@@ -18,6 +20,17 @@ class App {
 
   init() {
     this.render();
+    this.handleInitialRoute();
+  }
+
+  handleInitialRoute() {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view && ['list', 'detail', 'userChat', 'workAssistant', 'contentTemplates', 'myDocuments', 'settings', 'theme'].includes(view)) {
+      this.currentView = view;
+      this.sidebar.setActive(view);
+      this.renderView(view);
+    }
   }
 
   showToast(message, type = 'info') {
@@ -117,6 +130,12 @@ class App {
       case 'workAssistant':
         this.renderWorkAssistant(mainContent);
         break;
+      case 'contentTemplates':
+        this.renderContentTemplates(mainContent);
+        break;
+      case 'myDocuments':
+        this.renderDocumentManager(mainContent);
+        break;
       case 'settings':
         this.renderSettings(mainContent);
         break;
@@ -185,9 +204,73 @@ class App {
     new UserChat(container);
   }
 
-  renderWorkAssistant(container) {
+  renderWorkAssistant(container, options = {}) {
     container.innerHTML = '';
-    new WorkAssistant(container);
+    new WorkAssistant(container, {
+      ...options,
+      onNavigate: (view, params = {}) => {
+        this.currentView = view;
+        this.sidebar.setActive(view);
+        if (view === 'contentTemplates') {
+          this.renderContentTemplates(document.getElementById('main-content'), params);
+        } else if (view === 'myDocuments') {
+          this.renderDocumentManager(document.getElementById('main-content'));
+        }
+      },
+    });
+  }
+
+  renderContentTemplates(container, options = {}) {
+    container.innerHTML = '';
+    new ContentTemplateManager(container, {
+      ...options,
+      onSelect: (template) => {
+        this.currentView = 'workAssistant';
+        this.sidebar.setActive('workAssistant');
+        this.renderWorkAssistant(document.getElementById('main-content'), {
+          initialContentTemplateId: template?.id,
+        });
+      },
+      onClose: options.initialDocumentId
+        ? () => {
+            this.currentView = 'myDocuments';
+            this.sidebar.setActive('myDocuments');
+            this.renderDocumentManager(document.getElementById('main-content'));
+          }
+        : undefined,
+    });
+  }
+
+  renderDocumentManager(container) {
+    container.innerHTML = '';
+    const dm = new DocumentManager(container);
+    dm.setOnOpenContentDoc((docId) => {
+      this.currentView = 'contentTemplates';
+      this.sidebar.setActive('contentTemplates');
+      this.renderContentTemplates(document.getElementById('main-content'), {
+        initialDocumentId: docId,
+      });
+    });
+    dm.setOnOpenSceneRecord((recordId) => {
+      this.currentView = 'workAssistant';
+      this.sidebar.setActive('workAssistant');
+      this.renderWorkAssistant(document.getElementById('main-content'), {
+        initialRecordId: recordId,
+        returnToView: 'myDocuments',
+      });
+    });
+    dm.setOnGotoWork(() => {
+      this.currentView = 'workAssistant';
+      this.sidebar.setActive('workAssistant');
+      this.renderWorkAssistant(document.getElementById('main-content'), {
+        initialTab: 'templateMarket',
+      });
+    });
+    dm.setOnGotoContent(() => {
+      this.currentView = 'contentTemplates';
+      this.sidebar.setActive('contentTemplates');
+      this.renderContentTemplates(document.getElementById('main-content'));
+    });
   }
 
   renderSettings(container) {
@@ -303,6 +386,25 @@ function toggleTheme(mode) {
 }
 
 window.toggleTheme = toggleTheme;
+
+// 主题持久化：页面加载时读取 localStorage
+function initTheme() {
+  try {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (saved === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else if (saved === 'auto' || !saved) {
+      // 自动模式：跟随系统
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  } catch (e) {}
+}
+
+initTheme();
 
 document.addEventListener('DOMContentLoaded', () => {
   new App();

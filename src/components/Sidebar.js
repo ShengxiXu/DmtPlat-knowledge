@@ -7,7 +7,7 @@ export class Sidebar {
       { id: 'userChat', label: '用户聊天', icon: 'message' },
     ];
     this.workItems = [
-      { id: 'workAssistant', label: '智能工作助手', icon: 'briefcase' },
+      { id: 'workAssistant', label: '智能工作', icon: 'sparkles' },
     ];
     this.systemItems = [
       { id: 'settings', label: '设置', icon: 'gear' },

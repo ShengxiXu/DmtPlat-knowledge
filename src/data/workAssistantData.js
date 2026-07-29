@@ -7,6 +7,8 @@ export const fieldTypes = {
   SELECT: 'select',
   MULTI_SELECT: 'multi_select',
   NUMBER: 'number',
+  DATE: 'date',
+  FILE: 'file',
 };
 
 // 内容输出形式
@@ -22,11 +24,484 @@ export const outputTypes = {
   REPORT: 'report',
 };
 
+// PPT 视觉主题定义
+export const pptThemes = {
+  business: {
+    id: 'business',
+    label: '商务正式',
+    fontFamily: '"Times New Roman", "Songti SC", serif',
+    coverBg: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)',
+    contentBg: '#ffffff',
+    textColor: '#ffffff',
+    contentTextColor: '#1f2937',
+    accentColor: '#2d5a87',
+  },
+  tech: {
+    id: 'tech',
+    label: '科技现代',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    coverBg: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+    contentBg: '#0f172a',
+    textColor: '#ffffff',
+    contentTextColor: '#e2e8f0',
+    accentColor: '#38bdf8',
+  },
+  minimal: {
+    id: 'minimal',
+    label: '简约清新',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    coverBg: '#ffffff',
+    contentBg: '#ffffff',
+    textColor: '#1f2937',
+    contentTextColor: '#374151',
+    accentColor: '#10b981',
+  },
+  lively: {
+    id: 'lively',
+    label: '活泼生动',
+    fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
+    coverBg: 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)',
+    contentBg: '#fff7ed',
+    textColor: '#ffffff',
+    contentTextColor: '#7c2d12',
+    accentColor: '#f97316',
+  },
+  academic: {
+    id: 'academic',
+    label: '学术严谨',
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    coverBg: '#fafaf9',
+    contentBg: '#fafaf9',
+    textColor: '#44403c',
+    contentTextColor: '#57534e',
+    accentColor: '#78716c',
+  },
+  dark: {
+    id: 'dark',
+    label: '高端深色',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    coverBg: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)',
+    contentBg: '#18181b',
+    textColor: '#e4e4e7',
+    contentTextColor: '#d4d4d8',
+    accentColor: '#a1a1aa',
+  },
+};
+
+// PPT 配色方案定义
+export const pptColors = {
+  green: { id: 'green', label: '品牌绿', primary: '#10b981', secondary: '#059669' },
+  blue: { id: 'blue', label: '商务蓝', primary: '#2563eb', secondary: '#1d4ed8' },
+  black: { id: 'black', label: '科技黑', primary: '#111827', secondary: '#374151' },
+  orange: { id: 'orange', label: '活力橙', primary: '#f97316', secondary: '#ea580c' },
+  gray: { id: 'gray', label: '高级灰', primary: '#6b7280', secondary: '#4b5563' },
+  purple: { id: 'purple', label: '品质紫', primary: '#8b5cf6', secondary: '#7c3aed' },
+};
+
+// PPT 生成配置项定义
+export const pptConfigDefinitions = {
+  // 视觉表现
+  theme: {
+    id: 'theme',
+    group: 'visual',
+    label: '视觉主题',
+    type: 'select',
+    options: Object.values(pptThemes).map((t) => ({ value: t.id, label: t.label })),
+    defaultValue: 'business',
+  },
+  color: {
+    id: 'color',
+    group: 'visual',
+    label: '配色方案',
+    type: 'select',
+    options: Object.values(pptColors).map((c) => ({ value: c.id, label: c.label })),
+    defaultValue: 'green',
+  },
+  ratio: {
+    id: 'ratio',
+    group: 'visual',
+    label: '页面比例',
+    type: 'select',
+    options: [
+      { value: '16:9', label: '16:9 宽屏' },
+      { value: '4:3', label: '4:3 标准' },
+      { value: '9:16', label: '9:16 竖版' },
+    ],
+    defaultValue: '16:9',
+  },
+  background: {
+    id: 'background',
+    group: 'visual',
+    label: '背景风格',
+    type: 'select',
+    options: [
+      { value: 'solid', label: '纯色' },
+      { value: 'gradient', label: '渐变' },
+      { value: 'graphic', label: '简约图形' },
+      { value: 'white', label: '留白' },
+      { value: 'texture', label: '暗色质感' },
+    ],
+    defaultValue: 'solid',
+  },
+  // 内容结构
+  pageCount: {
+    id: 'pageCount',
+    group: 'structure',
+    label: '预计页数',
+    type: 'select',
+    options: ['5', '8', '10', '15', '20'].map((v) => ({ value: v, label: `${v}页` })),
+    defaultValue: '8',
+  },
+  density: {
+    id: 'density',
+    group: 'structure',
+    label: '内容密度',
+    type: 'select',
+    options: [
+      { value: 'simple', label: '简洁（每页1-2点）' },
+      { value: 'standard', label: '标准（每页3-4点）' },
+      { value: 'detailed', label: '详细（每页5-6点）' },
+    ],
+    defaultValue: 'standard',
+  },
+  structure: {
+    id: 'structure',
+    group: 'structure',
+    label: '逻辑结构',
+    type: 'select',
+    options: [
+      { value: 'total-part-total', label: '总-分-总' },
+      { value: 'problem-solution', label: '问题-方案' },
+      { value: 'timeline', label: '时间线' },
+      { value: 'compare', label: '对比分析' },
+      { value: 'story', label: '故事线' },
+    ],
+    defaultValue: 'total-part-total',
+  },
+  // 输出形式
+  notes: {
+    id: 'notes',
+    group: 'output',
+    label: '演讲备注',
+    type: 'select',
+    options: [
+      { value: 'none', label: '不生成' },
+      { value: 'brief', label: '简略' },
+      { value: 'detailed', label: '详细' },
+    ],
+    defaultValue: 'detailed',
+  },
+  imageSuggestion: {
+    id: 'imageSuggestion',
+    group: 'output',
+    label: '配图建议',
+    type: 'select',
+    options: [
+      { value: 'none', label: '不生成' },
+      { value: 'each', label: '每页1张' },
+      { value: 'key', label: '关键页配图' },
+    ],
+    defaultValue: 'each',
+  },
+  exportFormat: {
+    id: 'exportFormat',
+    group: 'output',
+    label: '导出格式',
+    type: 'select',
+    options: [
+      { value: 'pptx', label: 'PPTX' },
+      { value: 'pdf', label: 'PDF' },
+      { value: 'outline', label: '仅大纲' },
+    ],
+    defaultValue: 'pptx',
+  },
+  // 品牌信息
+  company: {
+    id: 'company',
+    group: 'brand',
+    label: '公司名称',
+    type: 'text',
+    defaultValue: '',
+  },
+  presenter: {
+    id: 'presenter',
+    group: 'brand',
+    label: '汇报人',
+    type: 'text',
+    defaultValue: '',
+  },
+  // 高级设置
+  decorations: {
+    id: 'decorations',
+    group: 'advanced',
+    label: '页面装饰',
+    type: 'multi_select',
+    options: [
+      { value: 'underline', label: '标题下划线' },
+      { value: 'leftbar', label: '左侧色块' },
+      { value: 'pagenumber', label: '页码' },
+      { value: 'chapter', label: '章节标识' },
+    ],
+    defaultValue: ['underline', 'leftbar', 'pagenumber'],
+  },
+  font: {
+    id: 'font',
+    group: 'advanced',
+    label: '字体风格',
+    type: 'select',
+    options: [
+      { value: 'sans', label: '无衬线（现代）' },
+      { value: 'serif', label: '衬线（正式）' },
+      { value: 'handwriting', label: '手写体（活泼）' },
+    ],
+    defaultValue: 'sans',
+  },
+  tone: {
+    id: 'tone',
+    group: 'advanced',
+    label: '语言风格',
+    type: 'select',
+    options: [
+      { value: 'formal', label: '正式' },
+      { value: 'natural', label: '自然' },
+      { value: 'passionate', label: '激情' },
+      { value: 'data', label: '数据驱动' },
+    ],
+    defaultValue: 'formal',
+  },
+};
+
+// ==================== 结构模板定义（新增） ====================
+// 结构模板定义生成结果的固定结构、章节、页面版式与视觉样式，
+// 可被多个创作模板复用。
+
+export const structureTemplateTypes = {
+  COVER: 'cover',
+  TOC: 'toc',
+  CONTENT: 'content',
+  END: 'end',
+  SECTION: 'section',
+  CHAPTER: 'chapter',
+};
+
+export const contentStructureTemplates = [
+  {
+    id: 'business_8pages',
+    name: '商务正式 8 页 PPT',
+    description: '适用于客户汇报、商务提案的正式风格，包含封面、目录、5 页内容、结尾。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'business',
+      color: 'green',
+      ratio: '16:9',
+      font: 'serif',
+      background: 'gradient',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'tech_8pages',
+    name: '科技现代 8 页 PPT',
+    description: '适用于产品汇报、技术分享的现代科技风格，深色背景、蓝色强调。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'tech',
+      color: 'blue',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'gradient',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'minimal_8pages',
+    name: '简约清新 8 页 PPT',
+    description: '适用于内部汇报、轻量化提案的清新风格，留白充分、绿色强调。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'minimal',
+      color: 'green',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'white',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'lively_8pages',
+    name: '活力橙 8 页 PPT',
+    description: '适用于营销方案、创意提案的活泼风格，橙色活力、视觉冲击力强。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'lively',
+      color: 'orange',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'gradient',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'academic_8pages',
+    name: '学术严谨 8 页 PPT',
+    description: '适用于研究报告、学术分享的严谨风格，灰色调、结构清晰。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'academic',
+      color: 'gray',
+      ratio: '16:9',
+      font: 'serif',
+      background: 'white',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'dark_8pages',
+    name: '高端深色 8 页 PPT',
+    description: '适用于产品发布、高端汇报的深色风格，质感强烈、视觉高级。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'dark',
+      color: 'purple',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'gradient',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'business_blue_8pages',
+    name: '商务蓝 8 页 PPT',
+    description: '适用于政府汇报、企业年报的稳重风格，蓝色主调、专业可信。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'business',
+      color: 'blue',
+      ratio: '16:9',
+      font: 'serif',
+      background: 'solid',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'tech_black_8pages',
+    name: '极客黑 8 页 PPT',
+    description: '适用于技术发布会、黑客松演示的极客风格，纯黑背景、科技感十足。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'tech',
+      color: 'black',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'texture',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'minimal_purple_8pages',
+    name: '品质紫 8 页 PPT',
+    description: '适用于品牌发布、品质宣传的优雅风格，紫色主调、高级质感。',
+    outputType: outputTypes.PPT,
+    isSystem: true,
+    style: {
+      theme: 'minimal',
+      color: 'purple',
+      ratio: '16:9',
+      font: 'sans',
+      background: 'graphic',
+    },
+    structure: [
+      { type: 'cover', title: '封面', layout: 'center-title', placeholders: ['topic', 'audience', 'presenter'] },
+      { type: 'toc', title: '目录', layout: 'left-title-right-nav', placeholders: ['sections'] },
+      { type: 'content', title: '内容页', count: 5, layout: 'title-bullets', placeholders: ['title', 'bullets', 'visual'] },
+      { type: 'end', title: '结尾', layout: 'center-message', placeholders: ['summary', 'nextSteps'] },
+    ],
+  },
+  {
+    id: 'report_standard',
+    name: '标准研究报告',
+    description: '适用于行业研究、市场调研的标准报告结构，包含摘要、背景、分析、结论、附录。',
+    outputType: outputTypes.REPORT,
+    isSystem: true,
+    style: {
+      theme: 'academic',
+      color: 'gray',
+      font: 'serif',
+      background: 'white',
+    },
+    structure: [
+      { type: 'cover', title: '封面', placeholders: ['topic', 'author', 'date'] },
+      { type: 'toc', title: '目录', placeholders: ['sections'] },
+      { type: 'section', title: '摘要', placeholders: ['summary'] },
+      { type: 'section', title: '背景', placeholders: ['background'] },
+      { type: 'section', title: '分析', count: 3, placeholders: ['title', 'content'] },
+      { type: 'section', title: '结论', placeholders: ['conclusion'] },
+      { type: 'end', title: '附录', placeholders: ['references'] },
+    ],
+  },
+];
+
+export function getStructureTemplateById(id) {
+  return contentStructureTemplates.find((t) => t.id === id);
+}
+
+export function getStructureTemplatesByOutputType(outputType) {
+  return contentStructureTemplates.filter((t) => t.outputType === outputType);
+}
+
 // 创作能力定义
 export const workAbilities = [
   {
     id: 'writing',
-    name: '写作',
+    name: '文档写作',
     icon: 'pen-nib',
     description: '生成方案、话术、邮件、报告等文字内容',
     supportsKB: true,
@@ -129,7 +604,7 @@ export const workRoles = [
     name: '人力资源',
     icon: 'users',
     description: '面向招聘与培训，生成JD、制度解读等内容',
-    color: '#8B5CF6',
+    color: '#f43f5e',
     recommendedAbilities: ['writing', 'table', 'ppt', 'report'],
   },
   {
@@ -137,7 +612,7 @@ export const workRoles = [
     name: '产品经理',
     icon: 'lightbulb',
     description: '面向产品工作，生成PRD、分析、汇报材料',
-    color: '#EC4899',
+    color: '#f97316',
     recommendedAbilities: ['writing', 'table', 'ppt', 'report'],
   },
   {
@@ -145,7 +620,7 @@ export const workRoles = [
     name: '技术支持',
     icon: 'screwdriver-wrench',
     description: '面向实施与运维，生成方案、排障、培训内容',
-    color: '#6366F1',
+    color: '#3b82f6',
     recommendedAbilities: ['writing', 'table', 'report', 'transcribe'],
   },
 ];
@@ -235,21 +710,16 @@ export const workTemplates = [
     defaultMode: 'kb',
     recommendedKBs: ['kb_202405001', 'kb_202405002'],
     outputType: outputTypes.PPT,
+    structureTemplateId: 'business_8pages',
     fields: [
       { id: 'topic', type: fieldTypes.TEXT, label: '汇报主题', placeholder: '例如：DmtPlat 企业知识库解决方案', required: true },
       { id: 'audience', type: fieldTypes.TEXT, label: '汇报对象', placeholder: '例如：客户IT负责人、业务负责人', required: false },
-      { id: 'pages', type: fieldTypes.SELECT, label: '预计页数', options: ['5页', '8页', '10页', '15页'], required: false },
-      { id: 'style', type: fieldTypes.SELECT, label: 'PPT风格', options: ['商务正式', '科技现代', '简约清新', '活泼生动'], required: false },
-      { id: 'color', type: fieldTypes.SELECT, label: '配色偏好', options: ['品牌绿', '商务蓝', '科技黑', '活力橙'], required: false },
       { id: 'coreMessage', type: fieldTypes.TEXTAREA, label: '核心信息', placeholder: '一句话总结本次汇报最想传递的信息', required: false, rows: 2 },
       { id: 'keyPoints', type: fieldTypes.TEXTAREA, label: '必须包含的要点', placeholder: '例如：产品优势、客户案例、实施路径、报价', required: false, rows: 3 },
     ],
     example: {
       topic: 'DmtPlat 企业知识库解决方案',
       audience: '客户IT负责人、业务部门负责人',
-      pages: '8页',
-      style: '商务正式',
-      color: '品牌绿',
       coreMessage: 'DmtPlat 能让企业知识真正被一线员工用起来，提升销售与客服效率。',
       keyPoints: '产品优势、核心能力、应用场景、实施路径、客户价值',
     },
@@ -349,6 +819,7 @@ export const workTemplates = [
     defaultMode: 'kb',
     recommendedKBs: ['kb_202405003', 'kb_202405001'],
     outputType: outputTypes.REPORT,
+    structureTemplateId: 'report_standard',
     fields: [
       { id: 'topic', type: fieldTypes.TEXT, label: '研究主题', placeholder: '例如：企业知识管理市场趋势', required: true },
       { id: 'focus', type: fieldTypes.TEXTAREA, label: '关注重点', placeholder: '例如：市场规模、竞争格局、用户需求', required: false, rows: 3 },
@@ -390,13 +861,18 @@ export const workTemplates = [
     defaultMode: 'kb',
     recommendedKBs: ['kb_202405001'],
     outputType: outputTypes.PPT,
+    structureTemplateId: 'tech_8pages',
     fields: [
       { id: 'topic', type: fieldTypes.TEXT, label: '汇报主题', placeholder: '例如：Q3产品规划汇报', required: true },
       { id: 'audience', type: fieldTypes.TEXT, label: '汇报对象', placeholder: '例如：管理层、研发团队', required: false },
+      { id: 'coreMessage', type: fieldTypes.TEXTAREA, label: '核心信息', placeholder: '一句话总结本次汇报最想传递的信息', required: false, rows: 2 },
+      { id: 'keyPoints', type: fieldTypes.TEXTAREA, label: '必须包含的要点', placeholder: '例如：产品目标、关键指标、里程碑、风险', required: false, rows: 3 },
     ],
     example: {
       topic: 'Q3 产品规划汇报',
       audience: '管理层、研发团队',
+      coreMessage: 'Q3 重点聚焦智能工作助手升级，提升一线员工内容创作效率。',
+      keyPoints: '产品目标、关键指标、里程碑、风险与应对',
     },
   },
 ];
@@ -622,6 +1098,11 @@ function generateText(template, formData, mode, kbNames, options = {}) {
   const refs = getCitations(mode, template);
   const master = options.useMaster ? template.masterData : null;
   const attachmentContext = options.attachmentContext || getAttachmentContext(options.attachments);
+  const contentTemplate = options.contentTemplate;
+
+  if (contentTemplate && contentTemplate.content?.sections?.length) {
+    return generateTextFromContentTemplate(template, formData, mode, kbNames, contentTemplate, refs, attachmentContext);
+  }
 
   if (master?.fileType === 'docx') {
     return generateTextFromDOCXMaster(template, formData, mode, kbNames, master, refs, attachmentContext);
@@ -677,6 +1158,34 @@ function generateText(template, formData, mode, kbNames, options = {}) {
   }
 
   return { title: '生成结果', content: '暂未实现该模板的生成逻辑。' + attachmentSuffix, citations: refs };
+}
+
+function generateTextFromContentTemplate(template, formData, mode, kbNames, contentTemplate, refs, attachmentContext = '') {
+  const sections = contentTemplate.content.sections || [];
+  const topic = formData.topic || formData.customer_name || formData.product_name || contentTemplate.name || '文档主题';
+
+  let content = '';
+  sections.forEach((section, idx) => {
+    const level = Math.min(section.level || 1, 4);
+    const prefix = '#'.repeat(level);
+    content += `${prefix} ${section.title}\n\n`;
+
+    const guideText = section.guide || '相关内容描述';
+    if (level === 1) {
+      content += `本章节围绕「${section.title}」展开。${mode === 'kb' ? `基于${kbNames}知识库中的相关资料，` : ''}整理了以下核心内容：\n\n`;
+      content += `- 核心要点一：关于${section.title}的关键信息[${(idx % refs.length) + 1}]\n`;
+      content += `- 核心要点二：具体数据与事实支撑\n`;
+      content += `- 核心要点三：实践经验与应用建议\n\n`;
+    } else {
+      content += `${guideText}的详细说明，包含具体的分析、数据和案例。${mode === 'kb' ? `内容参考了${kbNames}中的相关资料。` : ''}\n\n`;
+    }
+  });
+
+  if (attachmentContext) {
+    content += `\n---\n\n## 参考附件\n\n以下内容结合了上传附件中的信息：\n${attachmentContext}\n\n`;
+  }
+
+  return { title: contentTemplate.name + ' - ' + topic, content, citations: refs, contentTemplateId: contentTemplate.id };
 }
 
 function generateTextFromDOCXMaster(template, formData, mode, kbNames, master, refs, attachmentContext = '') {
@@ -766,10 +1275,117 @@ function generateTable(template, formData, mode, kbNames, options = {}) {
   return { title: '表格', columns: ['列1'], rows: [['示例数据'], ...attachmentRows], citations: refs };
 }
 
+// 根据用户确认/编辑后的大纲生成完整 PPT 页面内容
+function buildPPTPagesFromUserOutline(outline, ctx) {
+  const { topic, audience, coreMessage, color, styleTone, refs, attachmentContext } = ctx;
+
+  const contentMap = {
+    '背景与痛点': {
+      subtitle: '企业知识管理的现状',
+      bullets: ['知识分散在文档、邮件、聊天记录中，难以统一检索', '新员工培训成本高，知识传承依赖老员工经验', '一线销售、客服重复回答相同问题，效率低'],
+      note: '用具体场景引发共鸣，比如“销售找方案要翻10分钟”。',
+      visual: '建议配图：员工在多个系统中查找资料的示意图',
+    },
+    '解决方案': {
+      subtitle: coreMessage,
+      bullets: ['DmtPlat 提供一站式 AI 知识库管理平台', '支持文档、网页、数据库等多源数据接入', '通过智能问答让知识“开口说话”'],
+      note: '这里要抛出核心方案，呼应封面给出的核心信息。',
+      visual: '建议配图：DmtPlat 产品架构图或核心流程图',
+    },
+    '核心能力': {
+      subtitle: '四大技术亮点',
+      bullets: ['多源数据接入：PDF、Word、网页、数据库一键导入', '智能问答：基于大模型的语义理解与精准回复', '私有化部署：数据不出域，满足企业合规要求', '开放 API：与现有 OA、CRM、IM 系统快速集成'],
+      note: '逐条讲解，每条约 30 秒，强调与客户相关的点。',
+      visual: '建议配图：四宫格图标卡片',
+    },
+    '应用场景': {
+      subtitle: '让知识真正被用起来',
+      bullets: ['销售助手：客户方案、产品介绍、竞品对比', '客服助手：标准回复、问题解答、工单总结', '企业搜索门户：统一入口，秒级检索', '企业培训助手：课程学习、知识测验'],
+      note: '结合客户实际岗位，挑选 2-3 个场景重点展开。',
+      visual: '建议配图：岗位场景示意图或应用矩阵图',
+    },
+    '客户价值': {
+      subtitle: '可量化的业务收益',
+      bullets: ['知识检索效率提升 60% 以上', '新员工培训周期缩短 30%', '客服首次响应时间降低 50%', '销售方案准备时间从小时级降至分钟级'],
+      note: '尽量用数据说话，如果客户有同行业案例可以补充。',
+      visual: '建议配图：数据对比柱状图或收益雷达图',
+    },
+    '实施路径': {
+      subtitle: '分阶段落地，风险可控',
+      bullets: ['一期：搭建核心知识库，接入高频文档', '二期：对接业务系统，上线智能问答', '三期：扩展岗位助手，形成知识中台'],
+      note: '强调项目可控，打消客户对实施周期的顾虑。',
+      visual: '建议配图：三阶段时间轴',
+    },
+  };
+
+  const attachmentLines = attachmentContext
+    ? attachmentContext.split('\n').filter((line) => line.trim() && !line.startsWith('【附件')).slice(0, 3)
+    : [];
+
+  return outline.map((page, idx) => {
+    const type = page.type === 'toc' ? 'catalog' : page.type || 'content';
+    const title = page.title || (type === 'cover' ? topic : `第 ${idx + 1} 页`);
+
+    if (type === 'cover') {
+      return {
+        type: 'cover',
+        title,
+        subtitle: page.subtitle || `面向 ${audience || '相关方'} 的汇报`,
+        bullets: [],
+        note: `开场先问候，点明汇报目标：${coreMessage}`,
+        visual: `封面建议：简洁大气的${color}主题背景，突出标题与副标题`,
+        layout: 'center',
+      };
+    }
+
+    if (type === 'end') {
+      return {
+        type: 'end',
+        title,
+        subtitle: page.subtitle || '期待与您共创知识管理新范式',
+        bullets: ['下一步：安排产品演示', '确认试点范围与关键干系人'],
+        note: '收尾呼应核心信息，明确下一步动作。',
+        visual: `结尾页建议：${color}品牌色背景，简洁致谢与联系方式`,
+        layout: 'center',
+      };
+    }
+
+    if (type === 'catalog') {
+      return {
+        type: 'catalog',
+        title,
+        subtitle: '',
+        bullets: outline.filter((p) => p.type !== 'cover' && p.type !== 'end').map((p) => p.title),
+        note: '快速让听众了解今天会讲什么，建立预期。',
+        visual: '目录页建议：左侧大标题，右侧竖向导航条',
+        layout: 'left-title-right-content',
+      };
+    }
+
+    const matched = contentMap[title];
+    const bullets = matched
+      ? matched.bullets
+      : [...(page.bullets || []), '结合业务实际，补充关键论据与数据', '强调与听众相关的价值点'].slice(0, 4);
+
+    const enrichedBullets = attachmentLines.length ? [...bullets, ...attachmentLines].slice(0, 6) : bullets;
+
+    return {
+      type: 'content',
+      title,
+      subtitle: matched?.subtitle || page.subtitle || `围绕「${title}」展开`,
+      bullets: enrichedBullets,
+      note: matched?.note || `详细阐述“${title}”的核心观点，控制每页讲解时间在 1-2 分钟。`,
+      visual: matched?.visual || `建议配图：与“${title}”相关的高质量场景图或示意图`,
+      layout: 'left-title-right-content',
+    };
+  });
+}
+
 function generatePPTOutline(template, formData, mode, kbNames, options = {}) {
   const refs = getCitations(mode, template);
   const master = options.useMaster ? template.masterData : null;
   const attachmentContext = options.attachmentContext || getAttachmentContext(options.attachments);
+  const skeleton = options.pptSkeleton;
 
   const topic = formData.topic || master?.title || '汇报主题';
   const audience = formData.audience || '相关方';
@@ -817,6 +1433,41 @@ function generatePPTOutline(template, formData, mode, kbNames, options = {}) {
       pages: pages.map((p) => ({ ...p, bullets: [], note: '', visual: '', layout: p.type === 'cover' || p.type === 'end' ? 'center' : 'left-title-right-content' })),
       citations: refs,
       isOutline: true,
+    };
+  }
+
+  if (skeleton && skeleton.storyline?.length) {
+    const storylinePages = skeleton.storyline.map((item, idx) => ({
+      type: 'content',
+      title: item.title,
+      subtitle: item.guide || '',
+      guide: item.guide || '',
+    }));
+
+    const pages = [
+      { type: 'cover', title: topic, subtitle: skeleton.name || `面向 ${audience} 的汇报` },
+      { type: 'catalog', title: '汇报目录', subtitle: '' },
+      ...storylinePages,
+      { type: 'end', title: '感谢聆听', subtitle: '期待与您共创价值' },
+    ].map((p) => ({
+      ...p,
+      bullets: [],
+      note: '',
+      visual: '',
+      layout: p.type === 'cover' || p.type === 'end' ? 'center' : 'left-title-right-content',
+    }));
+
+    return {
+      title: topic,
+      style,
+      styleTone,
+      color,
+      colorHex,
+      pages,
+      citations: refs,
+      isOutline: true,
+      skeletonId: skeleton.id,
+      skeletonName: skeleton.name,
     };
   }
 
@@ -879,11 +1530,6 @@ function generatePPT(template, formData, mode, kbNames, options = {}) {
   const keyPoints = formData.keyPoints || '产品优势、核心能力、应用场景、客户价值';
   const pageCount = parseInt(formData.pages, 10) || 8;
 
-  // 如果存在 PPT 母版，优先使用母版的主题与结构
-  if (master?.fileType === 'pptx' && master.slides?.length) {
-    return generatePPTFromMaster(template, formData, mode, kbNames, master, refs, pageCount);
-  }
-
   const styleTone = {
     '商务正式': '稳重、专业、数据驱动',
     '科技现代': '前沿、简洁、强调创新',
@@ -897,6 +1543,27 @@ function generatePPT(template, formData, mode, kbNames, options = {}) {
     '科技黑': '111827',
     '活力橙': 'F05252',
   }[color] || '0E9F6E';
+
+  // 如果存在 PPT 母版，优先使用母版的主题与结构
+  if (master?.fileType === 'pptx' && master.slides?.length) {
+    return generatePPTFromMaster(template, formData, mode, kbNames, master, refs, pageCount);
+  }
+
+  // 如果用户已确认并编辑过大纲，优先按大纲结构生成内容
+  const userOutline = options.pptOutline;
+  if (Array.isArray(userOutline) && userOutline.length > 0) {
+    const pages = buildPPTPagesFromUserOutline(userOutline, { topic, audience, coreMessage, color, styleTone, refs, attachmentContext });
+    return {
+      title: topic,
+      style,
+      styleTone,
+      color,
+      colorHex,
+      coreMessage,
+      pages,
+      citations: refs,
+    };
+  }
 
   const basePages = [
     {
@@ -1342,17 +2009,18 @@ export function setLastRole(roleId) {
 }
 
 export function createWorkRecord(template, formData, mode, selectedKBs, result) {
+  const kbs = Array.isArray(selectedKBs) ? selectedKBs : [];
   return {
     id: generateId('wa'),
-    templateId: template.id,
-    templateName: template.name,
-    abilityId: template.abilityId,
-    abilityName: getAbilityById(template.abilityId)?.name || '',
-    roleId: template.roleId,
-    roleName: getRoleById(template.roleId)?.name || '',
+    templateId: template?.id,
+    templateName: template?.name,
+    abilityId: template?.abilityId,
+    abilityName: getAbilityById(template?.abilityId)?.name || '',
+    roleId: template?.roleId,
+    roleName: getRoleById(template?.roleId)?.name || '',
     mode,
-    kbIds: selectedKBs.map((kb) => kb.id),
-    kbNames: selectedKBs.map((kb) => kb.name),
+    kbIds: kbs.map((kb) => kb.id),
+    kbNames: kbs.map((kb) => kb.name),
     formData,
     result,
     createdAt: new Date().toISOString(),
