@@ -8,7 +8,7 @@ export class EditKBModal {
     this.currentStep = 1;
     this.formData = {
       name: kbData.name || '',
-      description: kbData.description || ''
+      description: kbData.description || '',
     };
     this.dataSources = kbData.dataSources ? [...kbData.dataSources] : [];
     this.init();
@@ -19,7 +19,8 @@ export class EditKBModal {
     this.modal.id = 'edit-kb-modal';
     this.modal.className = 'modal-overlay';
     this.modal.innerHTML = this.renderModal();
-    document.body.appendChild(this.modal);    setTimeout(() => this.modal.classList.add('active'), 10);
+    document.body.appendChild(this.modal);
+    setTimeout(() => this.modal.classList.add('active'), 10);
     this.bindEvents();
   }
 
@@ -48,17 +49,21 @@ export class EditKBModal {
   renderSteps() {
     const steps = [
       { number: '1', label: '基本信息' },
-      { number: '2', label: '数据源配置' }
+      { number: '2', label: '数据源配置' },
     ];
 
     return `
       <div class="kb-steps">
-        ${steps.map((step, index) => `
+        ${steps
+          .map(
+            (step, index) => `
           <div class="kb-step ${this.currentStep > index + 1 ? 'completed' : ''} ${this.currentStep === index + 1 ? 'active' : ''}">
             <div class="kb-step-number">${step.number}</div>
             <div class="kb-step-label">${step.label}</div>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
     `;
   }
@@ -100,8 +105,18 @@ export class EditKBModal {
   }
 
   renderStep2() {
-    const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
+    const typeLabels = {
+      document: '文档上传',
+      web: '网页爬取',
+      database: '数据库连接',
+      qa: '问答导入',
+    };
+    const typeIcons = {
+      document: 'file-lines',
+      web: 'globe',
+      database: 'database',
+      qa: 'message',
+    };
 
     return `
       <div class="kb-step2">
@@ -111,13 +126,19 @@ export class EditKBModal {
         </div>
 
         <div class="ds-list" id="edit-ds-list">
-          ${this.dataSources.length === 0 ? `
+          ${
+            this.dataSources.length === 0
+              ? `
             <div class="ds-empty">
               <i class="fa-solid fa-inbox empty-icon"></i>
               <p>暂无数据源</p>
               <p class="empty-hint">点击上方按钮添加数据源</p>
             </div>
-          ` : this.dataSources.map((ds, index) => this.renderDataSourceItem(ds, index)).join('')}
+          `
+              : this.dataSources
+                  .map((ds, index) => this.renderDataSourceItem(ds, index))
+                  .join('')
+          }
         </div>
 
         <div class="ds-modal" id="edit-ds-modal" style="display: none;">
@@ -128,8 +149,18 @@ export class EditKBModal {
   }
 
   renderDataSourceItem(ds, index) {
-    const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
+    const typeLabels = {
+      document: '文档上传',
+      web: '网页爬取',
+      database: '数据库连接',
+      qa: '问答导入',
+    };
+    const typeIcons = {
+      document: 'file-lines',
+      web: 'globe',
+      database: 'database',
+      qa: 'message',
+    };
 
     return `
       <div class="ds-item" data-index="${index}">
@@ -153,22 +184,32 @@ export class EditKBModal {
 
   renderConfigSummary(config) {
     const items = [];
-    if (config.priority !== undefined) items.push(`优先级: ${config.priority}级`);
-    if (config.supportedFormats) items.push(`支持格式: ${config.supportedFormats.join(', ')}`);
+    if (config.priority !== undefined)
+      items.push(`优先级: ${config.priority}级`);
+    if (config.supportedFormats)
+      items.push(`支持格式: ${config.supportedFormats.join(', ')}`);
     if (config.maxFileSize) items.push(`最大文件: ${config.maxFileSize}MB`);
-    if (config.matchThreshold !== undefined) items.push(`匹配阈值: ${config.matchThreshold}`);
+    if (config.matchThreshold !== undefined)
+      items.push(`匹配阈值: ${config.matchThreshold}`);
     if (config.maxQACount) items.push(`最大问答数: ${config.maxQACount}`);
-    
-    return items.length > 0 ? `
+
+    return items.length > 0
+      ? `
       <div class="config-summary">
-        ${items.slice(0, 3).map(item => `<span class="config-item">${item}</span>`).join('')}
+        ${items
+          .slice(0, 3)
+          .map((item) => `<span class="config-item">${item}</span>`)
+          .join('')}
         ${items.length > 3 ? `<span class="config-more">还有${items.length - 3}项配置...</span>` : ''}
       </div>
-    ` : '<span class="config-empty">配置已启用</span>';
+    `
+      : '<span class="config-empty">配置已启用</span>';
   }
 
   bindEvents() {
-    this.modal.querySelector('.modal-close').addEventListener('click', () => this.close());
+    this.modal
+      .querySelector('.modal-close')
+      .addEventListener('click', () => this.close());
     this.modal.addEventListener('click', (e) => {
       if (e.target === this.modal) {
         this.close();
@@ -240,25 +281,36 @@ export class EditKBModal {
   render() {
     const content = this.modal.querySelector('.kb-content');
     const footer = this.modal.querySelector('.modal-footer');
-    
+
     if (!content || !footer) return;
-    
-    content.innerHTML = this.currentStep === 1 ? this.renderStep1() : this.renderStep2();
+
+    content.innerHTML =
+      this.currentStep === 1 ? this.renderStep1() : this.renderStep2();
     footer.innerHTML = this.renderFooter();
 
     if (this.currentStep === 2) {
       this.bindStep2Events();
     }
-    
+
     this.bindFooterEvents();
   }
 
   showAddDataSourceModal() {
     const types = [
-      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: 'file-lines' },
+      {
+        type: 'document',
+        name: '文档上传',
+        desc: '上传PDF、Word等文档',
+        icon: 'file-lines',
+      },
       { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: 'globe' },
-      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: 'database' },
-      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' }
+      {
+        type: 'database',
+        name: '数据库连接',
+        desc: '连接数据库',
+        icon: 'database',
+      },
+      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' },
     ];
 
     const modal = document.createElement('div');
@@ -271,25 +323,30 @@ export class EditKBModal {
         </div>
         <div class="modal-body" style="padding: 20px;">
           <div class="ds-type-grid">
-            ${types.map(t => `
+            ${types
+              .map(
+                (t) => `
               <div class="ds-type-card" data-type="${t.type}">
                 <i class="fa-solid fa-${t.icon} ds-type-icon"></i>
                 <div class="ds-type-name">${t.name}</div>
                 <div class="ds-type-desc">${t.desc}</div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       </div>
     `;
-    
-    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
+
+    document.body.appendChild(modal);
+    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
     });
 
-    modal.querySelectorAll('.ds-type-card').forEach(card => {
+    modal.querySelectorAll('.ds-type-card').forEach((card) => {
       card.addEventListener('click', (e) => {
         const type = e.currentTarget.dataset.type;
         document.body.removeChild(modal);
@@ -316,8 +373,9 @@ export class EditKBModal {
         </div>
       </div>
     `;
-    
-    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
+
+    document.body.appendChild(modal);
+    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
@@ -341,19 +399,19 @@ export class EditKBModal {
   saveKB() {
     const nameInput = this.modal.querySelector('#edit-kb-name');
     const descInput = this.modal.querySelector('#edit-kb-desc');
-    
+
     const updatedKB = {
       ...this.kbData,
       name: nameInput?.value || this.formData.name,
       description: descInput?.value || this.formData.description,
       dataSources: this.dataSources,
-      lastUpdate: '刚刚'
+      lastUpdate: '刚刚',
     };
 
     const savedKBs = localStorage.getItem('knowledgeBases');
     if (savedKBs) {
       const kbs = JSON.parse(savedKBs);
-      const index = kbs.findIndex(kb => kb.id === this.kbData.id);
+      const index = kbs.findIndex((kb) => kb.id === this.kbData.id);
       if (index >= 0) {
         kbs[index] = updatedKB;
         localStorage.setItem('knowledgeBases', JSON.stringify(kbs));

@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案 C - AI 引导填字段</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0b; --bg-elevated: #131316; --surface: #1a1a1e; --surface-hover: #222227;
+      --text: #f5f5f7; --text-2: #a1a1aa; --text-3: #71717a; --text-4: #52525b;
+      --border: #27272a; --border-light: #1f1f23;
+      --accent: #59A674; --accent-bright: #6ec88a; --accent-soft: rgba(89,166,116,0.12); --accent-glow: rgba(89,166,116,0.25);
+      --kb-color: #3b82f6; --kb-soft: rgba(59,130,246,0.12);
+      --warn: #f59e0b; --warn-soft: rgba(245,158,11,0.12);
+    }
+    [data-theme="light"] {
+      --bg: #fafafa; --bg-elevated: #ffffff; --surface: #ffffff; --surface-hover: #f4f4f5;
+      --text: #18181b; --text-2: #52525b; --text-3: #a1a1aa; --text-4: #d4d4d8;
+      --border: #e4e4e7; --border-light: #f4f4f5;
+      --accent: #59A674; --accent-bright: #3d8b5a; --accent-soft: rgba(89,166,116,0.08); --accent-glow: rgba(89,166,116,0.15);
+      --kb-soft: rgba(59,130,246,0.08); --warn-soft: rgba(245,158,11,0.08);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    .ambient { position: fixed; top: -300px; left: 50%; transform: translateX(-50%); width: 1200px; height: 600px; background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 60%); pointer-events: none; z-index: 0; animation: breathe 8s ease-in-out infinite; }
+    @keyframes breathe { 0%,100%{opacity:.5;transform:translateX(-50%) scale(1);} 50%{opacity:.8;transform:translateX(-50%) scale(1.05);} }
+
+    .topbar { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid var(--border-light); }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
+    .brand-dot { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; box-shadow: 0 4px 12px var(--accent-glow); }
+    .top-actions { display: flex; gap: 8px; align-items: center; }
+    .top-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); padding: 8px 14px; border-radius: 10px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+    .top-btn:hover { color: var(--text); border-color: var(--accent); }
+    .top-btn .count { background: var(--accent-soft); color: var(--accent-bright); padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .theme-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+    .main-wrap { position: relative; z-index: 1; max-width: 920px; margin: 0 auto; padding: 48px 24px 200px; }
+    .welcome { text-align: center; margin-bottom: 40px; animation: fadeUp 0.6s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:translateY(0);} }
+    .welcome-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 100px; font-size: 12px; color: var(--accent-bright); margin-bottom: 20px; }
+    .welcome-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-bright); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+    .welcome-title { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .welcome-title .gradient { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .welcome-sub { color: var(--text-3); font-size: 14px; }
+
+    .section { margin-bottom: 32px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .section-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+    .tabs { display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
+    .tab { background: transparent; border: none; color: var(--text-3); padding: 6px 14px; border-radius: 7px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+    .tab.active { background: var(--bg-elevated); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .tab-count { font-size: 11px; color: var(--text-4); }
+    .tab.active .tab-count { color: var(--accent-bright); }
+
+    .template-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .template-card { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; overflow: hidden; transition: all 0.25s ease; animation: fadeUp 0.5s ease backwards; }
+    .template-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-bright)); transform: scaleX(0); transform-origin: left; transition: transform 0.3s ease; }
+    .template-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .template-card:hover::before { transform: scaleX(1); }
+    .template-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .template-card-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--text-3); display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.25s; }
+    .template-card:hover .template-card-icon { background: var(--accent); color: white; transform: scale(1.05); }
+    .template-card-tag { font-size: 10px; padding: 2px 8px; background: var(--surface-hover); color: var(--text-3); border-radius: 100px; }
+    .template-card-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .template-card-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+    .template-card-fields { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; gap: 4px; flex-wrap: wrap; }
+    .field-chip { font-size: 10px; padding: 2px 7px; background: var(--surface-hover); color: var(--text-3); border-radius: 4px; }
+    .field-chip.req { color: var(--accent-bright); background: var(--accent-soft); }
+
+    .messages { display: flex; flex-direction: column; gap: 20px; }
+    .message { display: flex; gap: 12px; animation: fadeUp 0.4s ease; }
+    .message-avatar { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .message.user .message-avatar { background: var(--surface-hover); color: var(--text-2); }
+    .message.ai .message-avatar { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%); color: white; box-shadow: 0 4px 12px var(--accent-glow); }
+    .message-content { flex: 1; min-width: 0; }
+    .message-name { font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
+    .message-bubble { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; font-size: 14px; line-height: 1.7; }
+    .message.user .message-bubble { background: var(--surface-hover); }
+    .context-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .context-tag { font-size: 11px; padding: 3px 9px; border-radius: 100px; display: inline-flex; align-items: center; gap: 4px; }
+    .context-tag.template { background: var(--accent-soft); color: var(--accent-bright); }
+    .context-tag.kb { background: var(--kb-soft); color: var(--kb-color); }
+
+    /* AI 引导问句 */
+    .ai-question { font-size: 14px; margin-bottom: 10px; }
+    .ai-question .field-label {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--accent-soft); color: var(--accent-bright);
+      padding: 2px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-right: 4px;
+    }
+    .ai-question .req-mark { color: var(--warn); font-size: 11px; margin-left: 6px; }
+
+    /* 字段进度条 */
+    .field-progress { margin-bottom: 12px; }
+    .field-progress-bar { display: flex; gap: 6px; }
+    .progress-dot {
+      flex: 1; height: 4px; background: var(--border); border-radius: 2px;
+      transition: all 0.3s;
+    }
+    .progress-dot.filled { background: var(--accent); }
+    .progress-dot.current { background: var(--accent-bright); animation: pulse 1.5s ease-in-out infinite; }
+    .field-progress-text { font-size: 11px; color: var(--text-3); margin-top: 6px; text-align: center; }
+
+    /* SELECT 选项按钮（AI 引导式） */
+    .option-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .option-btn {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
+      padding: 8px 14px; border-radius: 10px; cursor: pointer; font-size: 13px;
+      transition: all 0.2s;
+    }
+    .option-btn:hover { border-color: var(--accent); color: var(--accent-bright); transform: translateY(-1px); }
+    .option-btn.skip { color: var(--text-4); font-size: 12px; padding: 8px 12px; }
+
+    /* 已填字段汇总卡片 */
+    .filled-card {
+      margin-top: 10px; padding: 12px 14px;
+      background: var(--bg); border: 1px solid var(--border-light); border-radius: 10px;
+    }
+    .filled-card-title { font-size: 12px; color: var(--text-3); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .filled-row { display: flex; gap: 8px; padding: 4px 0; font-size: 13px; }
+    .filled-label { color: var(--text-3); min-width: 80px; }
+    .filled-value { color: var(--text); flex: 1; }
+    .filled-value.empty { color: var(--text-4); font-style: italic; }
+
+    /* 思考过程 */
+    .thinking-header { display: flex; align-items: center; gap: 8px; color: var(--accent-bright); font-size: 13px; margin-bottom: 12px; }
+    .thinking-header i { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .thinking-steps { display: flex; flex-direction: column; gap: 8px; }
+    .thinking-step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-3); padding: 6px 10px; background: var(--bg); border-radius: 8px; opacity: 0; transform: translateX(-8px); transition: all 0.3s; }
+    .thinking-step.show { opacity: 1; transform: translateX(0); }
+    .thinking-step.done { color: var(--text-2); }
+    .thinking-step .loader { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .thinking-step .check { color: var(--accent-bright); font-size: 12px; }
+
+    .result-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 8px; }
+    .result-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border-light); background: var(--surface); }
+    .result-icon { width: 28px; height: 28px; border-radius: 7px; background: var(--accent-soft); color: var(--accent-bright); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .result-title { font-weight: 600; font-size: 14px; flex: 1; }
+    .result-tag { font-size: 10px; padding: 2px 8px; background: var(--accent-soft); color: var(--accent-bright); border-radius: 100px; }
+    .result-body { padding: 16px; font-size: 13px; line-height: 1.8; }
+    .result-body h3 { font-size: 14px; margin: 12px 0 6px; color: var(--text); }
+    .result-body h3:first-child { margin-top: 0; }
+    .result-body ul { padding-left: 20px; }
+    .result-body li { margin: 3px 0; }
+    .result-body strong { color: var(--accent-bright); }
+    .cursor { display: inline-block; width: 7px; height: 15px; background: var(--accent); vertical-align: middle; animation: blink 0.8s steps(2) infinite; margin-left: 2px; }
+    @keyframes blink { to { opacity: 0; } }
+    .result-actions { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border-light); background: var(--surface); }
+    .result-btn { flex: 1; background: transparent; border: 1px solid var(--border); color: var(--text-2); padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; }
+    .result-btn:hover { border-color: var(--accent); color: var(--accent-bright); }
+    .result-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+
+    /* 底部输入区 */
+    .composer-wrap { position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 24px 24px; z-index: 5; }
+    .composer { max-width: 872px; margin: 0 auto; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); transition: all 0.25s; }
+    .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 30px rgba(0,0,0,0.2); }
+    .composer-hint { font-size: 11px; color: var(--text-4); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+    .composer-input { width: 100%; background: transparent; border: none; color: var(--text); font-size: 14px; font-family: inherit; resize: none; outline: none; line-height: 1.5; max-height: 140px; }
+    .composer-input::placeholder { color: var(--text-4); }
+    .composer-toolbar { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .composer-tools { display: flex; gap: 6px; }
+    .tool-btn { background: transparent; border: none; color: var(--text-3); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 13px; }
+    .tool-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .send-btn { background: var(--accent); color: white; border: none; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 13px; }
+    .send-btn:hover { background: var(--accent-bright); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 720px) {
+      .template-grid { grid-template-columns: repeat(2, 1fr); }
+      .welcome-title { font-size: 24px; }
+      .main-wrap { padding: 32px 16px 200px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient"></div>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-dot"><i class="fa-solid fa-sparkles"></i></div>
+      <span>AI 创作中心</span>
+    </div>
+    <div class="top-actions">
+      <button class="top-btn"><i class="fa-solid fa-folder-open"></i> 我的文档 <span class="count">156</span></button>
+      <button class="theme-toggle" id="theme-toggle"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </div>
+
+  <div class="main-wrap">
+    <div class="welcome" id="welcome">
+      <div class="welcome-badge">
+        <span class="dot"></span>
+        <span>AI 已就绪 · 对话式引导，逐个填入字段</span>
+      </div>
+      <h1 class="welcome-title">下午好，<span class="gradient">选模板，AI 引导你填字段</span></h1>
+      <p class="welcome-sub">点击模板后，AI 会逐个询问字段信息，自然对话完成创作</p>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title"><i class="fa-solid fa-layer-group"></i><span>从模板开始</span></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="scene"><i class="fa-solid fa-wand-magic-sparkles"></i> 场景<span class="tab-count">6</span></button>
+          <button class="tab" data-tab="content"><i class="fa-solid fa-file-lines"></i> 内容<span class="tab-count">8</span></button>
+        </div>
+      </div>
+      <div class="template-grid" id="template-grid"></div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+  </div>
+
+  <div class="composer-wrap">
+    <div class="composer">
+      <div class="composer-hint" id="composer-hint"><i class="fa-solid fa-circle-info"></i> <span>选择上方模板开始，AI 将引导你填写</span></div>
+      <textarea class="composer-input" id="input" placeholder="回答 AI 的问题，或直接描述需求..." rows="1"></textarea>
+      <div class="composer-toolbar">
+        <div class="composer-tools">
+          <button class="tool-btn"><i class="fa-solid fa-paperclip"></i></button>
+          <button class="tool-btn"><i class="fa-regular fa-image"></i></button>
+        </div>
+        <button class="send-btn" id="send" disabled><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const templates = [
+      { id:'sales_weekly', name:'销售周报生成', icon:'chart-line', tag:'文档', type:'scene', desc:'自动结构化，含趋势分析', kb:['产品知识库','销售知识库'],
+        fields:[
+          {id:'week_range',label:'周报周期',type:'text',question:'这周报覆盖的时间范围是？',placeholder:'例如：2026-07-21 至 2026-07-27',required:true},
+          {id:'highlight',label:'本周重点',type:'textarea',question:'本周有哪些想突出的业绩亮点或重点事件？',placeholder:'描述本周重点...',required:true},
+          {id:'focus_area',label:'关注区域',type:'select',question:'本周重点关注哪个区域？',options:['全国','华东','华南','华北','西部'],required:false},
+        ],
+        example:{week_range:'2026-07-21 至 2026-07-27',highlight:'Q3 业绩增长 23%，华南区新签 48 家客户',focus_area:'华南'} },
+      { id:'sales_proposal', name:'客户方案生成', icon:'file-contract', tag:'文档', type:'scene', desc:'基于知识库生成定制化方案', kb:['产品知识库','销售知识库'],
+        fields:[
+          {id:'customer_name',label:'客户名称',type:'text',question:'客户叫什么名字？',placeholder:'例如：某某制造有限公司',required:true},
+          {id:'industry',label:'所属行业',type:'select',question:'客户属于哪个行业？',options:['制造业','互联网','金融','教育','医疗','零售','其他'],required:false},
+          {id:'customer_needs',label:'客户需求',type:'textarea',question:'客户的核心需求、痛点或目标场景是什么？',placeholder:'描述客户需求...',required:true},
+          {id:'budget',label:'预算范围',type:'text',question:'客户的预算范围大概是多少？（可选）',placeholder:'例如：10-50万',required:false},
+        ],
+        example:{customer_name:'华东智能制造有限公司',industry:'制造业',customer_needs:'搭建企业知识库，统一管理产品文档和客服话术',budget:'20-30万'} },
+      { id:'competitor_compare', name:'竞品对比分析', icon:'scale-balanced', tag:'表格', type:'scene', desc:'多维度表格，自动梳理', kb:['产品知识库'],
+        fields:[
+          {id:'competitor_name',label:'竞品名称',type:'text',question:'要对比的竞品叫什么？',placeholder:'例如：某知名知识库',required:true},
+          {id:'compare_dimensions',label:'对比维度',type:'textarea',question:'想从哪些维度对比？（可选）',placeholder:'例如：数据接入、智能问答、部署方式',required:false},
+        ],
+        example:{competitor_name:'某知名知识管理软件',compare_dimensions:'数据接入、智能问答、部署方式、价格、扩展能力'} },
+      { id:'sales_ppt', name:'客户汇报 PPT', icon:'file-powerpoint', tag:'PPT', type:'scene', desc:'8 页标准结构，一键生成', kb:['产品知识库','销售知识库'],
+        fields:[
+          {id:'topic',label:'汇报主题',type:'text',question:'这次汇报的主题是什么？',placeholder:'例如：DmtPlat 企业知识库解决方案',required:true},
+          {id:'audience',label:'汇报对象',type:'text',question:'汇报对象是谁？（可选）',placeholder:'例如：客户 IT 负责人',required:false},
+          {id:'coreMessage',label:'核心信息',type:'textarea',question:'最想传递的核心信息是什么？（可选）',placeholder:'一句话总结...',required:false},
+        ],
+        example:{topic:'DmtPlat 企业知识库解决方案',audience:'客户IT负责人、业务部门负责人',coreMessage:'让企业知识真正被一线员工用起来'} },
+      { id:'cs_reply', name:'客服标准回复', icon:'headset', tag:'文档', type:'scene', desc:'专业有温度，覆盖全场景', kb:['客服知识库'],
+        fields:[
+          {id:'customer_question',label:'客户问题',type:'textarea',question:'客户咨询的具体问题是什么？',placeholder:'客户的问题...',required:true},
+          {id:'customer_emotion',label:'客户情绪',type:'select',question:'客户的情绪状态是？',options:['平和','着急','不满','满意','质疑'],required:false},
+          {id:'reply_style',label:'回复风格',type:'select',question:'希望用什么风格回复？',options:['标准正式','温和安抚','简洁直接','详细说明'],required:false},
+        ],
+        example:{customer_question:'产品支持哪些文件格式上传？有很多 PDF 和 Word 文档。',customer_emotion:'平和',reply_style:'标准正式'} },
+      { id:'biz_email', name:'商务邮件撰写', icon:'envelope', tag:'邮件', type:'scene', desc:'跟进、邀约、感谢多场景', kb:[],
+        fields:[
+          {id:'email_type',label:'邮件类型',type:'select',question:'要写哪种类型的邮件？',options:['跟进邮件','邀约邮件','感谢邮件','报价邮件','催办邮件'],required:true},
+          {id:'recipient',label:'收件人',type:'text',question:'收件人是谁？',placeholder:'例如：张总，某某公司采购部',required:true},
+          {id:'key_points',label:'核心要点',type:'textarea',question:'邮件要传达的核心信息是什么？',placeholder:'核心要点...',required:true},
+        ],
+        example:{email_type:'跟进邮件',recipient:'张总，华东智能制造',key_points:'约下周三见面演示产品，确认需求细节'} },
+    ];
+
+    const grid = document.getElementById('template-grid');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+    const composerHint = document.getElementById('composer-hint');
+    const messagesEl = document.getElementById('messages');
+
+    let currentTpl = null;
+    let fieldIdx = 0;
+    let fieldData = {};
+    let selectedKb = 'none';
+    let kbAsked = false;
+    let awaitingField = false;
+
+    function renderTemplates(type) {
+      grid.innerHTML = templates.filter(t => t.type === type).map((t, i) => `
+        <div class="template-card" data-id="${t.id}" style="animation-delay:${0.3 + i * 0.05}s">
+          <div class="template-card-top">
+            <div class="template-card-icon"><i class="fa-solid fa-${t.icon}"></i></div>
+            <span class="template-card-tag">${t.tag}</span>
+          </div>
+          <div class="template-card-name">${t.name}</div>
+          <div class="template-card-desc">${t.desc}</div>
+          <div class="template-card-fields">
+            ${t.fields.map(f => `<span class="field-chip ${f.required?'req':''}">${f.label}${f.required?' *':''}</span>`).join('')}
+          </div>
+        </div>
+      `).join('');
+      document.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const tpl = templates.find(t => t.id === card.dataset.id);
+          if (tpl) startGuidedFlow(tpl);
+        });
+      });
+    }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTemplates(tab.dataset.tab);
+      });
+    });
+    renderTemplates('scene');
+
+    function startGuidedFlow(tpl) {
+      currentTpl = tpl;
+      fieldIdx = 0;
+      fieldData = {};
+      selectedKb = 'none';
+      kbAsked = false;
+      document.getElementById('welcome').style.display = 'none';
+
+      // 上下文标签
+      let contextHtml = `<div class="context-tags"><span class="context-tag template"><i class="fa-solid fa-wand-magic-sparkles"></i> 模板：${tpl.name}</span></div>`;
+      addMessage('user', '你', `${contextHtml}<div>使用「${tpl.name}」模板创作</div>`);
+
+      // AI 开始引导
+      setTimeout(() => askNextField(), 400);
+    }
+
+    function askNextField() {
+      if (fieldIdx >= currentTpl.fields.length) {
+        // 所有字段问完，询问知识库（如果有推荐）
+        if (!kbAsked && currentTpl.kb.length > 0) {
+          kbAsked = true;
+          askKb();
+          return;
+        }
+        // 完成，开始生成
+        finalizeAndGenerate();
+        return;
+      }
+
+      const f = currentTpl.fields[fieldIdx];
+      awaitingField = true;
+
+      const progressDots = currentTpl.fields.map((_, i) => {
+        if (i < fieldIdx) return '<div class="progress-dot filled"></div>';
+        if (i === fieldIdx) return '<div class="progress-dot current"></div>';
+        return '<div class="progress-dot"></div>';
+      }).join('');
+
+      const reqMark = f.required ? '<span class="req-mark">*必填</span>' : '<span class="req-mark" style="color:var(--text-4);">可选</span>';
+      let optionsHtml = '';
+      if (f.type === 'select') {
+        optionsHtml = `<div class="option-grid">
+          ${f.options.map(o => `<button class="option-btn" data-val="${o}">${o}</button>`).join('')}
+          ${!f.required ? `<button class="option-btn skip" data-val="">跳过</button>` : ''}
+        </div>`;
+      }
+
+      const aiMsg = addMessage('ai', 'AI 创作中心', `
+        <div class="field-progress">
+          <div class="field-progress-bar">${progressDots}</div>
+          <div class="field-progress-text">${fieldIdx + 1} / ${currentTpl.fields.length} · ${f.required ? '必填' : '可选'}</div>
+        </div>
+        <div class="ai-question">
+          <span class="field-label"><i class="fa-solid fa-tag"></i> ${f.label}</span>
+          ${reqMark}
+        </div>
+        <div style="color:var(--text-2);margin-top:6px;">${f.question}</div>
+        ${optionsHtml}
+      `);
+
+      // SELECT 选项按钮
+      if (f.type === 'select') {
+        aiMsg.querySelectorAll('.option-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const val = btn.dataset.val;
+            handleFieldAnswer(val || '(未选择)');
+          });
+        });
+        composerHint.innerHTML = `<i class="fa-solid fa-hand-pointer"></i> <span>点击上方选项，或在输入框输入自定义值</span>`;
+        input.placeholder = '或输入自定义值后回车...';
+      } else {
+        composerHint.innerHTML = `<i class="fa-solid fa-keyboard"></i> <span>正在填写「${f.label}」字段，输入后回车确认</span>`;
+        input.placeholder = f.placeholder || '输入回答...';
+      }
+      input.focus();
+    }
+
+    function handleFieldAnswer(val) {
+      if (!awaitingField) return;
+      const f = currentTpl.fields[fieldIdx];
+      fieldData[f.id] = val;
+      awaitingField = false;
+
+      // 显示用户回答
+      addMessage('user', '你', `<div>${escapeHtml(val)}</div>`);
+
+      // 更新输入区
+      input.value = '';
+      input.style.height = 'auto';
+      send.disabled = true;
+
+      fieldIdx++;
+      setTimeout(() => askNextField(), 400);
+    }
+
+    function askKb() {
+      const aiMsg = addMessage('ai', 'AI 创作中心', `
+        <div style="color:var(--text-2);margin-bottom:10px;">是否关联知识库以提升内容质量？</div>
+        <div class="option-grid">
+          <button class="option-btn skip" data-kb="none"><i class="fa-solid fa-circle-xmark"></i> 不关联</button>
+          ${currentTpl.kb.map(k => `<button class="option-btn" data-kb="${k}"><i class="fa-solid fa-book"></i> ${k}</button>`).join('')}
+        </div>
+      `);
+      aiMsg.querySelectorAll('.option-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedKb = btn.dataset.kb;
+          addMessage('user', '你', `<div>${selectedKb === 'none' ? '不关联知识库' : selectedKb}</div>`);
+          setTimeout(() => finalizeAndGenerate(), 400);
+        });
+      });
+      composerHint.innerHTML = `<i class="fa-solid fa-book"></i> <span>选择是否关联知识库</span>`;
+    }
+
+    function finalizeAndGenerate() {
+      // 汇总已填字段
+      const filledRows = currentTpl.fields.map(f => `
+        <div class="filled-row">
+          <span class="filled-label">${f.label}</span>
+          <span class="filled-value ${!fieldData[f.id] ? 'empty' : ''}">${fieldData[f.id] || '未填'}</span>
+        </div>
+      `).join('');
+
+      const aiMsg = addMessage('ai', 'AI 创作中心', `
+        <div style="margin-bottom:10px;">好的，已收集完所有信息，开始为你生成：</div>
+        <div class="filled-card">
+          <div class="filled-card-title"><i class="fa-solid fa-clipboard-check"></i> 字段汇总</div>
+          ${filledRows}
+        </div>
+      `);
+
+      composerHint.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>选择上方模板开始，AI 将引导你填写</span>`;
+      input.placeholder = '回答 AI 的问题，或直接描述需求...';
+
+      setTimeout(() => simulateAI(currentTpl, fieldData, selectedKb), 800);
+    }
+
+    function addMessage(role, name, content) {
+      const msg = document.createElement('div');
+      msg.className = `message ${role}`;
+      const avatarIcon = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-sparkles"></i>';
+      msg.innerHTML = `<div class="message-avatar">${avatarIcon}</div><div class="message-content"><div class="message-name">${name}</div><div class="message-bubble">${content}</div></div>`;
+      messagesEl.appendChild(msg);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      return msg;
+    }
+
+    function simulateAI(tpl, data, kb) {
+      const aiMsg = addMessage('ai', 'AI 创作中心', '');
+      const content = aiMsg.querySelector('.message-bubble');
+      const steps = kb !== 'none'
+        ? [`匹配模板：${tpl.name}`, `检索知识库：${kb}`, '提取相关资料', '基于字段信息生成内容']
+        : [`匹配模板：${tpl.name}`, '解析字段信息', '规划内容结构', '生成结构化内容'];
+      content.innerHTML = `<div class="thinking"><div class="thinking-header"><i class="fa-solid fa-circle-notch"></i><span>正在创作...</span></div><div class="thinking-steps"></div></div>`;
+      const stepsEl = content.querySelector('.thinking-steps');
+      let idx = 0;
+      const showStep = () => {
+        if (idx >= steps.length) { setTimeout(() => streamResult(content, tpl, data, kb), 400); return; }
+        const step = document.createElement('div');
+        step.className = 'thinking-step';
+        step.innerHTML = `<span class="loader"></span><span>${steps[idx]}</span>`;
+        stepsEl.appendChild(step);
+        requestAnimationFrame(() => step.classList.add('show'));
+        setTimeout(() => { step.classList.add('done'); step.querySelector('.loader').outerHTML = '<i class="fa-solid fa-check check"></i>'; idx++; setTimeout(showStep, 550); }, 600);
+      };
+      showStep();
+    }
+
+    function streamResult(content, tpl, data, kb) {
+      const kbNote = kb !== 'none' ? `<p style="font-size:12px;color:var(--text-3);margin-bottom:10px;padding:8px 10px;background:var(--kb-soft);border-radius:8px;"><i class="fa-solid fa-book" style="color:var(--kb-color);"></i> 已参考《${kb}》中的相关资料</p>` : '';
+      const fullText = `${kbNote}<h3>📊 本周业绩摘要</h3><ul><li>${data.highlight||'Q3 销售额达成 ¥1,280 万'}，环比增长 <strong>23%</strong></li><li>新签客户 <strong>48 家</strong>，复购率提升至 <strong>62%</strong></li><li>${data.focus_area||'华南'}区表现突出，贡献 35% 业绩</li></ul><h3>📈 关键数据</h3><ul><li>成交订单：186 单（+28%）</li><li>客单价：¥6.88 万（+8%）</li></ul><h3>🎯 下周计划</h3><ul><li>重点跟进 12 个高意向客户</li><li>启动 Q4 大客户拓展计划</li></ul>`;
+      content.innerHTML = `<div style="margin-bottom:10px;">已基于 <strong>${tpl.name}</strong> 模板字段${kb!=='none'?`并参考 <strong>${kb}</strong>`:''}生成：</div><div class="result-card"><div class="result-header"><div class="result-icon"><i class="fa-solid fa-${tpl.icon}"></i></div><div class="result-title">${tpl.name}</div><span class="result-tag">${tpl.tag}</span></div><div class="result-body" id="result-body"></div><div class="result-actions"><button class="result-btn primary"><i class="fa-solid fa-pen"></i> 编辑</button><button class="result-btn"><i class="fa-solid fa-rotate"></i> 重新生成</button><button class="result-btn"><i class="fa-solid fa-book"></i> 保存</button><button class="result-btn"><i class="fa-solid fa-download"></i> 导出</button></div></div>`;
+      const body = content.querySelector('#result-body');
+      let i = 0;
+      const cursor = '<span class="cursor"></span>';
+      const stream = () => { if (i >= fullText.length) { body.innerHTML = fullText; return; } i += 3; body.innerHTML = fullText.slice(0, i) + cursor; window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); setTimeout(stream, 18); };
+      stream();
+    }
+
+    // 输入处理
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+      send.disabled = !input.value.trim();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    });
+    send.addEventListener('click', handleSend);
+
+    function handleSend() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (awaitingField) {
+        handleFieldAnswer(text);
+        return;
+      }
+
+      // 普通对话
+      document.getElementById('welcome').style.display = 'none';
+      addMessage('user', '你', `<div>${escapeHtml(text)}</div>`);
+      input.value = '';
+      input.style.height = 'auto';
+      send.disabled = true;
+      setTimeout(() => {
+        const aiMsg = addMessage('ai', 'AI 创作中心', '');
+        aiMsg.querySelector('.message-bubble').innerHTML = `<div style="color:var(--text-3);font-size:13px;">我检测到你的需求。建议从上方选择匹配的模板，AI 会逐个引导你填入字段信息，获得更精准的结果。</div>`;
+      }, 400);
+    }
+
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    const themeToggle = document.getElementById('theme-toggle');
+    themeToggle.addEventListener('click', () => {
+      const isLight = document.documentElement.dataset.theme === 'light';
+      document.documentElement.dataset.theme = isLight ? 'dark' : 'light';
+      themeToggle.innerHTML = isLight ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+    });
+  </script>
+</body>
+</html>

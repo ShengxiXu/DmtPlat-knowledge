@@ -35,7 +35,13 @@ export function parseXLSX(fileBuffer) {
 
 function buildXLSXSuggestedFields(sheets) {
   const fields = [
-    { id: 'sheet_name', label: '表格名称', type: 'text', required: false, placeholder: '例如：Q3 销售数据' },
+    {
+      id: 'sheet_name',
+      label: '表格名称',
+      type: 'text',
+      required: false,
+      placeholder: '例如：Q3 销售数据',
+    },
   ];
 
   const firstSheet = sheets[0];

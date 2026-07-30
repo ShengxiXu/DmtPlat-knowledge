@@ -3,7 +3,8 @@ export let knowledgeBases = [
     id: 'kb_202405001',
     name: '产品文档中心',
     type: '文档',
-    description: '存储所有产品相关的技术文档、用户手册和API文档，支持全文检索和智能问答。',
+    description:
+      '存储所有产品相关的技术文档、用户手册和API文档，支持全文检索和智能问答。',
     documentCount: 128,
     lastUpdate: '2小时前',
     views: '1.2k',
@@ -15,7 +16,8 @@ export let knowledgeBases = [
     id: 'kb_202405002',
     name: '客服知识库',
     type: '问答',
-    description: '收集整理常见客户问题及标准答案，用于智能客服机器人训练和问答匹配。',
+    description:
+      '收集整理常见客户问题及标准答案，用于智能客服机器人训练和问答匹配。',
     documentCount: 256,
     lastUpdate: '1天前',
     views: '3.5k',
@@ -168,7 +170,8 @@ export const evaluationRecords = [
     time: '5小时前',
     reasons: ['incomplete', 'confusing'],
     feedback: '回答太简略了，找不到导出按钮的具体位置',
-    suggestion: '应该在知识库列表页面，每个知识库卡片上有导出按钮，或者在知识库详情页面的右上角有导出选项',
+    suggestion:
+      '应该在知识库列表页面，每个知识库卡片上有导出按钮，或者在知识库详情页面的右上角有导出选项',
     status: 'pending',
   },
   {
@@ -179,7 +182,8 @@ export const evaluationRecords = [
     time: '昨天',
     reasons: ['wrong', 'incomplete'],
     feedback: '回答完全错误，根本找不到所谓的权限设置入口',
-    suggestion: '正确的路径应该是：系统设置 -> 用户管理 -> 选择用户 -> 设置权限',
+    suggestion:
+      '正确的路径应该是：系统设置 -> 用户管理 -> 选择用户 -> 设置权限',
     status: 'pending',
   },
   {
@@ -215,7 +219,8 @@ export const chatMessages = [
   {
     id: 'msg_001',
     role: 'bot',
-    content: '您好！我是产品文档助手，基于知识库「产品文档中心」训练而成。请问有什么可以帮助您的？',
+    content:
+      '您好！我是产品文档助手，基于知识库「产品文档中心」训练而成。请问有什么可以帮助您的？',
     time: '10:00',
   },
   {
@@ -227,7 +232,8 @@ export const chatMessages = [
   {
     id: 'msg_003',
     role: 'bot',
-    content: '根据文档《API接口文档v2.0.pdf》，用户认证接口的调用方式如下：\n\n1. 请求地址：POST /api/v2/auth/login\n2. 请求参数：{username, password, captcha}\n3. 返回结果：{token, expires_in, user_info}\n\n详细示例代码请参考文档第 3.2 节。',
+    content:
+      '根据文档《API接口文档v2.0.pdf》，用户认证接口的调用方式如下：\n\n1. 请求地址：POST /api/v2/auth/login\n2. 请求参数：{username, password, captcha}\n3. 返回结果：{token, expires_in, user_info}\n\n详细示例代码请参考文档第 3.2 节。',
     time: '10:01',
   },
 ];

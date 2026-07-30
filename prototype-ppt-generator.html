@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能工作助手 - PPT 生成 | 嵌入式交互原型</title>
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --primary-light: #d1fae5;
+      --primary-50: #ecfdf5;
+      --gray-900: #111827;
+      --gray-800: #1f2937;
+      --gray-700: #374151;
+      --gray-600: #4b5563;
+      --gray-500: #6b7280;
+      --gray-400: #9ca3af;
+      --gray-300: #d1d5db;
+      --gray-200: #e5e7eb;
+      --gray-100: #f3f4f6;
+      --gray-50: #f9fafb;
+      --white: #ffffff;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      background: #f8fafc;
+      color: var(--gray-800);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 外层布局：左侧边栏 + 右侧主内容 */
+    .app-shell {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* 左侧边栏 */
+    .app-sidebar {
+      width: 220px;
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-nav {
+      padding: 16px 12px;
+      flex: 1;
+    }
+
+    .nav-section-title {
+      font-size: 11px;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 16px 8px 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      color: var(--gray-600);
+      font-size: 14px;
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+
+    .nav-item:hover { background: var(--gray-50); }
+    .nav-item.active {
+      background: var(--primary-50);
+      color: var(--primary-dark);
+      font-weight: 500;
+    }
+
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    /* 右侧主内容 */
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* 顶栏 */
+    .app-header {
+      height: 60px;
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .brand-title { font-size: 15px; font-weight: 600; }
+
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: var(--gray-50);
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--gray-300);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    /* 工作台编辑器 */
+    .wa-editor {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: #f8fafc;
+    }
+
+    .wa-editor-header {
+      height: 64px;
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+
+    .wa-editor-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .wa-editor-back {
+      padding: 8px 14px;
+      border: 1px solid var(--gray-200);
+      background: var(--white);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .wa-editor-title-group { display: flex; flex-direction: column; gap: 4px; }
+    .wa-editor-title { font-size: 17px; font-weight: 600; }
+    .wa-editor-subtitle { display: flex; gap: 8px; align-items: center; }
+
+    .wa-tag {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      background: var(--primary-50);
+      color: var(--primary-dark);
+    }
+
+    .wa-switch {
+      font-size: 12px;
+      color: var(--gray-500);
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    .wa-editor-actions { display: flex; gap: 10px; }
+
+    .btn {
+      padding: 9px 16px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-ghost {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      color: var(--gray-700);
+    }
+
+    .btn-secondary {
+      background: var(--gray-100);
+      color: var(--gray-700);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+    /* 三栏主体 */
+    .wa-editor-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .wa-editor-left {
+      width: 360px;
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      overflow-y: auto;
+      padding: 20px;
+      flex-shrink: 0;
+    }
+
+    .wa-editor-main {
+      flex: 1;
+      background: #f8fafc;
+      overflow-y: auto;
+      padding: 24px;
+      min-width: 0;
+    }
+
+    .wa-editor-right {
+      width: 280px;
+      background: var(--white);
+      border-left: 1px solid var(--gray-200);
+      overflow-y: auto;
+      padding: 20px;
+      flex-shrink: 0;
+    }
+
+    /* 步骤条 */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--gray-400);
+    }
+
+    .step.active { color: var(--gray-900); font-weight: 500; }
+    .step.completed { color: var(--primary-dark); }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      background: var(--gray-100);
+      color: var(--gray-500);
+    }
+
+    .step.active .step-num { background: var(--primary); color: white; }
+    .step.completed .step-num { background: var(--primary-50); color: var(--primary-dark); }
+
+    .step-divider {
+      flex: 1;
+      height: 1px;
+      background: var(--gray-200);
+      max-width: 30px;
+    }
+
+    /* 面板 */
+    .panel {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-item { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      color: var(--gray-700);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .form-input, .form-textarea, .form-select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-50);
+    }
+
+    .required { color: #ef4444; margin-left: 2px; }
+
+    .option-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .option-card {
+      padding: 10px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-size: 13px;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .option-card:hover { border-color: var(--primary); }
+    .option-card.selected {
+      border-color: var(--primary);
+      background: var(--primary-50);
+      color: var(--primary-dark);
+      font-weight: 500;
+    }
+
+    .color-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+      border: 1px solid var(--gray-200);
+    }
+
+    .upload-zone {
+      border: 1px dashed var(--gray-300);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      text-align: center;
+      color: var(--gray-500);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .upload-zone:hover { border-color: var(--primary); background: var(--primary-50); }
+
+    .attachment-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--primary-50);
+      border: 1px solid var(--primary-light);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .collapse-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .collapse-body {
+      margin-top: 12px;
+      display: none;
+    }
+
+    .collapse-body.open { display: block; }
+
+    .step-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--gray-100);
+    }
+
+    /* 中间预览区 */
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .preview-title { font-size: 15px; font-weight: 600; }
+
+    .preview-subtitle { font-size: 12px; color: var(--gray-500); }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .slide-thumb {
+      aspect-ratio: 16/9;
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .slide-thumb-content {
+      height: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .slide-thumb-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .slide-thumb-subtitle {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .slide-thumb-bullet {
+      font-size: 10px;
+      margin-top: 6px;
+      opacity: 0.9;
+    }
+
+    .slide-label {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      font-size: 10px;
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.15);
+      color: white;
+      border-radius: 4px;
+    }
+
+    /* 主题变化 */
+    .theme-business { font-family: "Times New Roman", serif; }
+    .theme-business .slide-thumb-content { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; }
+
+    .theme-tech { font-family: system-ui, sans-serif; }
+    .theme-tech .slide-thumb-content { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; }
+    .theme-tech .slide-thumb-title { letter-spacing: 1px; text-transform: uppercase; }
+
+    .theme-minimal { font-family: -apple-system, sans-serif; }
+    .theme-minimal .slide-thumb-content { background: #ffffff; color: #1f2937; border: 2px solid #e5e7eb; }
+
+    .theme-lively { font-family: "PingFang SC", sans-serif; }
+    .theme-lively .slide-thumb-content { background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: white; border-radius: 16px; margin: 8px; }
+
+    .theme-academic { font-family: Georgia, serif; }
+    .theme-academic .slide-thumb-content { background: #fafaf9; color: #44403c; border-top: 4px solid #78716c; }
+
+    .theme-dark { font-family: system-ui, sans-serif; }
+    .theme-dark .slide-thumb-content { background: linear-gradient(135deg, #18181b 0%, #27272a 100%); color: #e4e4e7; border: 1px solid #3f3f46; }
+
+    /* 右侧大纲 */
+    .outline-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .outline-item {
+      padding: 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      background: var(--white);
+    }
+
+    .outline-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .outline-item-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .outline-item-page {
+      font-size: 11px;
+      color: var(--gray-400);
+    }
+
+    .outline-item-points {
+      font-size: 12px;
+      color: var(--gray-600);
+      padding-left: 12px;
+    }
+
+    .outline-item-points li { margin-bottom: 3px; }
+
+    .placeholder-empty {
+      text-align: center;
+      color: var(--gray-400);
+      padding: 60px 20px;
+    }
+
+    .placeholder-empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    /* 底部固定操作 */
+    .preview-actions {
+      position: sticky;
+      bottom: 0;
+      background: var(--white);
+      border-top: 1px solid var(--gray-200);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 24px -24px -24px;
+    }
+
+    .hidden { display: none !important; }
+
+    /* 响应式 */
+    @media (max-width: 1200px) {
+      .wa-editor-right { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 左侧边栏 -->
+    <aside class="app-sidebar">
+      <div class="sidebar-nav">
+        <div class="nav-section-title">知识库</div>
+        <div class="nav-item"><span class="nav-icon">📚</span> 知识库列表</div>
+        <div class="nav-item"><span class="nav-icon">💬</span> 用户聊天</div>
+
+        <div class="nav-section-title">智能工作</div>
+        <div class="nav-item active"><span class="nav-icon">✨</span> 智能工作助手</div>
+
+        <div class="nav-section-title">系统</div>
+        <div class="nav-item"><span class="nav-icon">⚙️</span> 设置</div>
+        <div class="nav-item"><span class="nav-icon">🎨</span> 主题</div>
+      </div>
+    </aside>
+
+    <!-- 右侧主内容 -->
+    <div class="app-main">
+      <!-- 顶栏 -->
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-logo">S</div>
+          <div class="brand-title">SSO Hub</div>
+        </div>
+        <div class="header-actions">
+          <span>🔔</span>
+          <span>⚙️</span>
+          <div class="user-pill">
+            <div class="avatar">👤</div>
+            <span>用户</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- 工作台编辑器 -->
+      <div class="wa-editor">
+        <!-- 编辑器顶栏 -->
+        <header class="wa-editor-header">
+          <div class="wa-editor-header-left">
+            <button class="wa-editor-back">← 返回</button>
+            <div class="wa-editor-title-group">
+              <div class="wa-editor-title">客户汇报PPT</div>
+              <div class="wa-editor-subtitle">
+                <span class="wa-tag">销售</span>
+                <span class="wa-tag">📊 PPT生成</span>
+                <button class="wa-switch">切换能力</button>
+              </div>
+            </div>
+          </div>
+          <div class="wa-editor-actions">
+            <button class="btn btn-ghost">✨ 体验示例</button>
+            <button class="btn btn-primary" id="primary-action">▶ 开始生成</button>
+          </div>
+        </header>
+
+        <!-- 三栏主体 -->
+        <div class="wa-editor-body">
+          <!-- 左侧：配置表单 -->
+          <aside class="wa-editor-left">
+            <!-- 步骤条 -->
+            <div class="stepper">
+              <div class="step active" data-step="1">
+                <div class="step-num">1</div>
+                <span>主题内容</span>
+              </div>
+              <div class="step-divider"></div>
+              <div class="step" data-step="2">
+                <div class="step-num">2</div>
+                <span>视觉结构</span>
+              </div>
+              <div class="step-divider"></div>
+              <div class="step" data-step="3">
+                <div class="step-num">3</div>
+                <span>大纲确认</span>
+              </div>
+            </div>
+
+            <!-- Step 1: 主题与内容 -->
+            <div id="step-1" class="step-panel">
+              <div class="panel">
+                <div class="panel-title">生成模式</div>
+                <div class="option-card selected" style="text-align:left; display:flex; gap:10px; align-items:center;">
+                  <span>✨</span>
+                  <div>
+                    <div style="font-weight:500;">自由生成</div>
+                    <div style="font-size:12px; color:var(--gray-500);">调用大模型能力，适合创意与发散</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-title">参考附件 <span style="font-size:12px;color:var(--gray-400);font-weight:normal;">1 个已传</span></div>
+                <div class="attachment-tag">
+                  <span>📄</span>
+                  <span style="flex:1;">产品介绍-2026.md</span>
+                  <span style="cursor:pointer;">✕</span>
+                </div>
+                <div class="upload-zone">+ 上传附件</div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-title">输入信息</div>
+                <div class="form-item">
+                  <label class="form-label">汇报主题 <span class="required">*</span></label>
+                  <input class="form-input" value="DmtPlat 企业知识库解决方案" placeholder="例如：DmtPlat 企业知识库解决方案">
+                </div>
+                <div class="form-item">
+                  <label class="form-label">汇报对象</label>
+                  <input class="form-input" value="客户 IT 负责人、业务负责人" placeholder="例如：客户 IT 负责人、业务负责人">
+                </div>
+                <div class="form-item">
+                  <label class="form-label">核心信息</label>
+                  <textarea class="form-textarea" rows="2" placeholder="一句话总结本次汇报最想传递的信息">DmtPlat 能让企业知识真正被一线员工用起来。</textarea>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">必须包含的要点</label>
+                  <textarea class="form-textarea" rows="3" placeholder="例如：产品优势、客户案例、实施路径、报价">产品优势、核心能力、应用场景、实施路径、客户价值</textarea>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <span></span>
+                <button class="btn btn-primary" onclick="goToStep(2)">下一步 →</button>
+              </div>
+            </div>
+
+            <!-- Step 2: 视觉与结构 -->
+            <div id="step-2" class="step-panel hidden">
+              <div class="panel">
+                <div class="panel-title">视觉表现</div>
+                <div class="form-item">
+                  <label class="form-label">视觉主题</label>
+                  <div class="option-group" id="theme-options">
+                    <div class="option-card selected" data-theme="business">商务正式</div>
+                    <div class="option-card" data-theme="tech">科技现代</div>
+                    <div class="option-card" data-theme="minimal">简约清新</div>
+                    <div class="option-card" data-theme="lively">活泼生动</div>
+                    <div class="option-card" data-theme="academic">学术严谨</div>
+                    <div class="option-card" data-theme="dark">高端深色</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">配色方案</label>
+                  <div class="option-group" id="color-options">
+                    <div class="option-card selected" data-color="green"><span class="color-dot" style="background:#10b981;"></span>品牌绿</div>
+                    <div class="option-card" data-color="blue"><span class="color-dot" style="background:#2563eb;"></span>商务蓝</div>
+                    <div class="option-card" data-color="black"><span class="color-dot" style="background:#111827;"></span>科技黑</div>
+                    <div class="option-card" data-color="orange"><span class="color-dot" style="background:#f97316;"></span>活力橙</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">页面比例</label>
+                  <div class="option-group">
+                    <div class="option-card selected">16:9</div>
+                    <div class="option-card">4:3</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">背景风格</label>
+                  <select class="form-select">
+                    <option>纯色</option>
+                    <option>渐变</option>
+                    <option>简约图形</option>
+                    <option>留白</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-title">内容结构</div>
+                <div class="form-item">
+                  <label class="form-label">预计页数</label>
+                  <div class="option-group">
+                    <div class="option-card">5页</div>
+                    <div class="option-card selected">8页</div>
+                    <div class="option-card">10页</div>
+                    <div class="option-card">15页</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">内容密度</label>
+                  <div class="option-group">
+                    <div class="option-card">简洁</div>
+                    <div class="option-card selected">标准</div>
+                    <div class="option-card">详细</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">逻辑结构</label>
+                  <select class="form-select">
+                    <option>总-分-总</option>
+                    <option>问题-方案</option>
+                    <option>时间线</option>
+                    <option>对比分析</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-title">输出形式</div>
+                <div class="form-item">
+                  <label class="form-label">演讲备注</label>
+                  <div class="option-group">
+                    <div class="option-card">不生成</div>
+                    <div class="option-card">简略</div>
+                    <div class="option-card selected">详细</div>
+                  </div>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">配图建议</label>
+                  <div class="option-group">
+                    <div class="option-card">不生成</div>
+                    <div class="option-card selected">每页1张</div>
+                    <div class="option-card">关键页配图</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-title">品牌信息</div>
+                <div class="form-item">
+                  <label class="form-label">公司名称</label>
+                  <input class="form-input" value="DmtPlat">
+                </div>
+                <div class="form-item">
+                  <label class="form-label">汇报人</label>
+                  <input class="form-input" placeholder="选填">
+                </div>
+              </div>
+
+              <div class="panel">
+                <div class="collapse-header" onclick="toggleCollapse(this)">
+                  <div class="panel-title" style="margin:0;">高级设置</div>
+                  <span>▼</span>
+                </div>
+                <div class="collapse-body">
+                  <div class="form-item">
+                    <label class="form-label">页面装饰</label>
+                    <div class="option-group">
+                      <div class="option-card selected">标题下划线</div>
+                      <div class="option-card selected">左侧色块</div>
+                      <div class="option-card selected">页码</div>
+                      <div class="option-card">章节标识</div>
+                    </div>
+                  </div>
+                  <div class="form-item">
+                    <label class="form-label">字体风格</label>
+                    <div class="option-group">
+                      <div class="option-card selected">无衬线</div>
+                      <div class="option-card">衬线</div>
+                      <div class="option-card">手写体</div>
+                    </div>
+                  </div>
+                  <div class="form-item">
+                    <label class="form-label">语言风格</label>
+                    <select class="form-select">
+                      <option>正式</option>
+                      <option>自然</option>
+                      <option>激情</option>
+                      <option>数据驱动</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button class="btn btn-ghost" onclick="goToStep(1)">← 上一步</button>
+                <button class="btn btn-primary" onclick="goToStep(3)">下一步 →</button>
+              </div>
+            </div>
+
+            <!-- Step 3: 大纲确认 -->
+            <div id="step-3" class="step-panel hidden">
+              <div class="panel">
+                <div class="panel-title">大纲编辑</div>
+                <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px;">可对每页标题和要点进行修改、增删或拖拽排序。</p>
+                <div class="form-item">
+                  <label class="form-label">全局调整</label>
+                  <select class="form-select">
+                    <option>保持当前结构</option>
+                    <option>重新生成大纲</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button class="btn btn-ghost" onclick="goToStep(2)">← 上一步</button>
+                <button class="btn btn-primary">✓ 确认生成完整PPT</button>
+              </div>
+            </div>
+          </aside>
+
+          <!-- 中间：实时预览区 -->
+          <main class="wa-editor-main" id="preview-area">
+            <!-- Step 1 空状态 -->
+            <div id="preview-step-1" class="step-preview">
+              <div class="placeholder-empty">
+                <div class="placeholder-empty-icon">📊</div>
+                <div style="font-size:16px;font-weight:600;margin-bottom:6px;">准备生成</div>
+                <div style="font-size:13px;">填写左侧信息后，将在第二步预览 PPT 视觉效果</div>
+              </div>
+            </div>
+
+            <!-- Step 2 实时预览 -->
+            <div id="preview-step-2" class="step-preview hidden">
+              <div class="preview-header">
+                <div>
+                  <div class="preview-title">视觉预览</div>
+                  <div class="preview-subtitle">当前主题：商务正式 · 16:9 · 品牌绿</div>
+                </div>
+                <button class="btn btn-ghost btn-sm">🔍 展开全屏预览</button>
+              </div>
+              <div class="preview-grid" id="slide-preview-grid">
+                <div class="slide-thumb theme-business">
+                  <div class="slide-thumb-content">
+                    <div class="slide-thumb-subtitle">DmtPlat</div>
+                    <div class="slide-thumb-title">企业知识库解决方案</div>
+                    <div class="slide-thumb-bullet">汇报人：销售团队</div>
+                  </div>
+                  <div class="slide-label">封面</div>
+                </div>
+                <div class="slide-thumb theme-business">
+                  <div class="slide-thumb-content">
+                    <div class="slide-thumb-title">目录</div>
+                    <div class="slide-thumb-bullet">1. 背景与痛点</div>
+                    <div class="slide-thumb-bullet">2. 产品核心能力</div>
+                    <div class="slide-thumb-bullet">3. 应用场景</div>
+                  </div>
+                  <div class="slide-label">目录</div>
+                </div>
+                <div class="slide-thumb theme-business">
+                  <div class="slide-thumb-content">
+                    <div class="slide-thumb-title">背景与痛点</div>
+                    <div class="slide-thumb-bullet">• 资料分散，查找困难</div>
+                    <div class="slide-thumb-bullet">• 信息更新不同步</div>
+                    <div class="slide-thumb-bullet">• 一线员工知识获取成本高</div>
+                  </div>
+                  <div class="slide-label">内容页</div>
+                </div>
+                <div class="slide-thumb theme-business">
+                  <div class="slide-thumb-content">
+                    <div class="slide-thumb-title">感谢聆听</div>
+                    <div class="slide-thumb-bullet">DmtPlat 让知识创造价值</div>
+                  </div>
+                  <div class="slide-label">结束页</div>
+                </div>
+              </div>
+
+              <div class="preview-actions">
+                <div style="font-size:13px;color:var(--gray-500);">共 8 页 · 预计生成时间 3-5 秒</div>
+                <div style="display:flex;gap:10px;">
+                  <button class="btn btn-ghost" onclick="goToStep(1)">返回修改</button>
+                  <button class="btn btn-primary" onclick="goToStep(3)">确认此风格 →</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3 大纲确认 -->
+            <div id="preview-step-3" class="step-preview hidden">
+              <div class="preview-header">
+                <div>
+                  <div class="preview-title">大纲确认</div>
+                  <div class="preview-subtitle">共 8 页 · 可编辑调整</div>
+                </div>
+                <button class="btn btn-ghost btn-sm">🔄 重新生成大纲</button>
+              </div>
+              <div class="outline-list">
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">封面：DmtPlat 企业知识库解决方案</span>
+                    <span class="outline-item-page">第 1 页</span>
+                  </div>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">目录</span>
+                    <span class="outline-item-page">第 2 页</span>
+                  </div>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">背景与痛点</span>
+                    <span class="outline-item-page">第 3 页</span>
+                  </div>
+                  <ul class="outline-item-points">
+                    <li>资料分散，查找困难</li>
+                    <li>信息更新不同步</li>
+                    <li>一线员工知识获取成本高</li>
+                  </ul>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">产品核心能力</span>
+                    <span class="outline-item-page">第 4 页</span>
+                  </div>
+                  <ul class="outline-item-points">
+                    <li>多源知识接入</li>
+                    <li>智能问答与检索</li>
+                    <li>场景化内容生成</li>
+                  </ul>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">应用场景</span>
+                    <span class="outline-item-page">第 5 页</span>
+                  </div>
+                  <ul class="outline-item-points">
+                    <li>销售场景</li>
+                    <li>客服场景</li>
+                    <li>培训场景</li>
+                  </ul>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">实施路径</span>
+                    <span class="outline-item-page">第 6 页</span>
+                  </div>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">客户价值</span>
+                    <span class="outline-item-page">第 7 页</span>
+                  </div>
+                </div>
+                <div class="outline-item">
+                  <div class="outline-item-header">
+                    <span class="outline-item-title">结束页：感谢聆听</span>
+                    <span class="outline-item-page">第 8 页</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="preview-actions">
+                <div style="font-size:13px;color:var(--gray-500);">确认后将生成完整 PPT 内容</div>
+                <div style="display:flex;gap:10px;">
+                  <button class="btn btn-ghost" onclick="goToStep(2)">返回修改</button>
+                  <button class="btn btn-primary">✓ 确认生成完整PPT</button>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <!-- 右侧：页面列表/引用 -->
+          <aside class="wa-editor-right">
+            <div id="right-step-1">
+              <div class="placeholder-empty" style="padding:40px 0;">
+                <div style="font-size:32px;margin-bottom:8px;">💡</div>
+                <div style="font-size:13px;color:var(--gray-500);">填写主题内容后，可在此查看参考来源与推荐素材</div>
+              </div>
+            </div>
+
+            <div id="right-step-2" class="hidden">
+              <div class="panel">
+                <div class="panel-title">页面结构</div>
+                <div class="outline-list">
+                  <div class="outline-item">
+                    <div class="outline-item-title">1. 封面</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">2. 目录</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">3. 背景与痛点</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">4. 产品核心能力</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">5. 应用场景</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">6. 实施路径</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">7. 客户价值</div>
+                  </div>
+                  <div class="outline-item">
+                    <div class="outline-item-title">8. 结束页</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="right-step-3" class="hidden">
+              <div class="panel">
+                <div class="panel-title">演讲备注</div>
+                <div style="font-size:12px;color:var(--gray-600);line-height:1.7;">
+                  <p style="margin-bottom:8px;"><strong>封面：</strong>开场介绍公司与方案定位，控制在 30 秒内。</p>
+                  <p style="margin-bottom:8px;"><strong>背景与痛点：</strong>先共鸣客户现状，再引出知识管理需求。</p>
+                  <p><strong>产品核心能力：</strong>重点强调多源接入和智能问答。</p>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-title">配图建议</div>
+                <div style="font-size:12px;color:var(--gray-500);">
+                  <div style="padding:8px;background:var(--gray-50);border-radius:6px;margin-bottom:8px;">封面：科技感办公场景</div>
+                  <div style="padding:8px;background:var(--gray-50);border-radius:6px;margin-bottom:8px;">痛点页：信息孤岛示意图</div>
+                  <div style="padding:8px;background:var(--gray-50);border-radius:6px;">能力页：产品界面截图</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+
+    function goToStep(step) {
+      currentStep = step;
+
+      // 更新步骤条
+      document.querySelectorAll('.step').forEach((el, idx) => {
+        el.classList.remove('active', 'completed');
+        const stepNum = parseInt(el.dataset.step);
+        if (stepNum === step) el.classList.add('active');
+        else if (stepNum < step) el.classList.add('completed');
+      });
+
+      // 更新左侧表单
+      document.querySelectorAll('.step-panel').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`step-${step}`).classList.remove('hidden');
+
+      // 更新中间预览
+      document.querySelectorAll('.step-preview').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`preview-step-${step}`).classList.remove('hidden');
+
+      // 更新右侧
+      document.getElementById('right-step-1').classList.add('hidden');
+      document.getElementById('right-step-2').classList.add('hidden');
+      document.getElementById('right-step-3').classList.add('hidden');
+      document.getElementById(`right-step-${step}`).classList.remove('hidden');
+
+      // 更新主按钮
+      const primaryBtn = document.getElementById('primary-action');
+      if (step === 1) primaryBtn.textContent = '▶ 开始生成';
+      else if (step === 2) primaryBtn.textContent = '▶ 生成大纲';
+      else primaryBtn.textContent = '▶ 确认生成完整PPT';
+
+      // 滚动到顶部
+      document.querySelector('.wa-editor-left').scrollTop = 0;
+      document.querySelector('.wa-editor-main').scrollTop = 0;
+    }
+
+    function toggleCollapse(header) {
+      const body = header.nextElementSibling;
+      const arrow = header.querySelector('span:last-child');
+      body.classList.toggle('open');
+      arrow.textContent = body.classList.contains('open') ? '▲' : '▼';
+    }
+
+    // 主题选择交互
+    document.querySelectorAll('#theme-options .option-card').forEach(card => {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('#theme-options .option-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        updatePreviewTheme(this.dataset.theme);
+      });
+    });
+
+    // 配色选择交互
+    document.querySelectorAll('#color-options .option-card').forEach(card => {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('#color-options .option-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+      });
+    });
+
+    function updatePreviewTheme(theme) {
+      const slides = document.querySelectorAll('.slide-thumb');
+      slides.forEach(slide => {
+        slide.className = slide.className.replace(/theme-\w+/, `theme-${theme}`);
+      });
+
+      const titles = {
+        business: '商务正式',
+        tech: '科技现代',
+        minimal: '简约清新',
+        lively: '活泼生动',
+        academic: '学术严谨',
+        dark: '高端深色'
+      };
+      document.querySelector('.preview-subtitle').textContent = `当前主题：${titles[theme]} · 16:9 · 品牌绿`;
+    }
+
+    // 通用选项卡选择
+    document.querySelectorAll('.option-group').forEach(group => {
+      if (group.id === 'theme-options' || group.id === 'color-options') return;
+      group.querySelectorAll('.option-card').forEach(card => {
+        card.addEventListener('click', function() {
+          group.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+          this.classList.add('selected');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

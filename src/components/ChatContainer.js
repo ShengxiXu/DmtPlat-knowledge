@@ -60,7 +60,12 @@ export class ChatContainer {
     return this.messages
       .map((msg) => {
         const isUser = msg.role === 'user';
-        const time = msg.time || new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        const time =
+          msg.time ||
+          new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
         return `
           <div class="chat-message" style="flex-direction:${isUser ? 'row-reverse' : 'row'}">
             <div class="chat-avatar ${isUser ? 'user' : ''}">${isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>'}</div>
@@ -86,9 +91,11 @@ export class ChatContainer {
     ];
 
     return questions
-      .map((q, index) => `
+      .map(
+        (q, index) => `
         <button class="quick-btn" id="quick-btn-${this.container.id}-${index}">${q}</button>
-      `)
+      `
+      )
       .join('');
   }
 
@@ -105,7 +112,10 @@ export class ChatContainer {
         id: Date.now(),
         role: 'user',
         content: messageContent,
-        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
       };
       this.addMessage(userMsg);
       input.value = '';
@@ -128,7 +138,9 @@ export class ChatContainer {
       }
     });
 
-    const quickBtns = document.querySelectorAll(`#quick-questions-${this.container.id} .quick-btn`);
+    const quickBtns = document.querySelectorAll(
+      `#quick-questions-${this.container.id} .quick-btn`
+    );
     quickBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         sendMessage(btn.textContent);
@@ -162,11 +174,16 @@ export class ChatContainer {
 
   addMessage(message) {
     if (!message.time) {
-      message.time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      message.time = new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
     }
     this.messages.push(message);
-    const messagesContainer = document.getElementById(`chat-messages-${this.container.id}`);
-    
+    const messagesContainer = document.getElementById(
+      `chat-messages-${this.container.id}`
+    );
+
     if (messagesContainer.querySelector('.empty-chat')) {
       messagesContainer.innerHTML = '';
     }

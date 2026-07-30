@@ -12,12 +12,13 @@ export class Modal {
   }
 
   render() {
-    const sizeClass = {
-      small: 'modal-small',
-      medium: 'modal-medium',
-      large: 'modal-large',
-      full: 'modal-full'
-    }[this.size] || 'modal-medium';
+    const sizeClass =
+      {
+        small: 'modal-small',
+        medium: 'modal-medium',
+        large: 'modal-large',
+        full: 'modal-full',
+      }[this.size] || 'modal-medium';
 
     const modalHTML = `
       <div class="modal-overlay" id="${this.id}">
@@ -40,7 +41,8 @@ export class Modal {
       existingModal.remove();
     }
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML);    this.bindEvents();
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    this.bindEvents();
   }
 
   bindEvents() {
@@ -83,7 +85,9 @@ export class Modal {
 
   setContent(content) {
     this.content = content;
-    const modalBody = document.getElementById(this.id)?.querySelector('.modal-body');
+    const modalBody = document
+      .getElementById(this.id)
+      ?.querySelector('.modal-body');
     if (modalBody) {
       modalBody.innerHTML = content;
     }
@@ -120,7 +124,7 @@ export class CreateKBModal extends Modal {
       content: '',
       cancelText: '取消',
       confirmText: '完成',
-      size: 'large'
+      size: 'large',
     });
 
     this.currentStep = 1;
@@ -185,24 +189,52 @@ export class CreateKBModal extends Modal {
 
   renderTypeSelection() {
     const types = [
-      { id: 'document', name: '文档知识库', icon: 'file-lines', desc: '管理PDF、Word等文档', color: 'bg-blue' },
-      { id: 'web', name: '网页知识库', icon: 'globe', desc: '自动采集网页内容', color: 'bg-green' },
-      { id: 'database', name: '数据库知识库', icon: 'database', desc: '连接数据库同步数据', color: 'bg-purple' },
-      { id: 'qa', name: '问答知识库', icon: 'message', desc: '智能问答与对话', color: 'bg-orange' }
+      {
+        id: 'document',
+        name: '文档知识库',
+        icon: 'file-lines',
+        desc: '管理PDF、Word等文档',
+        color: 'bg-blue',
+      },
+      {
+        id: 'web',
+        name: '网页知识库',
+        icon: 'globe',
+        desc: '自动采集网页内容',
+        color: 'bg-green',
+      },
+      {
+        id: 'database',
+        name: '数据库知识库',
+        icon: 'database',
+        desc: '连接数据库同步数据',
+        color: 'bg-purple',
+      },
+      {
+        id: 'qa',
+        name: '问答知识库',
+        icon: 'message',
+        desc: '智能问答与对话',
+        color: 'bg-orange',
+      },
     ];
 
     return `
       <div style="margin-top:24px;">
         <h4 style="margin-bottom:16px;">选择知识库类型</h4>
         <div class="type-grid">
-          ${types.map(type => `
+          ${types
+            .map(
+              (type) => `
             <div class="type-card ${this.selectedType === type.id ? 'selected' : ''}" data-type="${type.id}">
               <i class="fa-solid fa-${type.icon}"></i>
               <div class="type-name">${type.name}</div>
               <div class="type-desc">${type.desc}</div>
               ${this.selectedType === type.id ? '<div class="type-check">✓</div>' : ''}
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -222,7 +254,7 @@ export class CreateKBModal extends Modal {
       document: '文档知识库',
       web: '网页知识库',
       database: '数据库知识库',
-      qa: '问答知识库'
+      qa: '问答知识库',
     };
 
     this.setContent(`
@@ -287,7 +319,7 @@ export class CreateKBModal extends Modal {
       document: this.renderDocumentConfig(),
       web: this.renderWebConfig(),
       database: this.renderDatabaseConfig(),
-      qa: this.renderQAConfig()
+      qa: this.renderQAConfig(),
     };
     return configs[this.selectedType] || '';
   }
@@ -295,20 +327,35 @@ export class CreateKBModal extends Modal {
   renderDocumentConfig() {
     const config = this.selectedTemplate?.config || {};
     const formats = ['pdf', 'docx', 'md', 'txt', 'xlsx'];
-    const formatLabels = { pdf: 'PDF', docx: 'Word', md: 'Markdown', txt: 'TXT', xlsx: 'Excel' };
-    const savedFormats = config.supportedFormats || ['pdf', 'docx', 'md', 'txt'];
+    const formatLabels = {
+      pdf: 'PDF',
+      docx: 'Word',
+      md: 'Markdown',
+      txt: 'TXT',
+      xlsx: 'Excel',
+    };
+    const savedFormats = config.supportedFormats || [
+      'pdf',
+      'docx',
+      'md',
+      'txt',
+    ];
 
     return `
       <div class="config-form" data-type="document">
         <div class="config-group">
           <label class="form-label">支持格式</label>
           <div class="checkbox-grid">
-            ${formats.map(f => `
+            ${formats
+              .map(
+                (f) => `
               <label class="checkbox-item">
                 <input type="checkbox" name="doc-format" value="${f}" ${savedFormats.includes(f) ? 'checked' : ''}>
                 <span>${formatLabels[f]}</span>
               </label>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
         <div class="form-row">
@@ -505,7 +552,7 @@ export class CreateKBModal extends Modal {
       document: '文档知识库',
       web: '网页知识库',
       database: '数据库知识库',
-      qa: '问答知识库'
+      qa: '问答知识库',
     };
 
     this.setContent(`
@@ -541,22 +588,30 @@ export class CreateKBModal extends Modal {
               <span class="summary-label">知识库类型</span>
               <span class="summary-value">${typeNames[this.selectedType]}</span>
             </div>
-            ${this.selectedTemplate ? `
+            ${
+              this.selectedTemplate
+                ? `
               <div class="summary-row">
                 <span class="summary-label">使用模板</span>
                 <span class="summary-value">${this.selectedTemplate.name}</span>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
             <div class="summary-row">
               <span class="summary-label">可见范围</span>
               <span class="summary-value">${this.kbVisibility === 'private' ? '私有' : this.kbVisibility === 'team' ? '团队可见' : '公开'}</span>
             </div>
-            ${this.kbDescription ? `
+            ${
+              this.kbDescription
+                ? `
               <div class="summary-row">
                 <span class="summary-label">描述</span>
                 <span class="summary-value">${this.kbDescription}</span>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
         </div>
 
@@ -570,10 +625,12 @@ export class CreateKBModal extends Modal {
 
   bindStepEvents() {
     const container = document.getElementById('create-kb-modal');
-    
+
     container.addEventListener('click', (e) => {
       const target = e.target;
-      const action = target.dataset.action || target.closest('[data-action]')?.dataset.action;
+      const action =
+        target.dataset.action ||
+        target.closest('[data-action]')?.dataset.action;
 
       switch (action) {
         case 'cancel':
@@ -610,7 +667,7 @@ export class CreateKBModal extends Modal {
         this.createMode = modeCard.dataset.mode;
         this.selectedTemplate = null;
         this.renderStep1();
-        
+
         if (this.createMode === 'template') {
           setTimeout(() => {
             this.initTemplateSelector();
@@ -661,7 +718,8 @@ export class CreateKBModal extends Modal {
   saveStep2Data() {
     this.kbName = document.getElementById('kb-name')?.value || '';
     this.kbDescription = document.getElementById('kb-description')?.value || '';
-    this.kbVisibility = document.getElementById('kb-visibility')?.value || 'private';
+    this.kbVisibility =
+      document.getElementById('kb-visibility')?.value || 'private';
   }
 
   getFormData() {
@@ -669,17 +727,22 @@ export class CreateKBModal extends Modal {
       document: '文档',
       web: '网页',
       database: '数据库',
-      qa: '问答'
+      qa: '问答',
     };
 
     return {
       name: this.kbName,
       description: this.kbDescription,
       type: typeNames[this.selectedType],
-      visibility: this.kbVisibility === 'private' ? '私有' : this.kbVisibility === 'team' ? '团队可见' : '公开',
+      visibility:
+        this.kbVisibility === 'private'
+          ? '私有'
+          : this.kbVisibility === 'team'
+            ? '团队可见'
+            : '公开',
       templateId: this.selectedTemplate?.id,
       config: this.configData,
-      createMode: this.createMode
+      createMode: this.createMode,
     };
   }
 

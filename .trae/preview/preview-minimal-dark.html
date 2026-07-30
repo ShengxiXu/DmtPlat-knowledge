@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>极简深色</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --text: #ededed;
+      --text-2: #a1a1a1;
+      --text-3: #6b6b6b;
+      --text-4: #4a4a4a;
+      --line: #1f1f1f;
+      --line-2: #181818;
+      --accent: #59A674;
+      --hover: #141414;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "SF Pro Text", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .header {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 40px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+    }
+    .logo-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .header-link {
+      font-size: 13px;
+      color: var(--text-3);
+      cursor: pointer;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .header-link:hover { color: var(--text); }
+
+    .main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 80px 40px 64px;
+    }
+
+    .greeting {
+      font-size: 36px;
+      font-weight: 300;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+    .greeting-sub {
+      font-size: 15px;
+      color: var(--text-2);
+      font-weight: 400;
+      margin-bottom: 48px;
+    }
+
+    .composer {
+      margin-bottom: 64px;
+    }
+    .composer-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1.5px solid var(--line);
+      padding-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    .composer-input-wrap:focus-within {
+      border-bottom-color: var(--text);
+    }
+    .composer-input-wrap i {
+      color: var(--text-3);
+      font-size: 14px;
+    }
+    .composer-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+    }
+    .composer-input::placeholder { color: var(--text-3); }
+    .composer-submit {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      transition: color 0.15s;
+      font-family: inherit;
+    }
+    .composer-submit:hover { color: var(--accent); }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 28px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .tab {
+      padding: 0 0 14px;
+      font-size: 14px;
+      color: var(--text-3);
+      cursor: pointer;
+      position: relative;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .tab:hover { color: var(--text-2); }
+    .tab.active { color: var(--text); }
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 1.5px;
+      background: var(--text);
+    }
+    .tab-count {
+      font-size: 11px;
+      color: var(--text-4);
+      margin-left: 4px;
+      font-weight: 400;
+    }
+
+    .template-list {
+      padding-top: 4px;
+    }
+    .template-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line-2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .template-row:hover {
+      padding-left: 8px;
+    }
+    .template-row:hover .template-arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .template-row:hover .template-row-name {
+      color: var(--accent);
+    }
+    .template-row-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .template-row-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .template-row-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 3px;
+      transition: color 0.15s;
+    }
+    .template-row-desc {
+      font-size: 13px;
+      color: var(--text-3);
+      line-height: 1.4;
+    }
+    .template-row-meta {
+      font-size: 12px;
+      color: var(--text-4);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .template-arrow {
+      color: var(--text-3);
+      font-size: 12px;
+      opacity: 0;
+      transform: translateX(-4px);
+      transition: all 0.15s;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+      margin-top: 56px;
+      padding-top: 32px;
+      border-top: 1px solid var(--line);
+    }
+    .footer-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .footer-link:hover { color: var(--text); }
+    .footer-link i { font-size: 12px; }
+    .footer-link-count {
+      color: var(--text-4);
+      font-size: 12px;
+    }
+
+    @media (max-width: 640px) {
+      .header, .main { padding-left: 20px; padding-right: 20px; }
+      .main { padding-top: 48px; }
+      .greeting { font-size: 28px; }
+      .template-row-meta { display: none; }
+      .footer-links { flex-direction: column; gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      <span>AI 创作中心</span>
+    </div>
+    <div class="header-right">
+      <button class="header-link">⌘K 搜索</button>
+      <button class="header-link">模板管理</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <h1 class="greeting">下午好。</h1>
+    <p class="greeting-sub">从一个模板开始，或描述你的需求。</p>
+
+    <div class="composer">
+      <div class="composer-input-wrap">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <input type="text" class="composer-input" placeholder="描述你想创作的内容...">
+        <button class="composer-submit">创作 →</button>
+      </div>
+    </div>
+
+    <div class="section-label">模板</div>
+
+    <div class="tabs">
+      <button class="tab active">场景模板<span class="tab-count">12</span></button>
+      <button class="tab">内容模板<span class="tab-count">8</span></button>
+    </div>
+
+    <div class="template-list">
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-file-lines"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">销售周报生成</div>
+          <div class="template-row-desc">输入本周数据，自动生成结构化周报</div>
+        </div>
+        <div class="template-row-meta">
+          <span>文档</span>
+          <span>128 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-file-powerpoint"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">客户方案 PPT</div>
+          <div class="template-row-desc">商务正式风格，8 页标准结构</div>
+        </div>
+        <div class="template-row-meta">
+          <span>PPT</span>
+          <span>96 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-table"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">竞品对比分析</div>
+          <div class="template-row-desc">多维度产品对比，自动梳理优劣</div>
+        </div>
+        <div class="template-row-meta">
+          <span>表格</span>
+          <span>72 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-pen-to-square"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">营销文案生成</div>
+          <div class="template-row-desc">多平台文案一键适配</div>
+        </div>
+        <div class="template-row-meta">
+          <span>文档</span>
+          <span>64 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-comment"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">客服标准话术</div>
+          <div class="template-row-desc">专业且有温度的客服回复</div>
+        </div>
+        <div class="template-row-meta">
+          <span>文档</span>
+          <span>51 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+
+      <div class="template-row">
+        <div class="template-row-icon"><i class="fa-regular fa-envelope"></i></div>
+        <div class="template-row-content">
+          <div class="template-row-name">商务邮件撰写</div>
+          <div class="template-row-desc">跟进、邀约、感谢多场景</div>
+        </div>
+        <div class="template-row-meta">
+          <span>邮件</span>
+          <span>43 次</span>
+        </div>
+        <i class="fa-solid fa-arrow-right template-arrow"></i>
+      </div>
+    </div>
+
+    <div class="footer-links">
+      <button class="footer-link">
+        <i class="fa-regular fa-folder-open"></i>
+        <span>我的文档</span>
+        <span class="footer-link-count">156</span>
+      </button>
+      <button class="footer-link">
+        <i class="fa-regular fa-clock"></i>
+        <span>最近创作</span>
+      </button>
+    </div>
+  </main>
+</body>
+</html>

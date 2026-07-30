@@ -37,7 +37,10 @@ export async function parseDOCX(fileBuffer) {
   }
 
   // 提取纯文本段落（去除空行）
-  const plainText = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const plainText = text
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const paragraphs = plainText
     .split(/\n|\.\s+/)
     .map((p) => p.trim())
@@ -57,8 +60,20 @@ export async function parseDOCX(fileBuffer) {
 
 function buildDOCXSuggestedFields(headings, tables) {
   const fields = [
-    { id: 'topic', label: '文档主题', type: 'text', required: true, placeholder: '例如：产品使用手册' },
-    { id: 'audience', label: '目标读者', type: 'text', required: false, placeholder: '例如：新入职销售' },
+    {
+      id: 'topic',
+      label: '文档主题',
+      type: 'text',
+      required: true,
+      placeholder: '例如：产品使用手册',
+    },
+    {
+      id: 'audience',
+      label: '目标读者',
+      type: 'text',
+      required: false,
+      placeholder: '例如：新入职销售',
+    },
   ];
 
   if (headings.length > 3) {

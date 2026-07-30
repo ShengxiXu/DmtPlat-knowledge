@@ -27,11 +27,15 @@ export class FeedbackModal {
           <div class="feedback-rating-section">
             <div class="feedback-label">满意度评分</div>
             <div class="rating-stars">
-              ${[1, 2, 3, 4, 5].map((star) => `
+              ${[1, 2, 3, 4, 5]
+                .map(
+                  (star) => `
                 <button class="star-btn" data-rating="${star}">
                   <i class="fa-solid fa-star"></i>
                 </button>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
             <div class="rating-text" id="rating-text"></div>
           </div>
@@ -83,7 +87,9 @@ export class FeedbackModal {
     const submitBtn = this.modal.querySelector('.feedback-btn-submit');
     const starBtns = this.modal.querySelectorAll('.star-btn');
     const reasonSection = this.modal.getElementById('feedback-reason-section');
-    const suggestionSection = this.modal.getElementById('feedback-suggestion-section');
+    const suggestionSection = this.modal.getElementById(
+      'feedback-suggestion-section'
+    );
 
     closeBtn.addEventListener('click', () => this.close());
     skipBtn.addEventListener('click', () => this.close());
@@ -124,8 +130,9 @@ export class FeedbackModal {
 
   submit() {
     const rating = this.modal.querySelectorAll('.star-btn.active').length;
-    const reasons = Array.from(this.modal.querySelectorAll('input[name="reason"]:checked'))
-      .map((input) => input.value);
+    const reasons = Array.from(
+      this.modal.querySelectorAll('input[name="reason"]:checked')
+    ).map((input) => input.value);
     const feedback = this.modal.querySelector('.feedback-textarea').value;
     const suggestion = this.modal.querySelector('.suggestion-textarea').value;
 
@@ -166,9 +173,11 @@ export class FeedbackModal {
     `;
     document.body.appendChild(thankYouModal);
 
-    thankYouModal.querySelector('.thank-you-btn').addEventListener('click', () => {
-      thankYouModal.remove();
-    });
+    thankYouModal
+      .querySelector('.thank-you-btn')
+      .addEventListener('click', () => {
+        thankYouModal.remove();
+      });
 
     setTimeout(() => {
       thankYouModal.remove();

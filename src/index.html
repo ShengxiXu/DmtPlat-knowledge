@@ -1,62 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>SSO Hub - AI 知识库模块</title>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./ctm-styles.css">
-  <link rel="stylesheet" href="./ppt-skeleton.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-</head>
-<body>
-  <div id="app"></div>
-  <script type="module" src="./main.js"></script>
-  <script>
-    function dropHandler(e) {
-      e.preventDefault();
-      const uploadZone = document.getElementById('upload-zone');
-      uploadZone.classList.remove('dragover');
-      
-      if (e.dataTransfer.items) {
-        const files = Array.from(e.dataTransfer.items)
-          .filter(item => item.kind === 'file')
-          .map(item => item.getAsFile());
-        handleFiles(files);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>SSO Hub - AI 知识库模块</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./ctm-styles.css" />
+    <link rel="stylesheet" href="./ppt-skeleton.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.js"></script>
+    <script>
+      function dropHandler(e) {
+        e.preventDefault();
+        const uploadZone = document.getElementById('upload-zone');
+        uploadZone.classList.remove('dragover');
+
+        if (e.dataTransfer.items) {
+          const files = Array.from(e.dataTransfer.items)
+            .filter((item) => item.kind === 'file')
+            .map((item) => item.getAsFile());
+          handleFiles(files);
+        }
       }
-    }
 
-    function dragOverHandler(e) {
-      e.preventDefault();
-      const uploadZone = document.getElementById('upload-zone');
-      uploadZone.classList.add('dragover');
-    }
+      function dragOverHandler(e) {
+        e.preventDefault();
+        const uploadZone = document.getElementById('upload-zone');
+        uploadZone.classList.add('dragover');
+      }
 
-    function dragLeaveHandler(e) {
-      e.preventDefault();
-      const uploadZone = document.getElementById('upload-zone');
-      uploadZone.classList.remove('dragover');
-    }
+      function dragLeaveHandler(e) {
+        e.preventDefault();
+        const uploadZone = document.getElementById('upload-zone');
+        uploadZone.classList.remove('dragover');
+      }
 
-    function handleFiles(files) {
-      files.forEach(file => {
-        console.log('Uploading:', file.name);
-        const toast = document.createElement('div');
-        toast.className = 'toast toast-success';
-        toast.textContent = `正在上传: ${file.name}`;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 10);
-        setTimeout(() => {
-          toast.classList.remove('show');
-          setTimeout(() => toast.remove(), 300);
-        }, 3000);
-      });
-    }
+      function handleFiles(files) {
+        files.forEach((file) => {
+          console.log('Uploading:', file.name);
+          const toast = document.createElement('div');
+          toast.className = 'toast toast-success';
+          toast.textContent = `正在上传: ${file.name}`;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.classList.add('show'), 10);
+          setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+          }, 3000);
+        });
+      }
 
-    window.dropHandler = dropHandler;
-    window.dragOverHandler = dragOverHandler;
-    window.dragLeaveHandler = dragLeaveHandler;
-  </script>
-</body>
+      window.dropHandler = dropHandler;
+      window.dragOverHandler = dragOverHandler;
+      window.dragLeaveHandler = dragLeaveHandler;
+    </script>
+  </body>
 </html>

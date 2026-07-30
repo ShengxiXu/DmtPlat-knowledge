@@ -10,7 +10,7 @@ export class CreateKBModal {
     this.dataSources = [];
     this.formData = {
       name: '',
-      description: ''
+      description: '',
     };
     this.init();
   }
@@ -20,7 +20,7 @@ export class CreateKBModal {
     this.modal.id = 'create-kb-modal';
     this.modal.className = 'modal-overlay';
     this.modal.innerHTML = this.renderModal();
-    document.body.appendChild(this.modal);    
+    document.body.appendChild(this.modal);
     setTimeout(() => this.modal.classList.add('active'), 10);
     this.bindEvents();
   }
@@ -51,17 +51,21 @@ export class CreateKBModal {
     const steps = [
       { number: '1', label: '创建方式' },
       { number: '2', label: '配置数据源' },
-      { number: '3', label: '确认创建' }
+      { number: '3', label: '确认创建' },
     ];
 
     return `
       <div class="kb-steps">
-        ${steps.map((step, index) => `
+        ${steps
+          .map(
+            (step, index) => `
           <div class="kb-step ${this.currentStep > index + 1 ? 'completed' : ''} ${this.currentStep === index + 1 ? 'active' : ''}">
             <div class="kb-step-number">${step.number}</div>
             <div class="kb-step-label">${step.label}</div>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
     `;
   }
@@ -128,18 +132,24 @@ export class CreateKBModal {
   }
 
   renderTemplateSelection() {
-    const categories = [...new Set(kbTemplates.map(t => t.category))];
+    const categories = [...new Set(kbTemplates.map((t) => t.category))];
 
     return `
       <div class="template-section">
         <h4>选择模板</h4>
         <div class="template-categories">
-          ${categories.map(cat => `
+          ${categories
+            .map(
+              (cat) => `
             <span class="template-category ${this.selectedCategory === cat ? 'active' : ''}" data-category="${cat}">${cat}</span>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
         <div class="template-list">
-          ${kbTemplates.map(template => `
+          ${kbTemplates
+            .map(
+              (template) => `
             <div class="template-item ${this.selectedTemplate?.id === template.id ? 'selected' : ''}" data-template-id="${template.id}">
               <i class="fa-solid fa-${template.icon} template-icon"></i>
               <div class="template-info">
@@ -151,7 +161,9 @@ export class CreateKBModal {
                 </div>
               </div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -166,13 +178,19 @@ export class CreateKBModal {
         </div>
 
         <div class="ds-list" id="ds-list">
-          ${this.dataSources.length === 0 ? `
+          ${
+            this.dataSources.length === 0
+              ? `
             <div class="ds-empty">
               <i class="fa-solid fa-inbox empty-icon"></i>
               <p>暂无数据源</p>
               <p class="empty-hint">点击上方按钮添加数据源</p>
             </div>
-          ` : this.dataSources.map((ds, index) => this.renderDataSourceItem(ds, index)).join('')}
+          `
+              : this.dataSources
+                  .map((ds, index) => this.renderDataSourceItem(ds, index))
+                  .join('')
+          }
         </div>
 
         <div class="ds-modal" id="ds-modal" style="display: none;">
@@ -183,8 +201,18 @@ export class CreateKBModal {
   }
 
   renderDataSourceItem(ds, index) {
-    const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
+    const typeLabels = {
+      document: '文档上传',
+      web: '网页爬取',
+      database: '数据库连接',
+      qa: '问答导入',
+    };
+    const typeIcons = {
+      document: 'file-lines',
+      web: 'globe',
+      database: 'database',
+      qa: 'message',
+    };
 
     return `
       <div class="ds-item" data-index="${index}">
@@ -208,23 +236,41 @@ export class CreateKBModal {
 
   renderConfigSummary(config) {
     const items = [];
-    if (config.priority !== undefined) items.push(`优先级: ${config.priority}级`);
-    if (config.supportedFormats) items.push(`支持格式: ${config.supportedFormats.join(', ')}`);
+    if (config.priority !== undefined)
+      items.push(`优先级: ${config.priority}级`);
+    if (config.supportedFormats)
+      items.push(`支持格式: ${config.supportedFormats.join(', ')}`);
     if (config.maxFileSize) items.push(`最大文件: ${config.maxFileSize}MB`);
-    if (config.matchThreshold !== undefined) items.push(`匹配阈值: ${config.matchThreshold}`);
+    if (config.matchThreshold !== undefined)
+      items.push(`匹配阈值: ${config.matchThreshold}`);
     if (config.maxQACount) items.push(`最大问答数: ${config.maxQACount}`);
-    
-    return items.length > 0 ? `
+
+    return items.length > 0
+      ? `
       <div class="config-summary">
-        ${items.slice(0, 3).map(item => `<span class="config-item">${item}</span>`).join('')}
+        ${items
+          .slice(0, 3)
+          .map((item) => `<span class="config-item">${item}</span>`)
+          .join('')}
         ${items.length > 3 ? `<span class="config-more">还有${items.length - 3}项配置...</span>` : ''}
       </div>
-    ` : '<span class="config-empty">配置已启用</span>';
+    `
+      : '<span class="config-empty">配置已启用</span>';
   }
 
   renderStep3() {
-    const typeLabels = { document: '文档上传', web: '网页爬取', database: '数据库连接', qa: '问答导入' };
-    const typeIcons = { document: 'file-lines', web: 'globe', database: 'database', qa: 'message' };
+    const typeLabels = {
+      document: '文档上传',
+      web: '网页爬取',
+      database: '数据库连接',
+      qa: '问答导入',
+    };
+    const typeIcons = {
+      document: 'file-lines',
+      web: 'globe',
+      database: 'database',
+      qa: 'message',
+    };
 
     return `
       <div class="kb-step3">
@@ -253,7 +299,9 @@ export class CreateKBModal {
         <div class="ds-summary-section">
           <h4>数据源配置</h4>
           <div class="ds-summary-list">
-            ${this.dataSources.map((ds, index) => `
+            ${this.dataSources
+              .map(
+                (ds, index) => `
               <div class="ds-summary-item">
                 <i class="fa-solid fa-${typeIcons[ds.type]} ds-summary-icon"></i>
                 <div class="ds-summary-info">
@@ -261,7 +309,9 @@ export class CreateKBModal {
                   <div class="ds-summary-type">${typeLabels[ds.type]}</div>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
 
@@ -278,7 +328,9 @@ export class CreateKBModal {
   }
 
   bindEvents() {
-    this.modal.querySelector('.modal-close').addEventListener('click', () => this.close());
+    this.modal
+      .querySelector('.modal-close')
+      .addEventListener('click', () => this.close());
     this.modal.addEventListener('click', (e) => {
       if (e.target === this.modal) {
         this.close();
@@ -291,33 +343,38 @@ export class CreateKBModal {
 
   bindStep1Events() {
     // 创建方式选择
-    this.modal.querySelectorAll('.mode-card').forEach(card => {
+    this.modal.querySelectorAll('.mode-card').forEach((card) => {
       card.addEventListener('click', (e) => {
-        this.modal.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+        this.modal
+          .querySelectorAll('.mode-card')
+          .forEach((c) => c.classList.remove('selected'));
         card.classList.add('selected');
         this.createMode = e.currentTarget.dataset.mode;
-        
+
         if (this.createMode === 'template') {
           this.selectedTemplate = null;
         }
-        
+
         this.render();
       });
     });
 
     // 模板选择
-    this.modal.querySelectorAll('.template-item').forEach(item => {
+    this.modal.querySelectorAll('.template-item').forEach((item) => {
       item.addEventListener('click', (e) => {
-        this.modal.querySelectorAll('.template-item').forEach(i => i.classList.remove('selected'));
+        this.modal
+          .querySelectorAll('.template-item')
+          .forEach((i) => i.classList.remove('selected'));
         item.classList.add('selected');
         const templateId = e.currentTarget.dataset.templateId;
-        this.selectedTemplate = kbTemplates.find(t => t.id === templateId);
-        
+        this.selectedTemplate = kbTemplates.find((t) => t.id === templateId);
+
         if (this.selectedTemplate?.preset) {
           this.formData.name = this.selectedTemplate.preset.kbName;
-          this.formData.description = this.selectedTemplate.preset.kbDescription;
+          this.formData.description =
+            this.selectedTemplate.preset.kbDescription;
         }
-        
+
         this.updateNextButton();
       });
     });
@@ -395,7 +452,10 @@ export class CreateKBModal {
     const nextBtn = this.modal.querySelector('#kb-next');
     if (nextBtn) {
       const hasName = this.formData.name.trim() !== '';
-      const ready = this.createMode === 'blank' ? hasName : (hasName && this.selectedTemplate);
+      const ready =
+        this.createMode === 'blank'
+          ? hasName
+          : hasName && this.selectedTemplate;
       nextBtn.disabled = !ready;
     }
   }
@@ -409,7 +469,9 @@ export class CreateKBModal {
     if (this.currentStep === 1) {
       // 如果选择了模板，加载预设数据源
       if (this.createMode === 'template' && this.selectedTemplate) {
-        this.dataSources = JSON.parse(JSON.stringify(this.selectedTemplate.dataSources));
+        this.dataSources = JSON.parse(
+          JSON.stringify(this.selectedTemplate.dataSources)
+        );
       }
     }
     this.currentStep++;
@@ -419,12 +481,16 @@ export class CreateKBModal {
   render() {
     const content = this.modal.querySelector('.kb-content');
     const footer = this.modal.querySelector('.modal-footer');
-    
+
     if (!content || !footer) return;
-    
-    content.innerHTML = this.currentStep === 1 ? this.renderStep1() : 
-                        this.currentStep === 2 ? this.renderStep2() : this.renderStep3();
-    
+
+    content.innerHTML =
+      this.currentStep === 1
+        ? this.renderStep1()
+        : this.currentStep === 2
+          ? this.renderStep2()
+          : this.renderStep3();
+
     footer.innerHTML = this.renderFooter();
 
     if (this.currentStep === 1) {
@@ -432,16 +498,26 @@ export class CreateKBModal {
     } else if (this.currentStep === 2) {
       this.bindStep2Events();
     }
-    
+
     this.bindFooterEvents();
   }
 
   showAddDataSourceModal() {
     const types = [
-      { type: 'document', name: '文档上传', desc: '上传PDF、Word等文档', icon: 'file-lines' },
+      {
+        type: 'document',
+        name: '文档上传',
+        desc: '上传PDF、Word等文档',
+        icon: 'file-lines',
+      },
       { type: 'web', name: '网页爬取', desc: '爬取网页内容', icon: 'globe' },
-      { type: 'database', name: '数据库连接', desc: '连接数据库', icon: 'database' },
-      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' }
+      {
+        type: 'database',
+        name: '数据库连接',
+        desc: '连接数据库',
+        icon: 'database',
+      },
+      { type: 'qa', name: '问答导入', desc: '导入问答对', icon: 'message' },
     ];
 
     const modal = document.createElement('div');
@@ -454,25 +530,30 @@ export class CreateKBModal {
         </div>
         <div class="modal-body" style="padding: 20px;">
           <div class="ds-type-grid">
-            ${types.map(t => `
+            ${types
+              .map(
+                (t) => `
               <div class="ds-type-card" data-type="${t.type}">
                 <i class="fa-solid fa-${t.icon} ds-type-icon"></i>
                 <div class="ds-type-name">${t.name}</div>
                 <div class="ds-type-desc">${t.desc}</div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       </div>
     `;
-    
-    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
+
+    document.body.appendChild(modal);
+    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
     });
 
-    modal.querySelectorAll('.ds-type-card').forEach(card => {
+    modal.querySelectorAll('.ds-type-card').forEach((card) => {
       card.addEventListener('click', (e) => {
         const type = e.currentTarget.dataset.type;
         document.body.removeChild(modal);
@@ -499,8 +580,9 @@ export class CreateKBModal {
         </div>
       </div>
     `;
-    
-    document.body.appendChild(modal);    setTimeout(() => modal.classList.add('active'), 10);
+
+    document.body.appendChild(modal);
+    setTimeout(() => modal.classList.add('active'), 10);
 
     modal.querySelector('.modal-close').addEventListener('click', () => {
       document.body.removeChild(modal);
@@ -526,7 +608,10 @@ export class CreateKBModal {
       id: Date.now().toString(),
       name: this.formData.name,
       description: this.formData.description,
-      type: this.dataSources.length > 0 ? this.getKBType(this.dataSources[0].type) : '文档',
+      type:
+        this.dataSources.length > 0
+          ? this.getKBType(this.dataSources[0].type)
+          : '文档',
       createMode: this.createMode,
       templateId: this.selectedTemplate?.id || null,
       dataSources: this.dataSources,
@@ -535,7 +620,7 @@ export class CreateKBModal {
       views: '0',
       status: 'active',
       documentCount: 0,
-      creator: '管理员'
+      creator: '管理员',
     };
 
     localStorage.setItem('newKB', JSON.stringify(kbData));
@@ -551,7 +636,7 @@ export class CreateKBModal {
       document: '文档',
       web: '网页',
       database: '数据库',
-      qa: '问答'
+      qa: '问答',
     };
     return typeMap[dataSourceType] || '文档';
   }

@@ -85,11 +85,15 @@ export class KBList {
   getFilteredKBs() {
     const kbs = Array.isArray(knowledgeBases) ? knowledgeBases : [];
     return kbs.filter((kb) => {
-      const matchesSearch = !this.searchQuery || 
+      const matchesSearch =
+        !this.searchQuery ||
         kb.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
         kb.description.toLowerCase().includes(this.searchQuery.toLowerCase());
-      const matchesType = this.filterType === '全部' || kb.type === this.filterType;
-      const matchesStatus = this.filterStatus === '全部' || kb.status === (this.filterStatus === '已启用' ? 'active' : 'disabled');
+      const matchesType =
+        this.filterType === '全部' || kb.type === this.filterType;
+      const matchesStatus =
+        this.filterStatus === '全部' ||
+        kb.status === (this.filterStatus === '已启用' ? 'active' : 'disabled');
       return matchesSearch && matchesType && matchesStatus;
     });
   }
@@ -129,7 +133,7 @@ export class KBList {
   renderPagination() {
     const filteredKBs = this.getFilteredKBs();
     const totalPages = Math.ceil(filteredKBs.length / this.pageSize);
-    
+
     if (totalPages <= 1) return '';
 
     let html = `
@@ -160,7 +164,9 @@ export class KBList {
       });
     }
 
-    const typeFilters = this.container.querySelectorAll('#type-filter .filter-tag');
+    const typeFilters = this.container.querySelectorAll(
+      '#type-filter .filter-tag'
+    );
     typeFilters.forEach((filter) => {
       filter.addEventListener('click', () => {
         typeFilters.forEach((f) => f.classList.remove('active'));
@@ -187,7 +193,9 @@ export class KBList {
             this.currentPage--;
             this.render();
           } else if (target.id === 'next-page') {
-            const totalPages = Math.ceil(this.getFilteredKBs().length / this.pageSize);
+            const totalPages = Math.ceil(
+              this.getFilteredKBs().length / this.pageSize
+            );
             if (this.currentPage < totalPages) {
               this.currentPage++;
               this.render();

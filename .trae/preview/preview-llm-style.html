@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM 风格优化方案</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #ffffff;
+      --bg-soft: #fafafa;
+      --surface: #ffffff;
+      --text: #0a0a0a;
+      --text-2: #525252;
+      --text-3: #a3a3a3;
+      --text-4: #d4d4d4;
+      --line: #e5e5e5;
+      --line-2: #f0f0f0;
+      --accent: #59A674;
+      --accent-soft: rgba(89,166,116,0.08);
+      --accent-glow: rgba(89,166,116,0.15);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px -4px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px -8px rgba(0,0,0,0.12);
+      --shadow-focus: 0 0 0 4px rgba(89,166,116,0.1);
+    }
+    html.dark {
+      --bg: #0a0a0a;
+      --bg-soft: #111111;
+      --surface: #161616;
+      --text: #ededed;
+      --text-2: #a3a3a3;
+      --text-3: #6b6b6b;
+      --text-4: #404040;
+      --line: #262626;
+      --line-2: #1a1a1a;
+      --accent: #59A674;
+      --accent-soft: rgba(89,166,116,0.12);
+      --accent-glow: rgba(89,166,116,0.2);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 16px -4px rgba(0,0,0,0.4);
+      --shadow-lg: 0 12px 40px -8px rgba(0,0,0,0.5);
+      --shadow-focus: 0 0 0 4px rgba(89,166,116,0.15);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "SF Pro Text", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* 动态背景光晕 */
+    .ambient-bg {
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 60%);
+      filter: blur(60px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+      animation: ambient-pulse 8s ease-in-out infinite;
+    }
+    html.dark .ambient-bg { opacity: 0.4; }
+    @keyframes ambient-pulse {
+      0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+      50% { opacity: 0.7; transform: translateX(-50%) scale(1.1); }
+    }
+
+    /* Header */
+    .header {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 40px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+    }
+    .logo {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+    }
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), #3d8b5a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(89,166,116,0.3);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-link {
+      font-size: 13px;
+      color: var(--text-3);
+      cursor: pointer;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .header-link:hover { color: var(--text); }
+    .theme-toggle {
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      color: var(--text-2);
+      cursor: pointer;
+      border-radius: 10px;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .theme-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: rotate(15deg);
+    }
+
+    /* Main */
+    .main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 72px 40px 64px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 欢迎语 - 渐入动画 */
+    .greeting {
+      font-size: 38px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      color: var(--text);
+      animation: fade-up 0.6s ease-out;
+    }
+    .greeting .accent {
+      background: linear-gradient(135deg, var(--accent), #3d8b5a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .greeting-sub {
+      font-size: 16px;
+      color: var(--text-2);
+      font-weight: 400;
+      margin-bottom: 40px;
+      animation: fade-up 0.6s ease-out 0.1s both;
+    }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Composer - 容器式输入框 */
+    .composer {
+      background: var(--surface);
+      border: 1.5px solid var(--line);
+      border-radius: 20px;
+      padding: 18px 18px 14px;
+      margin-bottom: 12px;
+      transition: all 0.25s ease;
+      box-shadow: var(--shadow-sm);
+      animation: fade-up 0.6s ease-out 0.2s both;
+    }
+    .composer:focus-within {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-focus), var(--shadow-md);
+      transform: translateY(-1px);
+    }
+    .composer-input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      resize: none;
+      line-height: 1.5;
+      min-height: 24px;
+      max-height: 200px;
+    }
+    .composer-input::placeholder { color: var(--text-3); }
+    .composer-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding-top: 4px;
+    }
+    .composer-tools {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tool-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .tool-btn:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .tool-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--line);
+      margin: 0 6px;
+    }
+    .model-selector {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .model-selector:hover { border-color: var(--accent); color: var(--accent); }
+    .model-selector i { font-size: 10px; }
+    .send-btn {
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 10px;
+      font-size: 13px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(89,166,116,0.3);
+    }
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(89,166,116,0.4);
+    }
+    .send-btn:active { transform: scale(0.95); }
+
+    /* 能力标签 */
+    .capability-hint {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 56px;
+      font-size: 12px;
+      color: var(--text-3);
+      animation: fade-up 0.6s ease-out 0.3s both;
+    }
+    .capability-hint i { font-size: 11px; color: var(--accent); }
+
+    /* Section */
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: 0.3px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      animation: fade-up 0.6s ease-out 0.4s both;
+    }
+    .section-label-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-label-left i { color: var(--accent); font-size: 11px; }
+
+    /* Tab - 胶囊式 */
+    .tabs {
+      display: inline-flex;
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .tab {
+      padding: 7px 16px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      border-radius: 9px;
+      transition: all 0.2s;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab i { font-size: 11px; }
+    .tab:hover:not(.active) { color: var(--text); }
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+    .tab-count {
+      font-size: 10px;
+      padding: 1px 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 8px;
+      font-weight: 600;
+    }
+
+    /* 模板卡片网格 - 卡片式而非行式 */
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      animation: fade-up 0.6s ease-out 0.5s both;
+    }
+    .template-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      position: relative;
+      overflow: hidden;
+    }
+    .template-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .template-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .template-card:hover::before { transform: scaleX(1); }
+    .template-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .template-card:hover .template-icon {
+      background: var(--accent);
+      color: white;
+      transform: scale(1.05);
+    }
+    .template-info { flex: 1; min-width: 0; }
+    .template-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .template-desc {
+      font-size: 12px;
+      color: var(--text-3);
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .template-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 10px;
+    }
+    .template-tag {
+      padding: 2px 7px;
+      background: var(--bg-soft);
+      color: var(--text-3);
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .template-uses {
+      color: var(--text-4);
+    }
+
+    /* 底部入口卡片 */
+    .footer-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 40px;
+      animation: fade-up 0.6s ease-out 0.6s both;
+    }
+    .footer-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .footer-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .footer-card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--bg-soft);
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .footer-card-info { flex: 1; }
+    .footer-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .footer-card-desc {
+      font-size: 11px;
+      color: var(--text-3);
+    }
+    .footer-card-arrow {
+      color: var(--text-4);
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+    .footer-card:hover .footer-card-arrow {
+      transform: translateX(3px);
+      color: var(--accent);
+    }
+
+    @media (max-width: 640px) {
+      .header, .main { padding-left: 20px; padding-right: 20px; }
+      .main { padding-top: 40px; }
+      .greeting { font-size: 28px; }
+      .template-grid { grid-template-columns: 1fr; }
+      .footer-cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-bg"></div>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon"><i class="fa-solid fa-sparkles"></i></div>
+      <span>AI 创作中心</span>
+    </div>
+    <div class="header-right">
+      <button class="header-link">模板管理</button>
+      <button class="theme-toggle" onclick="document.documentElement.classList.toggle('dark')">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+    <h1 class="greeting">下午好，<span class="accent">有什么可以帮你？</span></h1>
+    <p class="greeting-sub">描述你的需求，或从下方模板开始创作。</p>
+
+    <!-- 容器式输入框 -->
+    <div class="composer">
+      <textarea class="composer-input" placeholder="给我一个想法，我来帮你创作..." rows="1"></textarea>
+      <div class="composer-toolbar">
+        <div class="composer-tools">
+          <button class="tool-btn" title="附件"><i class="fa-solid fa-paperclip"></i></button>
+          <button class="tool-btn" title="图片"><i class="fa-regular fa-image"></i></button>
+          <div class="tool-divider"></div>
+          <button class="model-selector">
+            <i class="fa-solid fa-circle" style="color:var(--accent);font-size:7px;"></i>
+            <span>智能匹配</span>
+            <i class="fa-solid fa-chevron-down"></i>
+          </button>
+        </div>
+        <button class="send-btn"><i class="fa-solid fa-arrow-up"></i></button>
+      </div>
+    </div>
+
+    <div class="capability-hint">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>AI 将根据你的描述自动匹配最佳创作模板</span>
+    </div>
+
+    <div class="section-label">
+      <div class="section-label-left">
+        <i class="fa-solid fa-layer-group"></i>
+        <span>从模板开始</span>
+      </div>
+      <div class="tabs">
+        <button class="tab active"><i class="fa-solid fa-wand-magic-sparkles"></i> 场景<span class="tab-count">12</span></button>
+        <button class="tab"><i class="fa-solid fa-file-lines"></i> 内容<span class="tab-count">8</span></button>
+      </div>
+    </div>
+
+    <div class="template-grid">
+      <div class="template-card">
+        <div class="template-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="template-info">
+          <div class="template-name">销售周报生成</div>
+          <div class="template-desc">输入数据，自动生成结构化周报</div>
+          <div class="template-meta">
+            <span class="template-tag">文档</span>
+            <span class="template-uses">128 次</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <div class="template-icon"><i class="fa-solid fa-file-powerpoint"></i></div>
+        <div class="template-info">
+          <div class="template-name">客户方案 PPT</div>
+          <div class="template-desc">商务正式风格，8 页标准结构</div>
+          <div class="template-meta">
+            <span class="template-tag">PPT</span>
+            <span class="template-uses">96 次</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <div class="template-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+        <div class="template-info">
+          <div class="template-name">竞品对比分析</div>
+          <div class="template-desc">多维度产品对比，自动梳理优劣</div>
+          <div class="template-meta">
+            <span class="template-tag">表格</span>
+            <span class="template-uses">72 次</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="template-card">
+        <div class="template-icon"><i class="fa-solid fa-bullhorn"></i></div>
+        <div class="template-info">
+          <div class="template-name">营销文案生成</div>
+          <div class="template-desc">多平台文案一键适配</div>
+          <div class="template-meta">
+            <span class="template-tag">文档</span>
+            <span class="template-uses">64 次</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-cards">
+      <div class="footer-card">
+        <div class="footer-card-icon"><i class="fa-regular fa-folder-open"></i></div>
+        <div class="footer-card-info">
+          <div class="footer-card-title">我的文档</div>
+          <div class="footer-card-desc">156 篇创作文档</div>
+        </div>
+        <i class="fa-solid fa-arrow-right footer-card-arrow"></i>
+      </div>
+      <div class="footer-card">
+        <div class="footer-card-icon"><i class="fa-regular fa-clock"></i></div>
+        <div class="footer-card-info">
+          <div class="footer-card-title">最近创作</div>
+          <div class="footer-card-desc">查看历史记录</div>
+        </div>
+        <i class="fa-solid fa-arrow-right footer-card-arrow"></i>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

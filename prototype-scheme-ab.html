@@ -1,0 +1,1921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>表单创建原型 - 方案一 A+B融合（含内容模板联动）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: #f5f6f8;
+    color: #1f2937;
+    line-height: 1.6;
+  }
+
+  /* 顶部导航 */
+  .top-bar {
+    height: 56px;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+  }
+  .back-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f3f4f6;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .back-btn:hover { background: #e5e7eb; color: #374151; }
+  .top-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+  }
+  .top-tabs {
+    display: flex;
+    gap: 4px;
+    margin-left: 32px;
+    background: #f3f4f6;
+    padding: 4px;
+    border-radius: 10px;
+  }
+  .top-tab {
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: #6b7280;
+    transition: all 0.2s;
+  }
+  .top-tab.active {
+    background: #fff;
+    color: #111827;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .top-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+  }
+  .btn-secondary:hover { background: #e5e7eb; }
+
+  /* 主容器 */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  /* 入口页样式 */
+  .entry-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .entry-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  .entry-header p {
+    font-size: 15px;
+    color: #6b7280;
+  }
+  .entry-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+  .entry-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 40px 36px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  .entry-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .entry-card.purple::before {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+  }
+  .entry-card.green::before {
+    background: linear-gradient(90deg, #10b981, #059669);
+  }
+  .entry-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  }
+  .entry-card.purple:hover { border-color: rgba(102, 126, 234, 0.2); }
+  .entry-card.green:hover { border-color: rgba(16, 185, 129, 0.2); }
+  .entry-card:hover::before { opacity: 1; }
+  .entry-card-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+  .entry-card.purple .entry-card-icon {
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    color: #667eea;
+  }
+  .entry-card.green .entry-card-icon {
+    background: linear-gradient(135deg, #10b98115, #05966915);
+    color: #10b981;
+  }
+  .entry-card h3 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #111827;
+  }
+  .entry-card p {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 28px;
+    line-height: 1.7;
+  }
+  .entry-card-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 10px;
+    transition: all 0.2s;
+  }
+  .entry-card.purple .entry-card-btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+  }
+  .entry-card.green .entry-card-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+  }
+  .entry-card-footer {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #f3f4f6;
+    font-size: 13px;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .entry-card-footer i { font-size: 11px; }
+
+  /* 编辑页样式 */
+  .editor-page {
+    display: none;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .editor-page.active { display: block; }
+  .editor-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* 左侧编辑区 */
+  .edit-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    border: 1px solid #eef0f3;
+  }
+  .edit-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .edit-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .edit-section-title-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .edit-section-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: #fef3c7;
+    color: #d97706;
+    font-weight: 500;
+  }
+  .edit-section-desc {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: -12px;
+    margin-bottom: 16px;
+  }
+
+  /* 模板名称输入 */
+  .name-input-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .name-input {
+    flex: 1;
+    height: 48px;
+    padding: 0 16px;
+    border: 2px solid #eef0f3;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .name-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  }
+  .name-input::placeholder { color: #9ca3af; font-weight: 400; }
+  .icon-selector {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 2px solid #eef0f3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #667eea;
+    background: linear-gradient(135deg, #667eea10, #764ba210);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .icon-selector:hover {
+    border-color: #667eea;
+    transform: translateY(-1px);
+  }
+
+  /* 内容类型卡片 */
+  .type-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .type-card {
+    padding: 16px;
+    border: 2px solid #eef0f3;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+  }
+  .type-card:hover {
+    border-color: #c7d2fe;
+    background: #fafbff;
+  }
+  .type-card.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea08, #764ba208);
+  }
+  .type-card.active::after {
+    content: '✓';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    background: #667eea;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .type-card-icon {
+    font-size: 22px;
+    color: #667eea;
+  }
+  .type-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+  .type-card-desc {
+    font-size: 12px;
+    color: #9ca3af;
+    line-height: 1.5;
+  }
+
+  /* 输出格式胶囊 */
+  .format-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .format-pill {
+    padding: 8px 16px;
+    border: 2px solid #eef0f3;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .format-pill:hover {
+    border-color: #c7d2fe;
+    color: #667eea;
+  }
+  .format-pill.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent;
+    color: #fff;
+  }
+
+  /* 内容模板联动区 - 增强版 */
+  .content-template-linkage {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #f0f1ff 0%, #faf5ff 100%);
+    border: 2px solid #c7d2fe;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ct-linkage-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #667eea10, #764ba210);
+    border-bottom: 1px solid #e0e7ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ct-linkage-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ct-linkage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+  .ct-linkage-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e1b4b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ct-linkage-title i { color: #667eea; font-size: 15px; }
+  .ct-linkage-desc {
+    font-size: 11px;
+    color: #6366f1;
+    margin-top: 2px;
+  }
+  .ct-linkage-manage {
+    font-size: 12px;
+    color: #667eea;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+    padding: 6px 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #c7d2fe;
+    transition: all 0.2s;
+  }
+  .ct-linkage-manage:hover {
+    background: #667eea;
+    color: #fff;
+    border-color: #667eea;
+  }
+
+  .ct-linkage-body {
+    padding: 18px 20px;
+  }
+  .ct-linkage-benefit {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e0e7ff;
+  }
+  .ct-benefit-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #4f46e5;
+  }
+  .ct-benefit-item i {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #667eea;
+  }
+
+  .ct-cards-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .ct-card {
+    background: #fff;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    text-align: center;
+  }
+  .ct-card:hover {
+    border-color: #667eea;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(102,126,234,0.2);
+  }
+  .ct-card.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea08, #764ba208);
+    box-shadow: 0 0 0 4px rgba(102,126,234,0.12), 0 4px 12px rgba(102,126,234,0.15);
+  }
+  .ct-card.active .ct-card-check {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .ct-card-check {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.4);
+    transform: scale(0);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ct-card-thumb {
+    height: 50px;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ct-card-thumb-doc {
+    padding: 6px 8px;
+  }
+  .ct-card-thumb-title {
+    height: 5px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 2px;
+    width: 60%;
+    margin-bottom: 5px;
+  }
+  .ct-card-thumb-line {
+    height: 3px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    margin-bottom: 3px;
+  }
+  .ct-card-thumb-line.short { width: 40%; }
+  .ct-card-thumb-line.medium { width: 70%; }
+  .ct-card-thumb-line.long { width: 90%; }
+  .ct-card-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #1e1b4b;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ct-card.active .ct-card-name { color: #4f46e5; }
+  .ct-card-meta {
+    font-size: 10px;
+    color: #9ca3af;
+  }
+  .ct-card-free {
+    border: 2px dashed #c7d2fe;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #667eea;
+    gap: 4px;
+    min-height: 92px;
+    transition: all 0.3s;
+  }
+  .ct-card-free:hover {
+    border-color: #667eea;
+    background: #f0f1ff;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(102,126,234,0.15);
+  }
+  .ct-card-free.active {
+    background: linear-gradient(135deg, #f0f1ff, #faf5ff);
+    border-style: solid;
+    border-color: #667eea;
+  }
+  .ct-card-free i { font-size: 18px; }
+  .ct-card-free span { font-size: 11px; font-weight: 600; }
+
+  /* 岗位胶囊 */
+  .role-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .role-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1.5px solid transparent;
+  }
+  .role-chip.purple { background: #f0f1ff; color: #667eea; }
+  .role-chip.green { background: #ecfdf5; color: #10b981; }
+  .role-chip.orange { background: #fff7ed; color: #f59e0b; }
+  .role-chip.blue { background: #eff6ff; color: #3b82f6; }
+  .role-chip.pink { background: #fdf2f8; color: #ec4899; }
+  .role-chip.gray { background: #f3f4f6; color: #6b7280; }
+  .role-chip:hover { transform: translateY(-1px); }
+  .role-chip.active {
+    box-shadow: 0 0 0 2px currentColor, 0 4px 12px rgba(0,0,0,0.1);
+    font-weight: 600;
+  }
+
+  /* 生成模式卡片 */
+  .mode-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .mode-card {
+    padding: 20px;
+    border: 2px solid #eef0f3;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    gap: 14px;
+  }
+  .mode-card:hover {
+    border-color: #c7d2fe;
+    background: #fafbff;
+  }
+  .mode-card.active {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea08, #764ba208);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  }
+  .mode-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+  .mode-card.active .mode-card-icon {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+  }
+  .mode-card-content h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+  .mode-card-content p {
+    font-size: 12px;
+    color: #9ca3af;
+    line-height: 1.5;
+  }
+
+  /* 字段设计 */
+  .fields-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .field-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #fafafa;
+    border-radius: 10px;
+    border: 1px solid #eee;
+    cursor: grab;
+    transition: all 0.2s;
+  }
+  .field-item:hover {
+    background: #f5f5f5;
+    border-color: #ddd;
+  }
+  .field-drag {
+    color: #9ca3af;
+    font-size: 14px;
+    cursor: grab;
+  }
+  .field-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #667eea;
+  }
+  .field-info { flex: 1; }
+  .field-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 2px;
+  }
+  .field-meta {
+    font-size: 12px;
+    color: #9ca3af;
+  }
+  .field-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .field-item:hover .field-actions { opacity: 1; }
+  .field-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: #fff;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .field-action-btn:hover {
+    background: #667eea;
+    color: #fff;
+  }
+  .add-field-btn {
+    width: 100%;
+    padding: 14px;
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    background: #fafafa;
+    color: #6b7280;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .add-field-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+    background: #f0f1ff;
+  }
+
+  /* 提示词区域 */
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .prompt-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .ai-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .ai-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+  .prompt-textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 16px;
+    border: 2px solid #eef0f3;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #374151;
+    outline: none;
+    resize: vertical;
+    font-family: 'Monaco', 'Menlo', monospace;
+    transition: all 0.2s;
+  }
+  .prompt-textarea:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  }
+
+  /* 右侧预览区 */
+  .preview-panel {
+    position: sticky;
+    top: 24px;
+  }
+  .preview-label {
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .preview-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    background: #fff;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+  }
+  .preview-tab {
+    flex: 1;
+    padding: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    border-radius: 7px;
+    cursor: pointer;
+    color: #6b7280;
+    transition: all 0.2s;
+  }
+  .preview-tab.active {
+    background: #f0f1ff;
+    color: #667eea;
+  }
+  .preview-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #eef0f3;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  }
+  .preview-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+  }
+  .preview-header-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+  .preview-header-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .preview-header-desc {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+  .preview-body {
+    padding: 20px;
+  }
+  .preview-field {
+    margin-bottom: 16px;
+  }
+  .preview-field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+  .preview-field-input {
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: #9ca3af;
+  }
+  .preview-field-textarea {
+    height: 80px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 13px;
+    color: #9ca3af;
+  }
+  .preview-generate-btn {
+    width: 100%;
+    height: 42px;
+    margin-top: 8px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+  }
+
+  /* 预览区联动标识 */
+  .preview-linked-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 12px;
+    margin-left: 6px;
+  }
+  .preview-linked-info {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+  }
+  .preview-linked-info-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #047857;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .preview-linked-info-title i { font-size: 10px; }
+  .preview-linked-info-desc {
+    font-size: 10px;
+    color: #059669;
+    line-height: 1.5;
+  }
+  .preview-linked-template-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: #fff;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #047857;
+    margin-top: 6px;
+  }
+
+  /* 内容结构预览 */
+  .structure-preview {
+    display: none;
+    padding: 20px;
+  }
+  .structure-preview.active { display: block; }
+  .structure-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .structure-title i { color: #667eea; }
+  .structure-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .structure-item {
+    padding: 10px 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
+  }
+  .structure-item.level-2 {
+    margin-left: 16px;
+    border-left-color: #a5b4fc;
+    font-weight: 400;
+    color: #6b7280;
+    font-size: 11px;
+  }
+  .structure-item.level-3 {
+    margin-left: 32px;
+    border-left-color: #c7d2fe;
+    font-weight: 400;
+    color: #9ca3af;
+    font-size: 11px;
+  }
+
+  /* 预设库页面 */
+  .preset-page {
+    display: none;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .preset-page.active { display: block; }
+  .preset-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .preset-filter {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    background: #fff;
+    color: #6b7280;
+    cursor: pointer;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+  }
+  .preset-filter:hover {
+    border-color: #c7d2fe;
+    color: #667eea;
+  }
+  .preset-filter.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border-color: transparent;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .preset-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.25s;
+    border: 1px solid #eef0f3;
+    position: relative;
+  }
+  .preset-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+    border-color: #c7d2fe;
+  }
+  .preset-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+  .preset-card h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+  .preset-card-desc {
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+  .preset-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .preset-card-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  .preset-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid #f3f4f6;
+  }
+  .preset-card-meta {
+    font-size: 12px;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .preset-card-use {
+    font-size: 12px;
+    color: #667eea;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.2s;
+  }
+  .preset-card:hover .preset-card-use { opacity: 1; transform: translateX(0); }
+  .preset-card:hover .preset-card-meta { opacity: 0; }
+
+  .preset-search {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .preset-search-input {
+    flex: 1;
+    height: 42px;
+    padding: 0 16px 0 40px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .preset-search-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  }
+
+  /* 底部操作栏 */
+  .bottom-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="top-bar">
+  <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-arrow-left"></i></button>
+  <div class="top-title">创建模板</div>
+  <div class="top-tabs">
+    <div class="top-tab">对话创建</div>
+    <div class="top-tab active">表单创建</div>
+    <div class="top-tab">从示例提取</div>
+  </div>
+  <div class="top-actions">
+    <button class="btn btn-secondary">预览</button>
+    <button class="btn btn-primary">保存模板</button>
+  </div>
+</div>
+
+<!-- 入口选择页 -->
+<div id="entryPage" class="container">
+  <div class="entry-header">
+    <h1>你想怎么创建模板？</h1>
+    <p>选择一种方式，快速搭建你的场景模板</p>
+  </div>
+  <div class="entry-cards">
+    <div class="entry-card purple" onclick="goToEditor()">
+      <div class="entry-card-icon"><i class="fa-solid fa-pen-nib"></i></div>
+      <h3>从零开始</h3>
+      <p>自定义内容类型、字段和提示词，完全按照你的想法来创建一个全新的模板。</p>
+      <div class="entry-card-btn">
+        开始创建 <i class="fa-solid fa-arrow-right"></i>
+      </div>
+      <div class="entry-card-footer">
+        <i class="fa-solid fa-sliders"></i>
+        完全自定义，适合有明确想法的场景
+      </div>
+    </div>
+    <div class="entry-card green" onclick="goToPreset()">
+      <div class="entry-card-icon"><i class="fa-solid fa-rocket"></i></div>
+      <h3>从预设开始</h3>
+      <p>选择一个常用模板骨架，稍作修改就能用，快速上手，不用从零设计。</p>
+      <div class="entry-card-btn">
+        浏览预设 <i class="fa-solid fa-arrow-right"></i>
+      </div>
+      <div class="entry-card-footer">
+        <i class="fa-solid fa-layer-group"></i>
+        已有 24 个精选预设模板
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 预设库页面 -->
+<div id="presetPage" class="preset-page">
+  <div class="preset-search">
+    <input class="preset-search-input" placeholder="搜索预设模板名称、描述..." />
+    <button class="btn btn-secondary" onclick="goBack()"><i class="fa-solid fa-arrow-left"></i> 返回</button>
+  </div>
+  <div class="preset-filters">
+    <div class="preset-filter active">全部</div>
+    <div class="preset-filter">文档写作</div>
+    <div class="preset-filter">表格</div>
+    <div class="preset-filter">PPT</div>
+    <div class="preset-filter">邮件</div>
+    <div class="preset-filter">报告</div>
+    <div class="preset-filter">列表/步骤</div>
+  </div>
+  <div class="preset-grid">
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-briefcase"></i></div>
+      <h4>客户方案生成</h4>
+      <p class="preset-card-desc">根据客户需求快速生成个性化方案文档，包含背景、方案、优势等。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">销售</span>
+        <span class="preset-card-tag">文档</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 5 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+      <h4>周工作报告</h4>
+      <p class="preset-card-desc">结构化输出本周工作内容、进展、问题和下周计划。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">办公</span>
+        <span class="preset-card-tag">报告</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 4 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-handshake"></i></div>
+      <h4>会议纪要</h4>
+      <p class="preset-card-desc">自动整理会议要点、决议事项、行动项和责任人。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">办公</span>
+        <span class="preset-card-tag">文档</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 6 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-envelope"></i></div>
+      <h4>客户投诉回复</h4>
+      <p class="preset-card-desc">专业礼貌地回复客户投诉，安抚情绪并给出解决方案。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">客服</span>
+        <span class="preset-card-tag">邮件</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 5 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-file-excel"></i></div>
+      <h4>竞品对比表</h4>
+      <p class="preset-card-desc">多维度对比分析竞品优劣势，生成结构化对比表格。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">产品</span>
+        <span class="preset-card-tag">表格</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 4 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+    <div class="preset-card" onclick="goToEditor()">
+      <div class="preset-card-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+      <h4>产品发布PPT</h4>
+      <p class="preset-card-desc">自动生成产品发布演示文稿大纲，涵盖背景、功能、价值等页。</p>
+      <div class="preset-card-tags">
+        <span class="preset-card-tag">产品</span>
+        <span class="preset-card-tag">PPT</span>
+      </div>
+      <div class="preset-card-footer">
+        <div class="preset-card-meta"><i class="fa-solid fa-list-ul"></i> 6 个字段</div>
+        <div class="preset-card-use">使用此预设 →</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 合并编辑页 -->
+<div id="editorPage" class="editor-page">
+  <div class="editor-layout">
+    <!-- 左侧编辑区 -->
+    <div>
+      <!-- 模板名称 -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-file-signature"></i></div>
+            基本信息
+          </div>
+        </div>
+        <div class="name-input-group">
+          <div class="icon-selector"><i class="fa-solid fa-pen-nib"></i></div>
+          <input class="name-input" placeholder="给模板起个名字，例如：客户方案生成" value="客户方案生成" />
+        </div>
+      </div>
+
+      <!-- 内容类型 + 输出格式 + 内容模板（联动区） -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-shapes"></i></div>
+            内容与格式
+          </div>
+        </div>
+        <div class="edit-section-desc">选择内容类型和输出格式，可关联内容模板规范输出结构</div>
+
+        <!-- 内容类型 -->
+        <div style="margin-bottom: 20px;">
+          <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">内容类型</div>
+          <div class="type-cards">
+            <div class="type-card active" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-file-lines"></i></div>
+              <div class="type-card-name">文档写作</div>
+              <div class="type-card-desc">方案、报告、说明等长文</div>
+            </div>
+            <div class="type-card" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-table-cells"></i></div>
+              <div class="type-card-name">表格生成</div>
+              <div class="type-card-desc">对比表、清单、数据表格</div>
+            </div>
+            <div class="type-card" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-presentation"></i></div>
+              <div class="type-card-name">PPT制作</div>
+              <div class="type-card-desc">演示文稿大纲与内容</div>
+            </div>
+            <div class="type-card" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+              <div class="type-card-name">研究报告</div>
+              <div class="type-card-desc">行业分析、市场调研报告</div>
+            </div>
+            <div class="type-card" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-envelope"></i></div>
+              <div class="type-card-name">邮件</div>
+              <div class="type-card-desc">商务邮件、通知、回复</div>
+            </div>
+            <div class="type-card" onclick="selectType(this)">
+              <div class="type-card-icon"><i class="fa-solid fa-list-check"></i></div>
+              <div class="type-card-name">列表/步骤</div>
+              <div class="type-card-desc">清单、待办、流程步骤</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 输出格式 -->
+        <div style="margin-bottom: 16px;">
+          <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">输出格式</div>
+          <div class="format-pills">
+            <div class="format-pill active" onclick="selectFormat(this)"><i class="fa-solid fa-file-lines"></i> 纯文本</div>
+            <div class="format-pill" onclick="selectFormat(this)"><i class="fa-brands fa-markdown"></i> Markdown</div>
+            <div class="format-pill" onclick="selectFormat(this)"><i class="fa-solid fa-envelope"></i> 邮件格式</div>
+            <div class="format-pill" onclick="selectFormat(this)"><i class="fa-solid fa-list-ul"></i> 清单列表</div>
+            <div class="format-pill" onclick="selectFormat(this)"><i class="fa-solid fa-person-walking"></i> 步骤流程</div>
+          </div>
+        </div>
+
+        <!-- 内容模板联动区（增强版） -->
+        <div class="content-template-linkage">
+          <div class="ct-linkage-header">
+            <div>
+              <div class="ct-linkage-title-row">
+                <div class="ct-linkage-badge">
+                  <i class="fa-solid fa-link"></i>
+                  联动功能
+                </div>
+              </div>
+              <div style="margin-top:8px;">
+                <div class="ct-linkage-title">
+                  <i class="fa-solid fa-puzzle-piece"></i>
+                  关联内容模板
+                </div>
+                <div class="ct-linkage-desc">选择内容模板，自动规范输出结构，生成更专业的内容</div>
+              </div>
+            </div>
+            <button class="ct-linkage-manage">
+              <i class="fa-solid fa-gear"></i> 管理模板库
+            </button>
+          </div>
+          <div class="ct-linkage-body">
+            <!-- 价值说明 -->
+            <div class="ct-linkage-benefit">
+              <div class="ct-benefit-item">
+                <i class="fa-solid fa-check"></i>
+                <span>结构更专业</span>
+              </div>
+              <div class="ct-benefit-item">
+                <i class="fa-solid fa-bolt"></i>
+                <span>生成更高效</span>
+              </div>
+              <div class="ct-benefit-item">
+                <i class="fa-solid fa-palette"></i>
+                <span>格式更统一</span>
+              </div>
+            </div>
+            <!-- 模板卡片 -->
+            <div class="ct-cards-row">
+              <div class="ct-card-free" onclick="selectCT(this, 'free')">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>自由生成</span>
+              </div>
+              <div class="ct-card active" onclick="selectCT(this, 'scheme')">
+                <div class="ct-card-check"><i class="fa-solid fa-check"></i></div>
+                <div class="ct-card-thumb ct-card-thumb-doc">
+                  <div class="ct-card-thumb-title"></div>
+                  <div class="ct-card-thumb-line long"></div>
+                  <div class="ct-card-thumb-line medium"></div>
+                  <div class="ct-card-thumb-line short"></div>
+                  <div class="ct-card-thumb-line long"></div>
+                </div>
+                <div class="ct-card-name">方案文档结构</div>
+                <div class="ct-card-meta">8 章节</div>
+              </div>
+              <div class="ct-card" onclick="selectCT(this, 'weekly')">
+                <div class="ct-card-check"><i class="fa-solid fa-check"></i></div>
+                <div class="ct-card-thumb ct-card-thumb-doc">
+                  <div class="ct-card-thumb-title" style="background:linear-gradient(90deg,#10b981,#059669);"></div>
+                  <div class="ct-card-thumb-line medium"></div>
+                  <div class="ct-card-thumb-line long"></div>
+                  <div class="ct-card-thumb-line short"></div>
+                </div>
+                <div class="ct-card-name">周报模板</div>
+                <div class="ct-card-meta">5 章节</div>
+              </div>
+              <div class="ct-card" onclick="selectCT(this, 'meeting')">
+                <div class="ct-card-check"><i class="fa-solid fa-check"></i></div>
+                <div class="ct-card-thumb ct-card-thumb-doc">
+                  <div class="ct-card-thumb-title" style="background:linear-gradient(90deg,#f59e0b,#d97706);"></div>
+                  <div class="ct-card-thumb-line long"></div>
+                  <div class="ct-card-thumb-line short"></div>
+                  <div class="ct-card-thumb-line medium"></div>
+                </div>
+                <div class="ct-card-name">会议纪要</div>
+                <div class="ct-card-meta">6 章节</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 适用岗位 -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-user-tie"></i></div>
+            适用岗位
+          </div>
+        </div>
+        <div class="role-chips">
+          <div class="role-chip purple active">销售</div>
+          <div class="role-chip green">市场</div>
+          <div class="role-chip orange">运营</div>
+          <div class="role-chip blue">产品</div>
+          <div class="role-chip pink">人力</div>
+          <div class="role-chip gray">客服</div>
+          <div class="role-chip purple">研发</div>
+          <div class="role-chip green">财务</div>
+          <div class="role-chip orange">管理层</div>
+        </div>
+      </div>
+
+      <!-- 生成模式 -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-gears"></i></div>
+            生成模式
+          </div>
+        </div>
+        <div class="mode-cards">
+          <div class="mode-card active">
+            <div class="mode-card-icon"><i class="fa-solid fa-database"></i></div>
+            <div class="mode-card-content">
+              <h4>基于知识库</h4>
+              <p>从已有的知识库文档中提取信息生成内容</p>
+            </div>
+          </div>
+          <div class="mode-card">
+            <div class="mode-card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div class="mode-card-content">
+              <h4>自由生成</h4>
+              <p>直接根据用户输入自由生成，不依赖知识库</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 字段设计 -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-layer-group"></i></div>
+            字段设计
+          </div>
+          <span class="edit-section-badge">5 个字段</span>
+        </div>
+        <div class="fields-list">
+          <div class="field-item">
+            <div class="field-drag"><i class="fa-solid fa-grip-vertical"></i></div>
+            <div class="field-icon"><i class="fa-solid fa-font"></i></div>
+            <div class="field-info">
+              <div class="field-name">主题</div>
+              <div class="field-meta">短文本 · 必填</div>
+            </div>
+            <div class="field-actions">
+              <button class="field-action-btn"><i class="fa-solid fa-pen"></i></button>
+              <button class="field-action-btn"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="field-item">
+            <div class="field-drag"><i class="fa-solid fa-grip-vertical"></i></div>
+            <div class="field-icon"><i class="fa-solid fa-align-left"></i></div>
+            <div class="field-info">
+              <div class="field-name">客户需求</div>
+              <div class="field-meta">长文本 · 必填</div>
+            </div>
+            <div class="field-actions">
+              <button class="field-action-btn"><i class="fa-solid fa-pen"></i></button>
+              <button class="field-action-btn"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="field-item">
+            <div class="field-drag"><i class="fa-solid fa-grip-vertical"></i></div>
+            <div class="field-icon"><i class="fa-solid fa-building"></i></div>
+            <div class="field-info">
+              <div class="field-name">公司名称</div>
+              <div class="field-meta">短文本 · 选填</div>
+            </div>
+            <div class="field-actions">
+              <button class="field-action-btn"><i class="fa-solid fa-pen"></i></button>
+              <button class="field-action-btn"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="field-item">
+            <div class="field-drag"><i class="fa-solid fa-grip-vertical"></i></div>
+            <div class="field-icon"><i class="fa-solid fa-user"></i></div>
+            <div class="field-info">
+              <div class="field-name">联系人</div>
+              <div class="field-meta">短文本 · 选填</div>
+            </div>
+            <div class="field-actions">
+              <button class="field-action-btn"><i class="fa-solid fa-pen"></i></button>
+              <button class="field-action-btn"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="field-item">
+            <div class="field-drag"><i class="fa-solid fa-grip-vertical"></i></div>
+            <div class="field-icon"><i class="fa-solid fa-list"></i></div>
+            <div class="field-info">
+              <div class="field-name">方案类型</div>
+              <div class="field-meta">单选 · 标准方案/定制方案</div>
+            </div>
+            <div class="field-actions">
+              <button class="field-action-btn"><i class="fa-solid fa-pen"></i></button>
+              <button class="field-action-btn"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        </div>
+        <button class="add-field-btn">
+          <i class="fa-solid fa-plus"></i> 添加字段
+        </button>
+      </div>
+
+      <!-- 提示词模板 -->
+      <div class="edit-section">
+        <div class="edit-section-header">
+          <div class="edit-section-title">
+            <div class="edit-section-title-icon"><i class="fa-solid fa-comment-dots"></i></div>
+            提示词模板
+          </div>
+        </div>
+        <div class="prompt-header">
+          <div style="font-size:13px;color:#6b7280;">可用 {字段ID} 引用字段值，如 {主题}、{客户需求}</div>
+          <div class="prompt-actions">
+            <button class="ai-btn"><i class="fa-solid fa-rotate"></i> 重新生成</button>
+          </div>
+        </div>
+        <textarea class="prompt-textarea">你是一位资深的方案顾问。请基于以下信息为客户生成一份专业的解决方案文档：
+
+主题：{主题}
+客户需求：{客户需求}
+公司名称：{公司名称}
+联系人：{联系人}
+方案类型：{方案类型}
+
+要求：
+1. 结构清晰，包含背景分析、解决方案、产品优势、实施规划等部分；
+2. 使用专业、正式的商务语气；
+3. 突出我们产品如何解决客户的核心痛点；
+4. 确保内容可直接用于客户沟通。</textarea>
+      </div>
+
+      <div style="height: 80px;"></div>
+    </div>
+
+    <!-- 右侧预览区 -->
+    <div class="preview-panel">
+      <div class="preview-label"><i class="fa-regular fa-eye"></i> 实时预览</div>
+      <div class="preview-tabs">
+        <div class="preview-tab active" onclick="switchPreview(this, 'form')">表单预览</div>
+        <div class="preview-tab" onclick="switchPreview(this, 'structure')">内容结构</div>
+      </div>
+      <div class="preview-card">
+        <!-- 表单预览 -->
+        <div id="previewForm">
+          <div class="preview-header">
+            <div>
+              <div class="preview-header-tag">写作 · 文档</div>
+              <div class="preview-linked-badge">
+                <i class="fa-solid fa-link"></i>
+                已关联内容模板
+              </div>
+            </div>
+            <div class="preview-header-title">客户方案生成</div>
+            <div class="preview-header-desc">专业方案，一键生成</div>
+          </div>
+          <div class="preview-body">
+            <!-- 联动提示信息 -->
+            <div class="preview-linked-info">
+              <div class="preview-linked-info-title">
+                <i class="fa-solid fa-puzzle-piece"></i>
+                内容结构已联动
+              </div>
+              <div class="preview-linked-info-desc">
+                生成的内容将自动按照关联的内容模板结构输出
+              </div>
+              <div class="preview-linked-template-name">
+                <i class="fa-solid fa-file-lines"></i>
+                方案文档结构 · 8 章节
+              </div>
+            </div>
+
+            <div style="height:14px;"></div>
+
+            <div class="preview-field">
+              <div class="preview-field-label">主题 *</div>
+              <div class="preview-field-input">请输入主题</div>
+            </div>
+            <div class="preview-field">
+              <div class="preview-field-label">客户需求 *</div>
+              <div class="preview-field-textarea">请描述客户的具体需求...</div>
+            </div>
+            <div class="preview-field">
+              <div class="preview-field-label">公司名称</div>
+              <div class="preview-field-input">请输入公司名称</div>
+            </div>
+            <div class="preview-field">
+              <div class="preview-field-label">联系人</div>
+              <div class="preview-field-input">请输入联系人</div>
+            </div>
+            <button class="preview-generate-btn">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> 生成内容
+            </button>
+          </div>
+        </div>
+
+        <!-- 内容结构预览 -->
+        <div id="previewStructure" class="structure-preview">
+          <div class="structure-title">
+            <i class="fa-solid fa-sitemap"></i>
+            方案文档结构预览
+          </div>
+          <div class="structure-list">
+            <div class="structure-item">一、项目背景与需求分析</div>
+            <div class="structure-item level-2">1.1 客户业务现状</div>
+            <div class="structure-item level-2">1.2 核心痛点与挑战</div>
+            <div class="structure-item">二、整体解决方案</div>
+            <div class="structure-item level-2">2.1 方案架构设计</div>
+            <div class="structure-item level-2">2.2 核心功能介绍</div>
+            <div class="structure-item level-2">2.3 技术实现路径</div>
+            <div class="structure-item">三、产品优势与价值</div>
+            <div class="structure-item level-2">3.1 差异化优势</div>
+            <div class="structure-item level-2">3.2 客户价值体现</div>
+            <div class="structure-item">四、实施与服务方案</div>
+            <div class="structure-item level-2">4.1 实施计划</div>
+            <div class="structure-item level-2">4.2 服务保障</div>
+            <div class="structure-item">五、总结与建议</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部操作栏 -->
+<div id="bottomActions" class="bottom-actions" style="display:none;">
+  <button class="btn btn-secondary" onclick="goBack()">返回</button>
+  <button class="btn btn-primary">保存模板</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+<script>
+  let currentPage = 'entry';
+
+  function goToEditor() {
+    document.getElementById('entryPage').style.display = 'none';
+    document.getElementById('presetPage').classList.remove('active');
+    document.getElementById('editorPage').classList.add('active');
+    document.getElementById('bottomActions').style.display = 'flex';
+    currentPage = 'editor';
+    window.scrollTo(0, 0);
+  }
+
+  function goToPreset() {
+    document.getElementById('entryPage').style.display = 'none';
+    document.getElementById('editorPage').classList.remove('active');
+    document.getElementById('presetPage').classList.add('active');
+    document.getElementById('bottomActions').style.display = 'none';
+    currentPage = 'preset';
+    window.scrollTo(0, 0);
+  }
+
+  function goBack() {
+    if (currentPage === 'editor' || currentPage === 'preset') {
+      document.getElementById('editorPage').classList.remove('active');
+      document.getElementById('presetPage').classList.remove('active');
+      document.getElementById('entryPage').style.display = 'block';
+      document.getElementById('bottomActions').style.display = 'none';
+      currentPage = 'entry';
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function selectType(el) {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function selectFormat(el) {
+    document.querySelectorAll('.format-pill').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  const ctTemplates = {
+    free: {
+      name: '自由生成',
+      chapters: []
+    },
+    scheme: {
+      name: '方案文档结构',
+      chapters: [
+        { title: '一、项目背景与需求分析', level: 1 },
+        { title: '1.1 客户业务现状', level: 2 },
+        { title: '1.2 核心痛点与挑战', level: 2 },
+        { title: '二、整体解决方案', level: 1 },
+        { title: '2.1 方案架构设计', level: 2 },
+        { title: '2.2 核心功能介绍', level: 2 },
+        { title: '2.3 技术实现路径', level: 2 },
+        { title: '三、产品优势与价值', level: 1 },
+        { title: '3.1 差异化优势', level: 2 },
+        { title: '3.2 客户价值体现', level: 2 },
+        { title: '四、实施与服务方案', level: 1 },
+        { title: '4.1 实施计划', level: 2 },
+        { title: '4.2 服务保障', level: 2 },
+        { title: '五、总结与建议', level: 1 }
+      ]
+    },
+    weekly: {
+      name: '周报模板',
+      chapters: [
+        { title: '一、本周工作概述', level: 1 },
+        { title: '二、重点工作进展', level: 1 },
+        { title: '2.1 项目A进展', level: 2 },
+        { title: '2.2 项目B进展', level: 2 },
+        { title: '三、遇到的问题与解决方案', level: 1 },
+        { title: '四、下周工作计划', level: 1 },
+        { title: '4.1 重点任务', level: 2 },
+        { title: '4.2 时间规划', level: 2 },
+        { title: '五、需要协调的事项', level: 1 }
+      ]
+    },
+    meeting: {
+      name: '会议纪要',
+      chapters: [
+        { title: '一、会议基本信息', level: 1 },
+        { title: '二、会议议题与讨论', level: 1 },
+        { title: '2.1 议题一：项目进度汇报', level: 2 },
+        { title: '2.2 议题二：问题与风险', level: 2 },
+        { title: '2.3 议题三：下一步计划', level: 2 },
+        { title: '三、会议决议', level: 1 },
+        { title: '四、行动项跟踪', level: 1 },
+        { title: '4.1 待办事项清单', level: 2 },
+        { title: '4.2 责任人与截止时间', level: 2 },
+        { title: '五、附件', level: 1 }
+      ]
+    }
+  };
+
+  let currentCT = 'scheme';
+
+  function selectCT(el, type) {
+    document.querySelectorAll('.ct-card, .ct-card-free').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    currentCT = type;
+    updateStructurePreview();
+    updateLinkedBadge();
+  }
+
+  function updateStructurePreview() {
+    const template = ctTemplates[currentCT];
+    const structureList = document.querySelector('#previewStructure .structure-list');
+    const structureTitle = document.querySelector('#previewStructure .structure-title');
+    
+    if (currentCT === 'free' || template.chapters.length === 0) {
+      structureTitle.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> 自由生成模式';
+      structureList.innerHTML = '<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px;">未关联内容模板<br/>AI将根据输入自由组织内容结构</div>';
+    } else {
+      structureTitle.innerHTML = '<i class="fa-solid fa-sitemap"></i> ' + template.name + '预览';
+      structureList.innerHTML = template.chapters.map(ch => 
+        `<div class="structure-item level-${ch.level}">${ch.title}</div>`
+      ).join('');
+    }
+  }
+
+  function updateLinkedBadge() {
+    const badge = document.querySelector('.preview-linked-badge');
+    const linkedInfo = document.querySelector('.preview-linked-info');
+    const templateName = document.querySelector('.preview-linked-template-name');
+    
+    if (currentCT === 'free') {
+      badge.style.display = 'none';
+      linkedInfo.style.display = 'none';
+    } else {
+      badge.style.display = 'inline-flex';
+      linkedInfo.style.display = 'block';
+      templateName.innerHTML = '<i class="fa-solid fa-file-lines"></i> ' + ctTemplates[currentCT].name + ' · ' + ctTemplates[currentCT].chapters.filter(c => c.level === 1).length + ' 章节';
+    }
+  }
+
+  function switchPreview(el, type) {
+    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    if (type === 'form') {
+      document.getElementById('previewForm').style.display = 'block';
+      document.getElementById('previewStructure').classList.remove('active');
+    } else {
+      document.getElementById('previewForm').style.display = 'none';
+      document.getElementById('previewStructure').classList.add('active');
+    }
+  }
+</script>
+</body>
+</html>

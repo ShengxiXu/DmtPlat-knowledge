@@ -61,11 +61,11 @@ export function showToast(message, type = 'info') {
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   document.body.appendChild(toast);
-  
+
   setTimeout(() => {
     toast.classList.add('show');
   }, 10);
-  
+
   setTimeout(() => {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
@@ -73,8 +73,11 @@ export function showToast(message, type = 'info') {
 }
 
 export function getRatingStars(rating) {
-  const filled = `<i class="fa-solid fa-star" style="color:#FFD700;"></i>`.repeat(rating);
-  const empty = `<i class="fa-solid fa-star" style="color:#DDD;"></i>`.repeat(5 - rating);
+  const filled =
+    `<i class="fa-solid fa-star" style="color:#FFD700;"></i>`.repeat(rating);
+  const empty = `<i class="fa-solid fa-star" style="color:#DDD;"></i>`.repeat(
+    5 - rating
+  );
   return filled + empty;
 }
 

@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
-import legacy from '@vitejs/plugin-legacy'
+import { defineConfig } from 'vite';
+import legacy from '@vitejs/plugin-legacy';
 
 export default defineConfig({
   root: './src',
@@ -13,11 +13,12 @@ export default defineConfig({
     port: 5173,
     open: true,
     headers: {
-      'Content-Security-Policy': "default-src 'self'; connect-src 'self' http://localhost:3001; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:;",
+      'Content-Security-Policy':
+        "default-src 'self'; connect-src 'self' http://localhost:3001; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:;",
     },
   },
   build: {
     outDir: '../dist',
     sourcemap: true,
   },
-})
+});

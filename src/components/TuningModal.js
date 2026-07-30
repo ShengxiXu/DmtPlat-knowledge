@@ -36,21 +36,23 @@ export class TuningModal {
     const steps = [
       { number: '1', title: '问题分析' },
       { number: '2', title: '优化方案' },
-      { number: '3', title: '确认提交' }
+      { number: '3', title: '确认提交' },
     ];
 
-    return steps.map((step, index) => {
-      let className = 'tuning-step';
-      if (index + 1 === this.currentStep) className += ' active';
-      else if (index + 1 < this.currentStep) className += ' completed';
-      
-      return `
+    return steps
+      .map((step, index) => {
+        let className = 'tuning-step';
+        if (index + 1 === this.currentStep) className += ' active';
+        else if (index + 1 < this.currentStep) className += ' completed';
+
+        return `
         <div class="${className}">
           <div class="tuning-step-number">${step.number}</div>
           <div class="tuning-step-title">${step.title}</div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   renderStepContent() {
@@ -72,7 +74,7 @@ export class TuningModal {
       incomplete: '回答不完整',
       irrelevant: '回答不相关',
       confusing: '回答不清楚',
-      other: '其他'
+      other: '其他',
     };
 
     return `
@@ -101,28 +103,40 @@ export class TuningModal {
           </div>
         </div>
         
-        ${this.record.reasons && this.record.reasons.length > 0 ? `
+        ${
+          this.record.reasons && this.record.reasons.length > 0
+            ? `
         <div class="tuning-form-group">
           <label>不满意原因</label>
           <div style="display:flex;flex-wrap:gap;gap:8px;">
-            ${this.record.reasons.map(r => `<span style="padding:4px 12px;background:var(--kb-warning-muted);color:var(--kb-warning);border-radius:20px;font-size:13px;">${reasons[r] || r}</span>`).join('')}
+            ${this.record.reasons.map((r) => `<span style="padding:4px 12px;background:var(--kb-warning-muted);color:var(--kb-warning);border-radius:20px;font-size:13px;">${reasons[r] || r}</span>`).join('')}
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
-        ${this.record.feedback ? `
+        ${
+          this.record.feedback
+            ? `
         <div class="tuning-form-group">
           <label>用户反馈</label>
           <textarea readonly class="tuning-content">${this.record.feedback}</textarea>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
-        ${this.record.suggestion ? `
+        ${
+          this.record.suggestion
+            ? `
         <div class="tuning-form-group">
           <label>用户建议的正确回答</label>
           <textarea readonly class="tuning-content">${this.record.suggestion}</textarea>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -160,7 +174,8 @@ export class TuningModal {
   }
 
   renderStep3() {
-    const tuningType = this.modal?.querySelector('#tuning-type')?.value || 'update';
+    const tuningType =
+      this.modal?.querySelector('#tuning-type')?.value || 'update';
     const answer = this.modal?.querySelector('#tuning-answer')?.value || '';
     const tags = this.modal?.querySelector('#tuning-tags')?.value || '';
     const note = this.modal?.querySelector('#tuning-note')?.value || '';
@@ -168,7 +183,7 @@ export class TuningModal {
     const typeText = {
       update: '更新知识库答案',
       add: '添加新的问答对',
-      ignore: '标记为无需优化'
+      ignore: '标记为无需优化',
     };
 
     return `
@@ -180,26 +195,38 @@ export class TuningModal {
           <div class="tuning-content">${typeText[tuningType]}</div>
         </div>
         
-        ${tuningType !== 'ignore' && answer ? `
+        ${
+          tuningType !== 'ignore' && answer
+            ? `
         <div class="tuning-form-group">
           <label>优化后的答案</label>
           <div class="tuning-content">${answer}</div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
-        ${tags ? `
+        ${
+          tags
+            ? `
         <div class="tuning-form-group">
           <label>关联标签</label>
           <div class="tuning-content">${tags}</div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
-        ${note ? `
+        ${
+          note
+            ? `
         <div class="tuning-form-group">
           <label>优化备注</label>
           <div class="tuning-content">${note}</div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
         <div style="padding:16px;background:var(--kb-primary-subtle);border-radius:8px;margin-top:16px;">
           <p style="margin:0;font-size:14px;color:var(--kb-primary-dark);">
@@ -231,8 +258,10 @@ export class TuningModal {
   }
 
   renderStars(rating) {
-    return Array.from({ length: 5 }, (_, i) => 
-      `<i class="fa-solid fa-star ${i < rating ? 'active' : ''}" style="${i < rating ? 'color:var(--kb-primary);' : 'color:var(--kb-border);'}"></i>`
+    return Array.from(
+      { length: 5 },
+      (_, i) =>
+        `<i class="fa-solid fa-star ${i < rating ? 'active' : ''}" style="${i < rating ? 'color:var(--kb-primary);' : 'color:var(--kb-border);'}"></i>`
     ).join('');
   }
 
@@ -307,20 +336,21 @@ export class TuningModal {
   updateModal() {
     const body = this.modal.querySelector('.tuning-modal-body');
     const footer = this.modal.querySelector('.tuning-modal-footer');
-    
+
     body.innerHTML = `
       <div class="tuning-steps">
         ${this.renderSteps()}
       </div>
       ${this.renderStepContent()}
     `;
-    
+
     footer.innerHTML = this.renderFooterButtons();
     this.bindEvents();
   }
 
   submit() {
-    const tuningType = this.modal.querySelector('#tuning-type')?.value || 'update';
+    const tuningType =
+      this.modal.querySelector('#tuning-type')?.value || 'update';
     const answer = this.modal.querySelector('#tuning-answer')?.value || '';
     const tags = this.modal.querySelector('#tuning-tags')?.value || '';
     const note = this.modal.querySelector('#tuning-note')?.value || '';
@@ -329,10 +359,13 @@ export class TuningModal {
       recordId: this.record.id,
       type: tuningType,
       answer,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
       note,
       timestamp: new Date().toISOString(),
-      status: 'completed'
+      status: 'completed',
     };
 
     this.onSubmit(tuningData);

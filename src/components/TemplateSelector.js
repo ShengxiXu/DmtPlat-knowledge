@@ -8,16 +8,32 @@ export class TemplateSelector {
     this.groups = {
       recommended: {
         name: '推荐',
-        templates: ['template_product_help', 'template_customer_service', 'template_internal_wiki']
+        templates: [
+          'template_product_help',
+          'template_customer_service',
+          'template_internal_wiki',
+        ],
       },
       team: {
         name: '团队协作库',
-        templates: ['template_employee_training', 'template_marketing_faq', 'template_web_crawler', 'template_db_sync', 'template_finance_regulations', 'template_medical_guide']
+        templates: [
+          'template_employee_training',
+          'template_marketing_faq',
+          'template_web_crawler',
+          'template_db_sync',
+          'template_finance_regulations',
+          'template_medical_guide',
+        ],
       },
       industry: {
         name: '行业解决方案',
-        templates: ['template_ecommerce_faq', 'template_insurance_qa', 'template_hospital_faq', 'template_retail_product']
-      }
+        templates: [
+          'template_ecommerce_faq',
+          'template_insurance_qa',
+          'template_hospital_faq',
+          'template_retail_product',
+        ],
+      },
     };
     this.render();
     this.bindEvents();
@@ -42,15 +58,18 @@ export class TemplateSelector {
   }
 
   renderGroups() {
-    return Object.entries(this.groups).map(([key, group]) => `
+    return Object.entries(this.groups)
+      .map(
+        ([key, group]) => `
       <div class="template-group">
         <h4 class="group-title">${group.name}</h4>
         <div class="template-grid">
-          ${group.templates.map(templateId => {
-            const template = kbTemplates.find(t => t.id === templateId);
-            if (!template) return '';
-            const isSelected = this.selectedTemplate?.id === template.id;
-            return `
+          ${group.templates
+            .map((templateId) => {
+              const template = kbTemplates.find((t) => t.id === templateId);
+              if (!template) return '';
+              const isSelected = this.selectedTemplate?.id === template.id;
+              return `
               <div class="template-card-new ${isSelected ? 'selected' : ''}" data-template-id="${template.id}">
                 <i class="fa-solid fa-${template.icon} template-icon-new"></i>
                 <div class="template-info">
@@ -60,10 +79,13 @@ export class TemplateSelector {
                 ${isSelected ? '<div class="template-check">✓</div>' : ''}
               </div>
             `;
-          }).join('')}
+            })
+            .join('')}
         </div>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   }
 
   renderPreview(template) {
@@ -76,13 +98,13 @@ export class TemplateSelector {
       <div class="preview-section">
         <h5>适用场景</h5>
         <ul class="preview-list">
-          ${template.scenarios?.map(s => `<li>${s}</li>`).join('') || '<li>暂无</li>'}
+          ${template.scenarios?.map((s) => `<li>${s}</li>`).join('') || '<li>暂无</li>'}
         </ul>
       </div>
       <div class="preview-section">
         <h5>推荐功能</h5>
         <ul class="preview-list">
-          ${template.recommendedFeatures?.map(f => `<li>${f}</li>`).join('') || '<li>暂无</li>'}
+          ${template.recommendedFeatures?.map((f) => `<li>${f}</li>`).join('') || '<li>暂无</li>'}
         </ul>
       </div>
     `;
@@ -93,18 +115,20 @@ export class TemplateSelector {
       const card = e.target.closest('.template-card-new');
       if (card) {
         const templateId = card.dataset.templateId;
-        this.selectedTemplate = kbTemplates.find(t => t.id === templateId);
-        
+        this.selectedTemplate = kbTemplates.find((t) => t.id === templateId);
+
         // 更新选中状态
-        this.container.querySelectorAll('.template-card-new').forEach(c => c.classList.remove('selected'));
+        this.container
+          .querySelectorAll('.template-card-new')
+          .forEach((c) => c.classList.remove('selected'));
         card.classList.add('selected');
-        
+
         // 更新预览
         const previewContent = this.container.querySelector('#preview-content');
         if (previewContent) {
           previewContent.innerHTML = this.renderPreview(this.selectedTemplate);
         }
-        
+
         // 通知父组件
         if (this.callback) {
           this.callback(this.selectedTemplate);

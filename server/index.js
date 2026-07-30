@@ -24,8 +24,13 @@ const upload = multer({
     destination: path.join(__dirname, 'uploads'),
     filename: (req, file, cb) => {
       // multer 默认用 latin1 解码中文文件名，这里转回 utf8
-      const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-      const safeName = `${Date.now()}_${originalName}`.replace(/[^\w\-.\u4e00-\u9fa5]/g, '_');
+      const originalName = Buffer.from(file.originalname, 'latin1').toString(
+        'utf8'
+      );
+      const safeName = `${Date.now()}_${originalName}`.replace(
+        /[^\w\-.\u4e00-\u9fa5]/g,
+        '_'
+      );
       cb(null, safeName);
     },
   }),
@@ -33,8 +38,10 @@ const upload = multer({
 });
 
 const MIME_MAP = {
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+    'pptx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'application/pdf': 'pdf',
   'text/plain': 'txt',
@@ -50,7 +57,9 @@ app.post('/api/parse-template', upload.single('file'), async (req, res) => {
     }
 
     // multer 默认用 latin1 解码中文文件名，统一转回 utf8
-    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const originalName = Buffer.from(file.originalname, 'latin1').toString(
+      'utf8'
+    );
     const ext = path.extname(originalName).toLowerCase();
     const detectedType = MIME_MAP[file.mimetype] || ext.replace('.', '');
     const buffer = await fs.readFile(file.path);
@@ -74,7 +83,9 @@ app.post('/api/parse-template', upload.single('file'), async (req, res) => {
         result = { text: buffer.toString('utf8') };
         break;
       default:
-        return res.status(400).json({ error: `不支持的文件类型：${detectedType}` });
+        return res
+          .status(400)
+          .json({ error: `不支持的文件类型：${detectedType}` });
     }
 
     // 异步清理上传文件

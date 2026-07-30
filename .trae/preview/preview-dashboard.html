@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案三：AI Dashboard Widgets</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --primary: #59A674;
+      --primary-light: #dcfce7;
+      --shadow: 0 4px 16px -4px rgba(15,23,42,0.08);
+      --shadow-lg: 0 12px 32px -8px rgba(15,23,42,0.12);
+      --radius: 20px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .preview-wrapper {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    /* Header */
+    .dashboard-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .greeting {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .greeting-sub {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 320px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .search-box i { font-size: 13px; }
+
+    /* Quick Create Bar */
+    .quick-create {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .create-main {
+      background: linear-gradient(135deg, var(--primary), #3d8b5a);
+      border-radius: var(--radius);
+      padding: 28px;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 160px;
+      position: relative;
+      overflow: hidden;
+    }
+    .create-main::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+      pointer-events: none;
+    }
+    .create-main-title {
+      font-size: 20px;
+      font-weight: 700;
+      position: relative;
+    }
+    .create-main-sub {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-top: 6px;
+      position: relative;
+    }
+    .create-main-btn {
+      align-self: flex-start;
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .create-main-btn:hover { background: rgba(255,255,255,0.3); }
+
+    .create-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .create-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(89,166,116,0.4);
+    }
+    .create-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: white;
+      margin-bottom: 16px;
+    }
+    .create-card-title { font-size: 15px; font-weight: 700; }
+    .create-card-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Bento Dashboard */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-auto-rows: minmax(160px, auto);
+      gap: 20px;
+    }
+    .widget {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .widget.w-2 { grid-column: span 2; }
+    .widget.w-3 { grid-column: span 3; }
+    .widget.w-4 { grid-column: span 4; }
+    .widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .widget-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .widget-title i { color: var(--primary); font-size: 12px; }
+    .widget-action {
+      font-size: 12px;
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    /* Stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .stat-item {
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 14px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Recent Docs */
+    .doc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .doc-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .doc-item:hover { background: var(--bg); }
+    .doc-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--primary);
+      background: var(--primary-light);
+      flex-shrink: 0;
+    }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-title { font-size: 13px; font-weight: 600; }
+    .doc-meta { font-size: 11px; color: var(--text-muted); }
+
+    /* Scenes */
+    .scene-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .scene-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      background: var(--bg);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .scene-chip:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+    .scene-chip i {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+    }
+    .scene-chip-title { font-size: 13px; font-weight: 600; }
+
+    /* Activity */
+    .activity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .activity-item {
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .activity-text { color: var(--text-secondary); }
+    .activity-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    @media (max-width: 1200px) {
+      .bento-grid { grid-template-columns: repeat(2, 1fr); }
+      .widget.w-2, .widget.w-3, .widget.w-4 { grid-column: span 2; }
+      .scene-grid { grid-template-columns: repeat(2, 1fr); }
+      .stats-row { grid-template-columns: 1fr; }
+      .quick-create { grid-template-columns: 1fr 1fr; }
+      .create-main { grid-column: span 2; }
+    }
+    @media (max-width: 640px) {
+      .preview-wrapper { padding: 24px 16px; }
+      .dashboard-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+      .search-box { width: 100%; }
+      .greeting { font-size: 22px; }
+      .quick-create { grid-template-columns: 1fr; }
+      .create-main { grid-column: span 1; }
+      .bento-grid { grid-template-columns: 1fr; }
+      .widget.w-2, .widget.w-3, .widget.w-4 { grid-column: span 1; }
+      .scene-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-wrapper">
+    <div class="dashboard-header">
+      <div>
+        <div class="greeting">下午好，今天想创作什么？</div>
+        <div class="greeting-sub">AI 创作中心 · 一站式内容生产工作台</div>
+      </div>
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span>搜索文档、模板、场景...</span>
+      </div>
+    </div>
+
+    <div class="quick-create">
+      <div class="create-main">
+        <div>
+          <div class="create-main-title">一句话开始创作</div>
+          <div class="create-main-sub">描述需求，AI 自动匹配最佳创作方式</div>
+        </div>
+        <button class="create-main-btn"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right:6px;"></i>开始创作</button>
+      </div>
+      <div class="create-card">
+        <div class="create-card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <div>
+          <div class="create-card-title">场景创作</div>
+          <div class="create-card-desc">智能生成专业内容</div>
+        </div>
+      </div>
+      <div class="create-card">
+        <div class="create-card-icon" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"><i class="fa-solid fa-layer-group"></i></div>
+        <div>
+          <div class="create-card-title">内容模板</div>
+          <div class="create-card-desc">结构化快速生成</div>
+        </div>
+      </div>
+      <div class="create-card">
+        <div class="create-card-icon" style="background: linear-gradient(135deg, #10b981, #34d399);"><i class="fa-solid fa-folder-open"></i></div>
+        <div>
+          <div class="create-card-title">我的文档</div>
+          <div class="create-card-desc">管理创作成果</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bento-grid">
+      <div class="widget w-2">
+        <div class="widget-header">
+          <div class="widget-title"><i class="fa-solid fa-clock-rotate-left"></i> 最近创作</div>
+          <div class="widget-action">查看全部</div>
+        </div>
+        <div class="doc-list">
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-file-lines"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">Q3 销售周报</div>
+              <div class="doc-meta">场景创作 · 10 分钟前</div>
+            </div>
+          </div>
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-file-powerpoint"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">客户方案 PPT</div>
+              <div class="doc-meta">内容模板 · 2 小时前</div>
+            </div>
+          </div>
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-table"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">竞品对比表</div>
+              <div class="doc-meta">场景创作 · 昨天</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="widget">
+        <div class="widget-header">
+          <div class="widget-title"><i class="fa-solid fa-chart-pie"></i> 创作统计</div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-value">24</div>
+            <div class="stat-label">本周创作</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">8</div>
+            <div class="stat-label">模板使用</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">156</div>
+            <div class="stat-label">累计文档</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="widget w-4">
+        <div class="widget-header">
+          <div class="widget-title"><i class="fa-solid fa-bolt"></i> 快捷场景</div>
+          <div class="widget-action">自定义</div>
+        </div>
+        <div class="scene-grid">
+          <div class="scene-chip">
+            <i class="fa-solid fa-chart-line" style="background: linear-gradient(135deg, #59A674, #3d8b5a);"></i>
+            <div class="scene-chip-title">销售周报</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-file-powerpoint" style="background: linear-gradient(135deg, #3b82f6, #60a5fa);"></i>
+            <div class="scene-chip-title">客户方案</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-scale-balanced" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa);"></i>
+            <div class="scene-chip-title">竞品对比</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-bullhorn" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></i>
+            <div class="scene-chip-title">营销文案</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-headset" style="background: linear-gradient(135deg, #ec4899, #f472b6);"></i>
+            <div class="scene-chip-title">客服回复</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-envelope" style="background: linear-gradient(135deg, #14b8a6, #2dd4bf);"></i>
+            <div class="scene-chip-title">商务邮件</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-list-check" style="background: linear-gradient(135deg, #6366f1, #818cf8);"></i>
+            <div class="scene-chip-title">会议纪要</div>
+          </div>
+          <div class="scene-chip">
+            <i class="fa-solid fa-pen-nib" style="background: linear-gradient(135deg, #f97316, #fb923c);"></i>
+            <div class="scene-chip-title">文章续写</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="widget w-2">
+        <div class="widget-header">
+          <div class="widget-title"><i class="fa-solid fa-bolt"></i> 最近活动</div>
+        </div>
+        <div class="activity-list">
+          <div class="activity-item">
+            <div class="activity-dot"></div>
+            <div>
+              <div class="activity-text">创建了 <strong>Q3 销售周报</strong></div>
+              <div class="activity-time">10 分钟前</div>
+            </div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot"></div>
+            <div>
+              <div class="activity-text">保存了 <strong>客户方案 PPT</strong> 的修改</div>
+              <div class="activity-time">2 小时前</div>
+            </div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot"></div>
+            <div>
+              <div class="activity-text">从模板创建了 <strong>竞品对比表</strong></div>
+              <div class="activity-time">昨天</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="widget w-2">
+        <div class="widget-header">
+          <div class="widget-title"><i class="fa-solid fa-star"></i> 常用模板</div>
+          <div class="widget-action">全部模板</div>
+        </div>
+        <div class="doc-list">
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-file-powerpoint"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">商务汇报 PPT 模板</div>
+              <div class="doc-meta">本周使用 6 次</div>
+            </div>
+          </div>
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-file-lines"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">周报生成模板</div>
+              <div class="doc-meta">本周使用 4 次</div>
+            </div>
+          </div>
+          <div class="doc-item">
+            <div class="doc-icon"><i class="fa-regular fa-envelope"></i></div>
+            <div class="doc-info">
+              <div class="doc-title">客户跟进邮件</div>
+              <div class="doc-meta">本周使用 3 次</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

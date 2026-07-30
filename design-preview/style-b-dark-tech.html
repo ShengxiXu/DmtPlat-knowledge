@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>风格 B — 暗黑科技 · AI 创作中心</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --bg: #0A0A0F;
+    --bg-card: #131318;
+    --bg-elevated: #1A1A22;
+    --text: #F5F5F7;
+    --text-muted: #8E8E93;
+    --text-dim: #5A5A63;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --purple: #A78BFA;
+    --purple-glow: rgba(167,139,250,0.15);
+    --cyan: #22D3EE;
+    --cyan-glow: rgba(34,211,238,0.15);
+    --emerald: #34D399;
+    --emerald-glow: rgba(52,211,153,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* 环境渐变网格 */
+  .mesh {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 15% 20%, var(--purple-glow) 0%, transparent 40%),
+      radial-gradient(circle at 85% 15%, var(--cyan-glow) 0%, transparent 35%),
+      radial-gradient(circle at 50% 80%, var(--emerald-glow) 0%, transparent 40%);
+    opacity: 0.6;
+  }
+  /* 噪点纹理 */
+  .grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .hub {
+    position: relative;
+    z-index: 1;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 24px 32px 48px;
+  }
+
+  /* 顶部栏 */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    margin-bottom: 56px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .brand-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 10px var(--purple), 0 0 20px var(--purple-glow);
+  }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+  .top-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .top-btn:hover { color: var(--text); border-color: var(--border-hover); background: var(--bg-elevated); }
+  .top-btn .count {
+    background: var(--purple-glow);
+    color: var(--purple);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 100px;
+  }
+  .top-btn.icon-only { padding: 8px; width: 36px; height: 36px; justify-content: center; }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 24px 0 56px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--purple);
+    margin-bottom: 24px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .hero-badge .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--emerald);
+    box-shadow: 0 0 8px var(--emerald);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 14px;
+  }
+  .hero h1 .grad-1 { color: var(--purple); }
+  .hero h1 .grad-2 { color: var(--cyan); }
+  .hero h1 .grad-3 { color: var(--emerald); }
+  .hero p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+
+  /* 模式卡片 */
+  .portals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .portal {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .portal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--portal-color), transparent 60%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .portal::after {
+    content: '';
+    position: absolute;
+    top: -50%; right: -40%;
+    width: 240px; height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--portal-color) 0%, transparent 65%);
+    opacity: 0.06;
+    filter: blur(30px);
+    transition: opacity 0.4s;
+  }
+  .portal:hover {
+    transform: translateY(-4px);
+    background: var(--bg-elevated);
+  }
+  .portal:hover::before { opacity: 1; }
+  .portal:hover::after { opacity: 0.15; }
+
+  .portal-num {
+    position: absolute;
+    top: 20px; right: 24px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-family: "SF Mono", "Fira Code", monospace;
+    letter-spacing: 0.05em;
+  }
+  .portal-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--portal-color);
+    margin-bottom: 24px;
+    background: var(--portal-bg);
+    border: 1px solid var(--portal-border);
+    box-shadow: 0 0 20px var(--portal-glow);
+  }
+  .portal-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .portal-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .portal-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .portal-tags { display: flex; gap: 6px; }
+  .portal-tag {
+    font-size: 10px;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.03);
+    padding: 3px 9px;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+  }
+  .portal-go {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .portal:hover .portal-go {
+    background: var(--portal-color);
+    color: var(--bg);
+    box-shadow: 0 0 12px var(--portal-glow);
+  }
+
+  /* 最近创作 */
+  .recents {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .recents-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .recents-title {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+  }
+  .recents-title i { color: var(--text-dim); font-size: 12px; }
+  .recents-link {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .recents-link:hover { color: var(--purple); }
+  .recent-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item:hover { background: rgba(255,255,255,0.02); }
+  .recent-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .recent-info { flex: 1; min-width: 0; }
+  .recent-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recent-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 6px;
+  }
+  .recent-time {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: "SF Mono", monospace;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 860px) {
+    .portals { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="mesh"></div>
+<div class="grain"></div>
+<div class="hub">
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span>AI 创作中心</span>
+    </div>
+    <div class="top-actions">
+      <button class="top-btn">
+        <i class="fa-regular fa-folder-open"></i>
+        <span>文档</span>
+        <span class="count">12</span>
+      </button>
+      <button class="top-btn">
+        <i class="fa-regular fa-clock"></i>
+        <span>历史</span>
+      </button>
+      <button class="top-btn icon-only" title="切换主题">
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span>AI Online</span>
+    </div>
+    <h1>下午好<br><span class="grad-1">对</span><span class="grad-2">话</span>·<span class="grad-3">模</span><span class="grad-1">板</span>·<span class="grad-2">创</span><span class="grad-3">作</span></h1>
+    <p>三种创作模式，从自由对话到结构化模板，满足不同场景需求</p>
+  </div>
+
+  <!-- 三模式卡片 -->
+  <div class="portals">
+    <div class="portal" style="--portal-color: #A78BFA; --portal-bg: rgba(167,139,250,0.08); --portal-border: rgba(167,139,250,0.2); --portal-glow: rgba(167,139,250,0.2);">
+      <span class="portal-num">01</span>
+      <div class="portal-icon"><i class="fa-solid fa-comments"></i></div>
+      <div class="portal-title">AI 对话</div>
+      <div class="portal-desc">自由对话，像 ChatGPT 一样提问，AI 流式回复，可关联知识库</div>
+      <div class="portal-foot">
+        <div class="portal-tags">
+          <span class="portal-tag">自由提问</span>
+          <span class="portal-tag">流式</span>
+        </div>
+        <div class="portal-go"><i class="fa-solid fa-arrow-right"></i></div>
+      </div>
+    </div>
+
+    <div class="portal" style="--portal-color: #22D3EE; --portal-bg: rgba(34,211,238,0.08); --portal-border: rgba(34,211,238,0.2); --portal-glow: rgba(34,211,238,0.2);">
+      <span class="portal-num">02</span>
+      <div class="portal-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="portal-title">场景模板</div>
+      <div class="portal-desc">选择岗位能力模板，填写结构化字段，AI 按模板生成专业内容</div>
+      <div class="portal-foot">
+        <div class="portal-tags">
+          <span class="portal-tag">结构化</span>
+          <span class="portal-tag">PPT</span>
+        </div>
+        <div class="portal-go"><i class="fa-solid fa-arrow-right"></i></div>
+      </div>
+    </div>
+
+    <div class="portal" style="--portal-color: #34D399; --portal-bg: rgba(52,211,153,0.08); --portal-border: rgba(52,211,153,0.2); --portal-glow: rgba(52,211,153,0.2);">
+      <span class="portal-num">03</span>
+      <div class="portal-icon"><i class="fa-solid fa-file-lines"></i></div>
+      <div class="portal-title">内容模板</div>
+      <div class="portal-desc">选择文档模板（周报/纪要/方案），直接进入编辑器创作</div>
+      <div class="portal-foot">
+        <div class="portal-tags">
+          <span class="portal-tag">文档</span>
+          <span class="portal-tag">直接编辑</span>
+        </div>
+        <div class="portal-go"><i class="fa-solid fa-arrow-right"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最近创作 -->
+  <div class="recents">
+    <div class="recents-header">
+      <div class="recents-title">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>最近创作</span>
+      </div>
+      <div class="recents-link">查看全部 <i class="fa-solid fa-chevron-right" style="font-size:9px;"></i></div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(167,139,250,0.1); color: #A78BFA;"><i class="fa-solid fa-comments"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">AI 对话 · 产品竞品分析策略</div>
+        <div class="recent-meta"><span>AI 对话</span><span>·</span><span>自由模式</span></div>
+      </div>
+      <div class="recent-time">2h ago</div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(34,211,238,0.1); color: #22D3EE;"><i class="fa-solid fa-file-powerpoint"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">客户方案 PPT · DmtPlat 产品介绍</div>
+        <div class="recent-meta"><span>场景模板</span><span>·</span><span>销售岗</span><span>·</span><span>PPT</span></div>
+      </div>
+      <div class="recent-time">1d ago</div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(52,211,153,0.1); color: #34D399;"><i class="fa-solid fa-file-lines"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">工作周报 · 第30周研发进展</div>
+        <div class="recent-meta"><span>内容模板</span><span>·</span><span>Word</span></div>
+      </div>
+      <div class="recent-time">3d ago</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

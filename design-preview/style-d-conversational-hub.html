@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>风格 D — 对话式 Hub · AI 创作中心</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    /* A 方案的明亮配色 */
+    --bg: #F7F8FC;
+    --bg-card: #FFFFFF;
+    --bg-elevated: #FCFCFE;
+    --text: #1A1B2E;
+    --text-secondary: #4A4A52;
+    --text-muted: #6B7280;
+    --text-light: #9CA3AF;
+    --border: rgba(0,0,0,0.06);
+    --border-hover: rgba(0,0,0,0.12);
+    --radius: 20px;
+    --radius-sm: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03);
+    --shadow-hover: 0 8px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+    --shadow-focus: 0 0 0 4px rgba(139,92,246,0.10);
+    /* A 方案的三色渐变 */
+    --purple: #8B5CF6;
+    --purple-soft: rgba(139,92,246,0.08);
+    --purple-border: rgba(139,92,246,0.15);
+    --blue: #3B82F6;
+    --blue-soft: rgba(59,130,246,0.08);
+    --green: #10B981;
+    --green-soft: rgba(16,185,129,0.08);
+    --brand-gradient: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 50%, #10B981 100%);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* A 方案的环境光晕 */
+  .ambient {
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1100px;
+    height: 560px;
+    background: radial-gradient(ellipse at center,
+      rgba(139,92,246,0.12) 0%,
+      rgba(59,130,246,0.07) 35%,
+      rgba(16,185,129,0.04) 55%,
+      transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: breathe 8s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%,100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  }
+
+  .hub {
+    position: relative;
+    z-index: 1;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 28px 40px 48px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 顶部栏 */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    margin-bottom: 24px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  /* A 方案的渐变品牌球 */
+  .brand-dot {
+    width: 28px; height: 28px;
+    border-radius: 9px;
+    background: var(--brand-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 4px 14px rgba(139,92,246,0.35);
+  }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+  .top-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .top-btn:hover { color: var(--text); border-color: var(--border-hover); }
+  .top-btn .count {
+    background: var(--purple-soft);
+    color: var(--purple);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 100px;
+  }
+  .top-btn.icon-only { padding: 8px; width: 36px; height: 36px; justify-content: center; }
+
+  /* Hero 区 */
+  .hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 32px 0 28px;
+  }
+  /* A 方案的紫色 hero-badge */
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    background: var(--purple-soft);
+    border: 1px solid var(--purple-border);
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--purple);
+    margin-bottom: 20px;
+  }
+  .hero-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--purple);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .hero h1 {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  /* A 方案的渐变文字 */
+  .hero h1 .gradient {
+    background: var(--brand-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  .hero-sub {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  /* 对话输入框 —— 默认入口（融合 A 的柔和阴影 + 大圆角） */
+  .composer {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    overflow: hidden;
+    position: relative;
+  }
+  .composer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--brand-gradient);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .composer:focus-within {
+    border-color: rgba(139,92,246,0.25);
+    box-shadow: var(--shadow-md), var(--shadow-focus);
+  }
+  .composer:focus-within::before { opacity: 1; }
+  .composer-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 20px 22px 8px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: inherit;
+    line-height: 1.5;
+    resize: none;
+    min-height: 56px;
+    max-height: 200px;
+  }
+  .composer-input::placeholder { color: var(--text-light); }
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px 14px;
+  }
+  .composer-tools { display: flex; gap: 4px; align-items: center; }
+  .tool-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 11px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { background: rgba(0,0,0,0.03); color: var(--text); }
+  .tool-btn.active {
+    background: var(--purple-soft);
+    color: var(--purple);
+    border-color: var(--purple-border);
+  }
+  .tool-btn i { font-size: 12px; }
+  .tool-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+  /* A 方案的渐变发送按钮 */
+  .send-btn {
+    width: 36px; height: 36px;
+    border-radius: 11px;
+    background: var(--brand-gradient);
+    color: #fff;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    box-shadow: 0 4px 14px rgba(139,92,246,0.3);
+  }
+  .send-btn:hover { transform: scale(1.05); box-shadow: 0 6px 18px rgba(139,92,246,0.4); }
+  .send-btn:disabled {
+    background: var(--text-light);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    opacity: 0.6;
+  }
+
+  /* 提示词快捷 */
+  .prompts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 18px;
+    max-width: 720px;
+  }
+  .prompt-chip {
+    padding: 7px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+  }
+  .prompt-chip:hover {
+    border-color: var(--purple-border);
+    color: var(--purple);
+    background: var(--bg-card);
+    transform: translateY(-1px);
+  }
+  .prompt-chip i {
+    color: var(--purple);
+    margin-right: 5px;
+    font-size: 10px;
+    opacity: 0.7;
+  }
+
+  /* 辅助模式入口分隔 */
+  .alt-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 40px auto 16px;
+    max-width: 720px;
+    width: 100%;
+  }
+  .alt-divider::before,
+  .alt-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .alt-divider span {
+    font-size: 11px;
+    color: var(--text-light);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* 辅助模式入口 —— 融合 A 的彩色渐变图标 + hover 上浮 */
+  .alt-modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 0 auto;
+    max-width: 720px;
+    width: 100%;
+  }
+  .alt-mode {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    text-align: left;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .alt-mode::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--mode-color);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .alt-mode::after {
+    content: '';
+    position: absolute;
+    top: -50%; right: -30%;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--mode-color) 0%, transparent 70%);
+    opacity: 0.04;
+    filter: blur(20px);
+    transition: opacity 0.3s;
+  }
+  .alt-mode:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--mode-color);
+  }
+  .alt-mode:hover::before { opacity: 1; }
+  .alt-mode:hover::after { opacity: 0.10; }
+
+  /* A 方案的彩色渐变图标 */
+  .alt-mode-icon {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+    flex-shrink: 0;
+    background: var(--mode-gradient);
+    box-shadow: 0 4px 14px var(--mode-shadow);
+  }
+  .alt-mode-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .alt-mode-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: -0.01em;
+  }
+  .alt-mode-tag {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-light);
+    background: rgba(0,0,0,0.03);
+    padding: 2px 8px;
+    border-radius: 100px;
+  }
+  .alt-mode-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .alt-mode-arrow {
+    font-size: 11px;
+    color: var(--text-light);
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+  }
+  .alt-mode:hover .alt-mode-arrow {
+    color: #fff;
+    background: var(--mode-color);
+    transform: translateX(2px);
+  }
+  .alt-mode-arrow-wrap {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+  }
+  .alt-mode:hover .alt-mode-arrow-wrap {
+    background: var(--mode-color);
+  }
+
+  /* 最近创作 */
+  .recents {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    max-width: 720px;
+    width: 100%;
+    margin: 24px auto 0;
+    box-shadow: var(--shadow);
+  }
+  .recents-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .recents-title {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .recents-title i { color: var(--text-light); font-size: 12px; }
+  .recents-link {
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .recents-link:hover { color: var(--purple); }
+  .recent-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item:hover { background: rgba(0,0,0,0.02); }
+  .recent-icon {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .recent-info { flex: 1; min-width: 0; }
+  .recent-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recent-meta {
+    font-size: 11px;
+    color: var(--text-light);
+    display: flex;
+    gap: 6px;
+  }
+  .recent-time {
+    font-size: 11px;
+    color: var(--text-light);
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 720px) {
+    .hub { padding: 20px 16px; }
+    .hero h1 { font-size: 26px; }
+    .alt-modes { grid-template-columns: 1fr; }
+    .composer-input { font-size: 14px; padding: 16px 16px 6px; }
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div class="hub">
+  <!-- 顶部栏 -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-dot"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+      <span>AI 创作中心</span>
+    </div>
+    <div class="top-actions">
+      <button class="top-btn">
+        <i class="fa-regular fa-folder-open"></i>
+        <span>文档</span>
+        <span class="count">12</span>
+      </button>
+      <button class="top-btn">
+        <i class="fa-regular fa-clock"></i>
+        <span>历史</span>
+      </button>
+      <button class="top-btn icon-only" title="切换主题">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hero + 对话输入框（默认入口） -->
+  <div class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span>AI 已就绪</span>
+    </div>
+    <h1>下午好，<span class="gradient">直接开始对话</span><br><em>或选择下方结构化模板</em></h1>
+    <div class="hero-sub">支持关联知识库 · 流式输出 · 可随时切换到模板创作</div>
+
+    <!-- 对话输入框：默认交互入口 -->
+    <div class="composer">
+      <textarea class="composer-input" placeholder="描述你的需求，比如：帮我写一份产品竞品分析..." rows="1"></textarea>
+      <div class="composer-bar">
+        <div class="composer-tools">
+          <button class="tool-btn" title="关联知识库">
+            <i class="fa-solid fa-book"></i>
+            <span>知识库</span>
+          </button>
+          <button class="tool-btn" title="上传文件">
+            <i class="fa-solid fa-paperclip"></i>
+          </button>
+          <div class="tool-divider"></div>
+          <button class="tool-btn" title="深度思考">
+            <i class="fa-solid fa-brain"></i>
+            <span>深度思考</span>
+          </button>
+        </div>
+        <button class="send-btn" title="发送 (Enter)">
+          <i class="fa-solid fa-arrow-up"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 提示词快捷 -->
+    <div class="prompts">
+      <div class="prompt-chip"><i class="fa-solid fa-lightbulb"></i>写一份本周工作周报</div>
+      <div class="prompt-chip"><i class="fa-solid fa-lightbulb"></i>帮我做产品竞品分析</div>
+      <div class="prompt-chip"><i class="fa-solid fa-lightbulb"></i>起草一封项目启动邮件</div>
+      <div class="prompt-chip"><i class="fa-solid fa-lightbulb"></i>梳理季度OKR</div>
+    </div>
+  </div>
+
+  <!-- 辅助模式入口 -->
+  <div class="alt-divider"><span>或使用结构化模板</span></div>
+  <div class="alt-modes">
+    <div class="alt-mode" style="--mode-color: #3B82F6; --mode-gradient: linear-gradient(135deg, #3B82F6, #06B6D4); --mode-shadow: rgba(59,130,246,0.3);">
+      <div class="alt-mode-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="alt-mode-body">
+        <div class="alt-mode-title">场景模板 <span class="alt-mode-tag">结构化</span></div>
+        <div class="alt-mode-desc">选岗位模板，按字段生成 PPT/报告</div>
+      </div>
+      <div class="alt-mode-arrow-wrap"><i class="fa-solid fa-arrow-right alt-mode-arrow"></i></div>
+    </div>
+    <div class="alt-mode" style="--mode-color: #10B981; --mode-gradient: linear-gradient(135deg, #10B981, #059669); --mode-shadow: rgba(16,185,129,0.3);">
+      <div class="alt-mode-icon"><i class="fa-solid fa-file-lines"></i></div>
+      <div class="alt-mode-body">
+        <div class="alt-mode-title">内容模板 <span class="alt-mode-tag">文档</span></div>
+        <div class="alt-mode-desc">选文档模板，直接进入编辑器</div>
+      </div>
+      <div class="alt-mode-arrow-wrap"><i class="fa-solid fa-arrow-right alt-mode-arrow"></i></div>
+    </div>
+  </div>
+
+  <!-- 最近创作 -->
+  <div class="recents">
+    <div class="recents-header">
+      <div class="recents-title">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>最近创作</span>
+      </div>
+      <div class="recents-link">查看全部 <i class="fa-solid fa-chevron-right" style="font-size:10px;"></i></div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(139,92,246,0.1); color: #8B5CF6;"><i class="fa-solid fa-comments"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">AI 对话 · 产品竞品分析策略</div>
+        <div class="recent-meta"><span>AI 对话</span><span>·</span><span>自由模式</span></div>
+      </div>
+      <div class="recent-time">2小时前</div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(59,130,246,0.1); color: #3B82F6;"><i class="fa-solid fa-file-powerpoint"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">客户方案 PPT · DmtPlat 产品介绍</div>
+        <div class="recent-meta"><span>场景模板</span><span>·</span><span>销售岗</span><span>·</span><span>PPT</span></div>
+      </div>
+      <div class="recent-time">昨天</div>
+    </div>
+    <div class="recent-item">
+      <div class="recent-icon" style="background: rgba(16,185,129,0.1); color: #10B981;"><i class="fa-solid fa-file-lines"></i></div>
+      <div class="recent-info">
+        <div class="recent-name">工作周报 · 第30周研发进展</div>
+        <div class="recent-meta"><span>内容模板</span><span>·</span><span>Word</span></div>
+      </div>
+      <div class="recent-time">3天前</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ta = document.querySelector('.composer-input');
+  const send = document.querySelector('.send-btn');
+  function resize() {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+    send.disabled = !ta.value.trim();
+  }
+  ta.addEventListener('input', resize);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (ta.value.trim()) {
+        alert('演示：将发送 "' + ta.value.trim() + '" 并进入流式对话');
+      }
+    }
+  });
+  document.querySelectorAll('.prompt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      ta.value = chip.textContent.trim();
+      resize();
+      ta.focus();
+    });
+  });
+  resize();
+</script>
+</body>
+</html>

@@ -1,4 +1,8 @@
-import { knowledgeBases, userChatMessages, suggestions } from '../data/mockData.js';
+import {
+  knowledgeBases,
+  userChatMessages,
+  suggestions,
+} from '../data/mockData.js';
 import { ChatContainer } from '../components/ChatContainer.js';
 import { getTypeIcon } from '../utils/helpers.js';
 
@@ -55,13 +59,18 @@ export class UserChat {
               <i class="fa-solid fa-${this.expandedGroups.personal ? 'chevron-down' : 'chevron-right'} expand-arrow"></i>
             </div>
             <div class="nav-submenu ${this.expandedGroups.personal ? '' : 'collapsed'}">
-              ${knowledgeBases.slice(0, 5).map((kb, index) => `
+              ${knowledgeBases
+                .slice(0, 5)
+                .map(
+                  (kb, index) => `
                 <div class="nav-subitem ${index === 0 ? 'default-active' : ''}" data-id="${kb.id}">
                   <i class="fa-solid fa-${kb.type === '问答' ? 'comments' : 'file-text'}"></i>
                   <span>${kb.name}</span>
                   <span class="kb-count">${kb.documentCount}</span>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
 
@@ -101,13 +110,18 @@ export class UserChat {
               </div>
 
               <div class="history-list">
-                ${filteredConversations.length > 0
-                  ? filteredConversations.map((conv) => `
+                ${
+                  filteredConversations.length > 0
+                    ? filteredConversations
+                        .map(
+                          (conv) => `
                     <div class="history-item" data-id="${conv.id}">
                       <span class="history-title">${conv.title}</span>
                     </div>
-                  `).join('')
-                  : `<div class="empty-history">暂无历史对话</div>`
+                  `
+                        )
+                        .join('')
+                    : `<div class="empty-history">暂无历史对话</div>`
                 }
               </div>
             </div>
@@ -182,7 +196,9 @@ export class UserChat {
       });
     }
 
-    const expandableNavItems = this.container.querySelectorAll('.nav-item.expandable');
+    const expandableNavItems = this.container.querySelectorAll(
+      '.nav-item.expandable'
+    );
     expandableNavItems.forEach((item) => {
       item.addEventListener('click', () => {
         const groupId = item.dataset.group;
@@ -206,7 +222,9 @@ export class UserChat {
       });
     });
 
-    const navItems = this.container.querySelectorAll('.nav-item:not(.expandable)');
+    const navItems = this.container.querySelectorAll(
+      '.nav-item:not(.expandable)'
+    );
     navItems.forEach((item) => {
       item.addEventListener('click', () => {
         navItems.forEach((nav) => nav.classList.remove('active'));

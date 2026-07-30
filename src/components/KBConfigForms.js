@@ -1,15 +1,26 @@
 export class DocumentConfigForm {
   constructor(config = {}) {
     this.config = {
-      supportedFormats: config.supportedFormats || ['pdf', 'docx', 'md', 'txt', 'xlsx', 'pptx'],
+      supportedFormats: config.supportedFormats || [
+        'pdf',
+        'docx',
+        'md',
+        'txt',
+        'xlsx',
+        'pptx',
+      ],
       maxFileSize: config.maxFileSize || '50MB',
       allowUpload: config.allowUpload !== undefined ? config.allowUpload : true,
-      allowWebCrawl: config.allowWebCrawl !== undefined ? config.allowWebCrawl : false,
-      autoExtractImages: config.autoExtractImages !== undefined ? config.autoExtractImages : true,
+      allowWebCrawl:
+        config.allowWebCrawl !== undefined ? config.allowWebCrawl : false,
+      autoExtractImages:
+        config.autoExtractImages !== undefined
+          ? config.autoExtractImages
+          : true,
       enableOCR: config.enableOCR !== undefined ? config.enableOCR : false,
       chunkSize: config.chunkSize || 512,
       chunkOverlap: config.chunkOverlap || 64,
-      ...config
+      ...config,
     };
     this.container = null;
   }
@@ -23,12 +34,16 @@ export class DocumentConfigForm {
           <div class="form-group">
             <label class="form-label">支持的文件格式</label>
             <div class="checkbox-grid">
-              ${this.config.supportedFormats.map(format => `
+              ${this.config.supportedFormats
+                .map(
+                  (format) => `
                 <label class="checkbox-item">
                   <input type="checkbox" checked value="${format}" />
                   <span>${format.toUpperCase()}</span>
                 </label>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
           <div class="form-row">
@@ -83,7 +98,7 @@ export class DocumentConfigForm {
 
   bindEvents() {
     const ranges = this.container.querySelectorAll('.range');
-    ranges.forEach(range => {
+    ranges.forEach((range) => {
       range.addEventListener('input', (e) => {
         e.target.nextElementSibling.textContent = e.target.value;
       });
@@ -91,21 +106,35 @@ export class DocumentConfigForm {
   }
 
   getData() {
-    const checkboxes = this.container.querySelectorAll('.checkbox-grid input:checked');
-    const formats = Array.from(checkboxes).map(cb => cb.value);
-    
+    const checkboxes = this.container.querySelectorAll(
+      '.checkbox-grid input:checked'
+    );
+    const formats = Array.from(checkboxes).map((cb) => cb.value);
+
     return {
       type: 'document',
       config: {
         supportedFormats: formats,
         maxFileSize: this.container.querySelector('input[type="text"]').value,
-        allowUpload: this.container.querySelector('.toggle-group input:nth-child(1)').checked,
-        allowWebCrawl: this.container.querySelector('.toggle-group input:nth-child(3)').checked,
-        autoExtractImages: this.container.querySelector('.toggle-group input:nth-child(5)').checked,
-        enableOCR: this.container.querySelector('.toggle-group input:nth-child(7)').checked,
-        chunkSize: parseInt(this.container.querySelector('.range:nth-child(1)').value),
-        chunkOverlap: parseInt(this.container.querySelector('.range:nth-child(2)').value)
-      }
+        allowUpload: this.container.querySelector(
+          '.toggle-group input:nth-child(1)'
+        ).checked,
+        allowWebCrawl: this.container.querySelector(
+          '.toggle-group input:nth-child(3)'
+        ).checked,
+        autoExtractImages: this.container.querySelector(
+          '.toggle-group input:nth-child(5)'
+        ).checked,
+        enableOCR: this.container.querySelector(
+          '.toggle-group input:nth-child(7)'
+        ).checked,
+        chunkSize: parseInt(
+          this.container.querySelector('.range:nth-child(1)').value
+        ),
+        chunkOverlap: parseInt(
+          this.container.querySelector('.range:nth-child(2)').value
+        ),
+      },
     };
   }
 }
@@ -116,12 +145,14 @@ export class WebConfigForm {
       crawlDepth: config.crawlDepth || 3,
       maxPages: config.maxPages || 100,
       followLinks: config.followLinks !== undefined ? config.followLinks : true,
-      respectRobots: config.respectRobots !== undefined ? config.respectRobots : true,
-      enableJavaScript: config.enableJavaScript !== undefined ? config.enableJavaScript : false,
+      respectRobots:
+        config.respectRobots !== undefined ? config.respectRobots : true,
+      enableJavaScript:
+        config.enableJavaScript !== undefined ? config.enableJavaScript : false,
       requestDelay: config.requestDelay || 1000,
       maxContentSize: config.maxContentSize || '10MB',
       excludePaths: config.excludePaths || [],
-      ...config
+      ...config,
     };
     this.container = null;
   }
@@ -189,9 +220,15 @@ export class WebConfigForm {
 
   bindEvents() {
     const ranges = this.container.querySelectorAll('.range');
-    ranges.forEach(range => {
+    ranges.forEach((range) => {
       range.addEventListener('input', (e) => {
-        e.target.nextElementSibling.textContent = e.target.value + (e.target === ranges[0] ? ' 层' : e.target === ranges[2] ? 'ms' : ' 页');
+        e.target.nextElementSibling.textContent =
+          e.target.value +
+          (e.target === ranges[0]
+            ? ' 层'
+            : e.target === ranges[2]
+              ? 'ms'
+              : ' 页');
       });
     });
   }
@@ -200,15 +237,31 @@ export class WebConfigForm {
     return {
       type: 'web',
       config: {
-        crawlDepth: parseInt(this.container.querySelector('.range:nth-child(1)').value),
-        maxPages: parseInt(this.container.querySelector('.range:nth-child(2)').value),
-        requestDelay: parseInt(this.container.querySelector('.range:nth-child(3)').value),
-        maxContentSize: this.container.querySelector('input[type="text"]').value,
-        followLinks: this.container.querySelector('.toggle-group input:nth-child(1)').checked,
-        respectRobots: this.container.querySelector('.toggle-group input:nth-child(3)').checked,
-        enableJavaScript: this.container.querySelector('.toggle-group input:nth-child(5)').checked,
-        excludePaths: this.container.querySelector('textarea').value.split('\n').filter(line => line.trim())
-      }
+        crawlDepth: parseInt(
+          this.container.querySelector('.range:nth-child(1)').value
+        ),
+        maxPages: parseInt(
+          this.container.querySelector('.range:nth-child(2)').value
+        ),
+        requestDelay: parseInt(
+          this.container.querySelector('.range:nth-child(3)').value
+        ),
+        maxContentSize:
+          this.container.querySelector('input[type="text"]').value,
+        followLinks: this.container.querySelector(
+          '.toggle-group input:nth-child(1)'
+        ).checked,
+        respectRobots: this.container.querySelector(
+          '.toggle-group input:nth-child(3)'
+        ).checked,
+        enableJavaScript: this.container.querySelector(
+          '.toggle-group input:nth-child(5)'
+        ).checked,
+        excludePaths: this.container
+          .querySelector('textarea')
+          .value.split('\n')
+          .filter((line) => line.trim()),
+      },
     };
   }
 }
@@ -223,11 +276,12 @@ export class DatabaseConfigForm {
       username: config.username || '',
       password: config.password || '',
       tableWhitelist: config.tableWhitelist || [],
-      enableFullText: config.enableFullText !== undefined ? config.enableFullText : true,
+      enableFullText:
+        config.enableFullText !== undefined ? config.enableFullText : true,
       syncInterval: config.syncInterval || 'daily',
       batchSize: config.batchSize || 1000,
       query: config.query || '',
-      ...config
+      ...config,
     };
     this.container = null;
   }
@@ -333,25 +387,38 @@ export class DatabaseConfigForm {
   }
 
   getData() {
-    const tablesInput = this.container.querySelector('.form-section:nth-child(3) input').value;
-    const tables = tablesInput ? tablesInput.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const query = this.container.querySelector('.form-section:nth-child(4) textarea').value;
-    
+    const tablesInput = this.container.querySelector(
+      '.form-section:nth-child(3) input'
+    ).value;
+    const tables = tablesInput
+      ? tablesInput
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+    const query = this.container.querySelector(
+      '.form-section:nth-child(4) textarea'
+    ).value;
+
     return {
       type: 'database',
       config: {
         dbType: this.container.querySelector('.select:nth-child(1)').value,
         host: this.container.querySelector('.input:nth-child(1)').value,
-        port: parseInt(this.container.querySelector('.input:nth-child(2)').value),
+        port: parseInt(
+          this.container.querySelector('.input:nth-child(2)').value
+        ),
         database: this.container.querySelector('.input:nth-child(3)').value,
         username: this.container.querySelector('.input:nth-child(4)').value,
         password: this.container.querySelector('.input:nth-child(5)').value,
-        syncInterval: this.container.querySelector('.select:nth-child(2)').value,
+        syncInterval: this.container.querySelector('.select:nth-child(2)')
+          .value,
         batchSize: parseInt(this.container.querySelector('.range').value),
-        enableFullText: this.container.querySelector('.toggle-group input').checked,
+        enableFullText: this.container.querySelector('.toggle-group input')
+          .checked,
         tableWhitelist: tables,
-        query: query || ''
-      }
+        query: query || '',
+      },
     };
   }
 }
@@ -362,12 +429,17 @@ export class QAConfigForm {
       trainingRounds: config.trainingRounds || 8,
       similarityThreshold: config.similarityThreshold || 0.8,
       maxResults: config.maxResults || 5,
-      intentRecognition: config.intentRecognition !== undefined ? config.intentRecognition : true,
-      multiTurnDialog: config.multiTurnDialog !== undefined ? config.multiTurnDialog : true,
+      intentRecognition:
+        config.intentRecognition !== undefined
+          ? config.intentRecognition
+          : true,
+      multiTurnDialog:
+        config.multiTurnDialog !== undefined ? config.multiTurnDialog : true,
       enableFAQ: config.enableFAQ !== undefined ? config.enableFAQ : true,
-      enableEmbedding: config.enableEmbedding !== undefined ? config.enableEmbedding : true,
+      enableEmbedding:
+        config.enableEmbedding !== undefined ? config.enableEmbedding : true,
       answerTemplate: config.answerTemplate || '',
-      ...config
+      ...config,
     };
     this.container = null;
   }
@@ -437,7 +509,8 @@ export class QAConfigForm {
       e.target.nextElementSibling.textContent = e.target.value + ' 轮';
     });
     ranges[1].addEventListener('input', (e) => {
-      e.target.nextElementSibling.textContent = (parseFloat(e.target.value) * 100).toFixed(0) + '%';
+      e.target.nextElementSibling.textContent =
+        (parseFloat(e.target.value) * 100).toFixed(0) + '%';
     });
     ranges[2].addEventListener('input', (e) => {
       e.target.nextElementSibling.textContent = e.target.value + ' 条';
@@ -448,22 +521,36 @@ export class QAConfigForm {
     return {
       type: 'qa',
       config: {
-        trainingRounds: parseInt(this.container.querySelector('.range:nth-child(1)').value),
-        similarityThreshold: parseFloat(this.container.querySelector('.range:nth-child(2)').value),
-        maxResults: parseInt(this.container.querySelector('.range:nth-child(3)').value),
-        intentRecognition: this.container.querySelector('.toggle-group input:nth-child(1)').checked,
-        multiTurnDialog: this.container.querySelector('.toggle-group input:nth-child(3)').checked,
-        enableFAQ: this.container.querySelector('.toggle-group input:nth-child(5)').checked,
-        enableEmbedding: this.container.querySelector('.toggle-group input:nth-child(7)').checked,
-        answerTemplate: this.container.querySelector('textarea').value
-      }
+        trainingRounds: parseInt(
+          this.container.querySelector('.range:nth-child(1)').value
+        ),
+        similarityThreshold: parseFloat(
+          this.container.querySelector('.range:nth-child(2)').value
+        ),
+        maxResults: parseInt(
+          this.container.querySelector('.range:nth-child(3)').value
+        ),
+        intentRecognition: this.container.querySelector(
+          '.toggle-group input:nth-child(1)'
+        ).checked,
+        multiTurnDialog: this.container.querySelector(
+          '.toggle-group input:nth-child(3)'
+        ).checked,
+        enableFAQ: this.container.querySelector(
+          '.toggle-group input:nth-child(5)'
+        ).checked,
+        enableEmbedding: this.container.querySelector(
+          '.toggle-group input:nth-child(7)'
+        ).checked,
+        answerTemplate: this.container.querySelector('textarea').value,
+      },
     };
   }
 }
 
 export const KBConfigFactory = {
   create(type, config = {}) {
-    switch(type) {
+    switch (type) {
       case 'document':
         return new DocumentConfigForm(config);
       case 'web':
@@ -475,5 +562,5 @@ export const KBConfigFactory = {
       default:
         throw new Error(`Unknown KB type: ${type}`);
     }
-  }
+  },
 };

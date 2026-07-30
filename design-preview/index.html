@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 创作中心 · 首页设计三方案预览</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+    background: #0F0F12;
+    color: #F5F5F7;
+    min-height: 100vh;
+    padding: 32px 24px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1320px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  header p {
+    font-size: 13px;
+    color: #8E8E93;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 8px 18px;
+    background: #1A1A22;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 100px;
+    font-size: 13px;
+    color: #8E8E93;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab:hover { color: #F5F5F7; border-color: rgba(255,255,255,0.18); }
+  .tab.active { background: #F5F5F7; color: #0F0F12; border-color: #F5F5F7; }
+  .tab .swatch {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .stage {
+    background: #1A1A22;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .stage-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: #131318;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots span {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: #2A2A33;
+  }
+  .dots span:nth-child(1) { background: #FF5F57; }
+  .dots span:nth-child(2) { background: #FEBC2E; }
+  .dots span:nth-child(3) { background: #28C840; }
+  .stage-url {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    color: #8E8E93;
+    font-family: "SF Mono", "Consolas", monospace;
+    background: #0F0F12;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .stage-actions { display: flex; gap: 6px; }
+  .stage-btn {
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    color: #8E8E93;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .stage-btn:hover { color: #F5F5F7; border-color: rgba(255,255,255,0.18); }
+  .stage iframe {
+    width: 100%;
+    height: 720px;
+    border: none;
+    background: #fff;
+  }
+  .info {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .info-card {
+    background: #1A1A22;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .info-card:hover { border-color: rgba(255,255,255,0.18); }
+  .info-card.active { border-color: #F5F5F7; background: #1F1F28; }
+  .info-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .info-card .swatch {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .info-card p {
+    font-size: 12px;
+    color: #8E8E93;
+    line-height: 1.5;
+  }
+  @media (max-width: 960px) {
+    .info { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 720px) {
+    .info { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>AI 创作中心 · 首页设计方案</h1>
+    <p>三种风格供你选择，点击下方卡片或顶部 Tab 切换预览</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="tab active" data-src="style-d-conversational-hub.html">
+      <span class="swatch" style="background: linear-gradient(135deg, #8B5CF6, #3B82F6, #10B981);"></span>
+      D · 对话式 Hub（融合 A）
+    </div>
+    <div class="tab" data-src="style-a-bright-gradient.html">
+      <span class="swatch" style="background: linear-gradient(135deg, #8B5CF6, #3B82F6, #10B981);"></span>
+      A · 明亮渐变
+    </div>
+    <div class="tab" data-src="style-b-dark-tech.html">
+      <span class="swatch" style="background: linear-gradient(135deg, #A78BFA, #22D3EE, #34D399);"></span>
+      B · 暗黑科技
+    </div>
+    <div class="tab" data-src="style-c-minimal-editorial.html">
+      <span class="swatch" style="background: #6B5B95;"></span>
+      C · 极简编辑
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="stage-bar">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <div class="stage-url" id="urlDisplay">http://127.0.0.1:8787/style-d-conversational-hub.html</div>
+      <div class="stage-actions">
+        <a class="stage-btn" id="openBtn" href="style-d-conversational-hub.html" target="_blank">
+          <i class="fa-solid fa-up-right-from-square"></i> 新窗口
+        </a>
+      </div>
+    </div>
+    <iframe id="frame" src="style-d-conversational-hub.html"></iframe>
+  </div>
+
+  <div class="info">
+    <div class="info-card active" data-src="style-d-conversational-hub.html">
+      <h3><span class="swatch" style="background: linear-gradient(135deg, #8B5CF6, #3B82F6, #10B981);"></span>D · 对话式 Hub（融合 A）</h3>
+      <p>D 的对话式交互结构 + A 的视觉元素（环境光晕、渐变标题、彩色图标、紫色徽章、柔和阴影）。</p>
+    </div>
+    <div class="info-card" data-src="style-a-bright-gradient.html">
+      <h3><span class="swatch" style="background: linear-gradient(135deg, #8B5CF6, #3B82F6, #10B981);"></span>A · 明亮渐变</h3>
+      <p>白底+紫蓝绿渐变光晕，三栏卡片网格，活力现代，适合面向大众用户、亲和力强的产品。</p>
+    </div>
+    <div class="info-card" data-src="style-b-dark-tech.html">
+      <h3><span class="swatch" style="background: linear-gradient(135deg, #A78BFA, #22D3EE, #34D399);"></span>B · 暗黑科技</h3>
+      <p>深色底+霓虹辉光、网格噪点、编号 01/02/03，未来感强，适合技术型/极客向产品。</p>
+    </div>
+    <div class="info-card" data-src="style-c-minimal-editorial.html">
+      <h3><span class="swatch" style="background: #6B5B95;"></span>C · 极简编辑</h3>
+      <p>米白底+低饱和点缀色、横向列表卡片、搜索框入口，克制高级，适合工具型/办公向产品。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const cards = document.querySelectorAll('.info-card');
+  const frame = document.getElementById('frame');
+  const urlDisplay = document.getElementById('urlDisplay');
+  const openBtn = document.getElementById('openBtn');
+
+  function select(src) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.src === src));
+    cards.forEach(c => c.classList.toggle('active', c.dataset.src === src));
+    frame.src = src;
+    urlDisplay.textContent = 'http://127.0.0.1:8787/' + src;
+    openBtn.href = src;
+  }
+
+  tabs.forEach(t => t.addEventListener('click', () => select(t.dataset.src)));
+  cards.forEach(c => c.addEventListener('click', () => select(c.dataset.src)));
+</script>
+</body>
+</html>

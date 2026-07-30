@@ -96,14 +96,19 @@ export class ChatSidebar {
             >
           </div>
           <div class="history-list">
-            ${filteredConversations.length > 0
-              ? filteredConversations.map((conv) => `
+            ${
+              filteredConversations.length > 0
+                ? filteredConversations
+                    .map(
+                      (conv) => `
                 <div class="history-item" data-id="${conv.id}">
                   <i class="fa-solid fa-${conv.icon || 'message-square'} history-icon"></i>
                   <span class="history-title">${conv.title}</span>
                 </div>
-              `).join('')
-              : `<div class="empty-history">暂无历史对话</div>`
+              `
+                    )
+                    .join('')
+                : `<div class="empty-history">暂无历史对话</div>`
             }
           </div>
         </div>
@@ -141,7 +146,9 @@ export class ChatSidebar {
       });
     }
 
-    const groupHeaders = this.container.querySelectorAll('.nav-item.expandable');
+    const groupHeaders = this.container.querySelectorAll(
+      '.nav-item.expandable'
+    );
     groupHeaders.forEach((header) => {
       header.addEventListener('click', () => {
         const groupId = header.dataset.group;
@@ -166,7 +173,7 @@ export class ChatSidebar {
       item.addEventListener('click', () => {
         navItems.forEach((nav) => nav.classList.remove('active'));
         item.classList.add('active');
-        
+
         const id = item.id;
         if (id === 'personal-kb') {
           this.onSelectKB?.({ id: 'personal', name: '个人知识库' });

@@ -21,7 +21,10 @@ export async function parsePDF(fileBuffer) {
       const isNumbered = /^\d+(\.\d+)*\s+/.test(line);
       const isBoldLike = line === line.toUpperCase() && line.length < 50;
       if (isNumbered || isBoldLike) {
-        headings.push({ level: isNumbered ? line.split('.').length : 1, text: line });
+        headings.push({
+          level: isNumbered ? line.split('.').length : 1,
+          text: line,
+        });
       }
     }
   }
@@ -30,7 +33,10 @@ export async function parsePDF(fileBuffer) {
   const paragraphs = [];
   let currentPara = '';
   for (const line of lines) {
-    if (/^\d+(\.\d+)*\s+/.test(line) || (line.length < 80 && line === line.toUpperCase())) {
+    if (
+      /^\d+(\.\d+)*\s+/.test(line) ||
+      (line.length < 80 && line === line.toUpperCase())
+    ) {
       if (currentPara) paragraphs.push(currentPara.trim());
       currentPara = line + ' ';
     } else {
@@ -56,8 +62,21 @@ export async function parsePDF(fileBuffer) {
 
 function buildPDFSuggestedFields(headings) {
   const fields = [
-    { id: 'topic', label: '文档主题', type: 'text', required: true, placeholder: '例如：行业研究报告' },
-    { id: 'summary_focus', label: '关注重点', type: 'textarea', required: false, placeholder: '希望从文档中重点提取或总结的内容', rows: 3 },
+    {
+      id: 'topic',
+      label: '文档主题',
+      type: 'text',
+      required: true,
+      placeholder: '例如：行业研究报告',
+    },
+    {
+      id: 'summary_focus',
+      label: '关注重点',
+      type: 'textarea',
+      required: false,
+      placeholder: '希望从文档中重点提取或总结的内容',
+      rows: 3,
+    },
   ];
 
   if (headings.length > 3) {

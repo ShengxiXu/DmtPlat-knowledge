@@ -20,12 +20,17 @@ export class KBDetail {
     this.evaluationRecords = mockData.evaluationRecords || [];
     this.apiKeys = mockData.apiKeys || [];
     this.chatMessages = mockData.chatMessages || [];
-    this.evalStats = mockData.evalStats || { accuracy: '0%', averageRating: '0', averageResponse: '0s', totalQuestions: '0' };
-    
+    this.evalStats = mockData.evalStats || {
+      accuracy: '0%',
+      averageRating: '0',
+      averageResponse: '0s',
+      totalQuestions: '0',
+    };
+
     console.log('KBDetail initialized with:', this.kbData.name);
     console.log('Documents count:', this.documents.length);
     console.log('Training logs count:', this.trainingLogs.length);
-    
+
     this.render();
   }
 
@@ -34,7 +39,10 @@ export class KBDetail {
     console.log('this.documents:', this.documents);
     console.log('this.documents.length:', this.documents.length);
     console.log('this.trainingLogs.length:', this.trainingLogs.length);
-    console.log('this.evaluationRecords.length:', this.evaluationRecords.length);
+    console.log(
+      'this.evaluationRecords.length:',
+      this.evaluationRecords.length
+    );
     console.log('this.apiKeys.length:', this.apiKeys.length);
     console.log('this.chatMessages.length:', this.chatMessages.length);
     console.log('this.evalStats:', this.evalStats);
@@ -46,21 +54,27 @@ export class KBDetail {
     const dataSources = this.kbData.dataSources || [
       { type: 'document', name: '文档上传' },
       { type: 'web', name: '网页爬取' },
-      { type: 'qa', name: '问答导入' }
+      { type: 'qa', name: '问答导入' },
     ];
 
     const tabConfig = {
       document: { tabId: 'tab-docs', icon: 'file-lines', label: '文档管理' },
       web: { tabId: 'tab-crawl', icon: 'globe', label: '网页爬取' },
-      database: { tabId: 'tab-database', icon: 'database', label: '数据库连接' },
-      qa: { tabId: 'tab-qa', icon: 'message', label: '问答管理' }
+      database: {
+        tabId: 'tab-database',
+        icon: 'database',
+        label: '数据库连接',
+      },
+      qa: { tabId: 'tab-qa', icon: 'message', label: '问答管理' },
     };
 
-    return dataSources.map((ds, index) => {
-      const config = tabConfig[ds.type];
-      if (!config) return '';
-      return `<div class="tab ${index === 0 ? 'active' : ''}" data-tab="${config.tabId}"><i class="fa-solid fa-${config.icon}"></i> ${config.label}</div>`;
-    }).join('');
+    return dataSources
+      .map((ds, index) => {
+        const config = tabConfig[ds.type];
+        if (!config) return '';
+        return `<div class="tab ${index === 0 ? 'active' : ''}" data-tab="${config.tabId}"><i class="fa-solid fa-${config.icon}"></i> ${config.label}</div>`;
+      })
+      .join('');
   }
 
   render() {
@@ -68,13 +82,16 @@ export class KBDetail {
     console.log('this.documents:', this.documents);
     console.log('this.documents.length:', this.documents.length);
     console.log('this.trainingLogs.length:', this.trainingLogs.length);
-    console.log('this.evaluationRecords.length:', this.evaluationRecords.length);
+    console.log(
+      'this.evaluationRecords.length:',
+      this.evaluationRecords.length
+    );
     console.log('this.apiKeys.length:', this.apiKeys.length);
     console.log('this.chatMessages.length:', this.chatMessages.length);
     console.log('this.evalStats:', this.evalStats);
     console.log('this.activeTab:', this.activeTab);
     console.log('=== KBDetail render() 结束 ===');
-    
+
     this.container.innerHTML = `
       <header class="header">
         <div style="display:flex;align-items:center;gap:20px;">
@@ -122,9 +139,9 @@ export class KBDetail {
       console.error('tab-content-container not found');
       return;
     }
-    
+
     console.log('Current activeTab:', this.activeTab);
-    
+
     let content = '';
     switch (this.activeTab) {
       case 'tab-docs':
@@ -154,7 +171,7 @@ export class KBDetail {
       default:
         content = '<div style="padding:24px;">请选择一个标签页</div>';
     }
-    
+
     console.log('Content length:', content.length);
     container.innerHTML = content;
 
@@ -224,10 +241,42 @@ export class KBDetail {
 
   renderCrawlTab() {
     const crawlHistory = [
-      { id: 1, url: 'https://example.com/docs', depth: 2, status: 'completed', pages: 15, time: '2024-01-15 10:30', size: '2.3 MB' },
-      { id: 2, url: 'https://docs.example.com/api', depth: 3, status: 'completed', pages: 42, time: '2024-01-16 14:20', size: '5.8 MB' },
-      { id: 3, url: 'https://help.example.com', depth: 2, status: 'running', pages: 8, time: '2024-01-18 09:15', size: '1.2 MB' },
-      { id: 4, url: 'https://blog.example.com', depth: 1, status: 'failed', pages: 0, time: '2024-01-17 16:45', size: '0 KB' },
+      {
+        id: 1,
+        url: 'https://example.com/docs',
+        depth: 2,
+        status: 'completed',
+        pages: 15,
+        time: '2024-01-15 10:30',
+        size: '2.3 MB',
+      },
+      {
+        id: 2,
+        url: 'https://docs.example.com/api',
+        depth: 3,
+        status: 'completed',
+        pages: 42,
+        time: '2024-01-16 14:20',
+        size: '5.8 MB',
+      },
+      {
+        id: 3,
+        url: 'https://help.example.com',
+        depth: 2,
+        status: 'running',
+        pages: 8,
+        time: '2024-01-18 09:15',
+        size: '1.2 MB',
+      },
+      {
+        id: 4,
+        url: 'https://blog.example.com',
+        depth: 1,
+        status: 'failed',
+        pages: 0,
+        time: '2024-01-17 16:45',
+        size: '0 KB',
+      },
     ];
 
     return `
@@ -301,7 +350,9 @@ export class KBDetail {
               <div class="crawl-th">操作</div>
             </div>
             <div class="crawl-table-body">
-              ${crawlHistory.map(task => `
+              ${crawlHistory
+                .map(
+                  (task) => `
                 <div class="crawl-table-row">
                   <div class="crawl-td">
                     <div style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${task.url}">${task.url}</div>
@@ -321,7 +372,9 @@ export class KBDetail {
                     <button class="btn btn-sm btn-ghost crawl-delete-btn" data-id="${task.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
         </div>
@@ -361,9 +414,36 @@ export class KBDetail {
 
   renderDatabaseTab() {
     const dbConnections = [
-      { id: 1, name: 'MySQL-产品库', type: 'MySQL', host: '192.168.1.100', port: 3306, database: 'product_db', status: 'connected', lastSync: '2024-01-18 10:30' },
-      { id: 2, name: 'PostgreSQL-日志库', type: 'PostgreSQL', host: '192.168.1.101', port: 5432, database: 'log_db', status: 'connected', lastSync: '2024-01-18 09:00' },
-      { id: 3, name: 'Oracle-财务库', type: 'Oracle', host: '192.168.1.102', port: 1521, database: 'finance_db', status: 'disconnected', lastSync: '2024-01-15 16:45' },
+      {
+        id: 1,
+        name: 'MySQL-产品库',
+        type: 'MySQL',
+        host: '192.168.1.100',
+        port: 3306,
+        database: 'product_db',
+        status: 'connected',
+        lastSync: '2024-01-18 10:30',
+      },
+      {
+        id: 2,
+        name: 'PostgreSQL-日志库',
+        type: 'PostgreSQL',
+        host: '192.168.1.101',
+        port: 5432,
+        database: 'log_db',
+        status: 'connected',
+        lastSync: '2024-01-18 09:00',
+      },
+      {
+        id: 3,
+        name: 'Oracle-财务库',
+        type: 'Oracle',
+        host: '192.168.1.102',
+        port: 1521,
+        database: 'finance_db',
+        status: 'disconnected',
+        lastSync: '2024-01-15 16:45',
+      },
     ];
 
     return `
@@ -442,7 +522,9 @@ export class KBDetail {
               <div class="db-th">操作</div>
             </div>
             <div class="db-table-body">
-              ${dbConnections.map(conn => `
+              ${dbConnections
+                .map(
+                  (conn) => `
                 <div class="db-table-row">
                   <div class="db-td">${conn.name}</div>
                   <div class="db-td">
@@ -460,7 +542,9 @@ export class KBDetail {
                     <button class="btn btn-sm btn-ghost db-delete-btn" data-id="${conn.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
         </div>
@@ -470,10 +554,36 @@ export class KBDetail {
 
   renderQATab() {
     const qaPairs = [
-      { id: 1, question: '如何重置密码？', answer: '您可以在登录页面点击"忘记密码"，通过邮箱或手机号验证后重置密码。', status: '已启用', createdAt: '2024-01-15' },
-      { id: 2, question: '如何联系客服？', answer: '您可以通过页面右下角的在线客服按钮联系我们，工作时间为周一至周五 9:00-18:00。', status: '已启用', createdAt: '2024-01-16' },
-      { id: 3, question: '订单多久发货？', answer: '订单通常在下单后24小时内发货，节假日可能会有延迟。', status: '已启用', createdAt: '2024-01-18' },
-      { id: 4, question: '支持哪些支付方式？', answer: '我们支持支付宝、微信支付、银行卡等多种支付方式。', status: '已禁用', createdAt: '2024-01-20' },
+      {
+        id: 1,
+        question: '如何重置密码？',
+        answer:
+          '您可以在登录页面点击"忘记密码"，通过邮箱或手机号验证后重置密码。',
+        status: '已启用',
+        createdAt: '2024-01-15',
+      },
+      {
+        id: 2,
+        question: '如何联系客服？',
+        answer:
+          '您可以通过页面右下角的在线客服按钮联系我们，工作时间为周一至周五 9:00-18:00。',
+        status: '已启用',
+        createdAt: '2024-01-16',
+      },
+      {
+        id: 3,
+        question: '订单多久发货？',
+        answer: '订单通常在下单后24小时内发货，节假日可能会有延迟。',
+        status: '已启用',
+        createdAt: '2024-01-18',
+      },
+      {
+        id: 4,
+        question: '支持哪些支付方式？',
+        answer: '我们支持支付宝、微信支付、银行卡等多种支付方式。',
+        status: '已禁用',
+        createdAt: '2024-01-20',
+      },
     ];
 
     return `
@@ -507,11 +617,11 @@ export class KBDetail {
               <div class="stat-label">问答总数</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">${qaPairs.filter(q => q.status === '已启用').length}</div>
+              <div class="stat-value">${qaPairs.filter((q) => q.status === '已启用').length}</div>
               <div class="stat-label">已启用</div>
             </div>
             <div class="stat-item">
-              <div class="stat-value">${qaPairs.filter(q => q.status === '已禁用').length}</div>
+              <div class="stat-value">${qaPairs.filter((q) => q.status === '已禁用').length}</div>
               <div class="stat-label">已禁用</div>
             </div>
           </div>
@@ -525,7 +635,9 @@ export class KBDetail {
               <div class="qa-th">操作</div>
             </div>
             <div class="qa-table-body">
-              ${qaPairs.map(qa => `
+              ${qaPairs
+                .map(
+                  (qa) => `
                 <div class="qa-table-row">
                   <div class="qa-td">${qa.question}</div>
                   <div class="qa-td qa-answer">${qa.answer}</div>
@@ -538,7 +650,9 @@ export class KBDetail {
                     <button class="btn btn-sm btn-ghost qa-delete-btn" data-id="${qa.id}"><i class="fa-solid fa-trash-can"></i></button>
                   </div>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
         </div>
@@ -958,11 +1072,13 @@ export class KBDetail {
         tabs.forEach((t) => t.classList.remove('active'));
         tab.classList.add('active');
         this.activeTab = tab.dataset.tab;
-        
-        const contentContainer = document.getElementById('tab-content-container');
+
+        const contentContainer = document.getElementById(
+          'tab-content-container'
+        );
         if (contentContainer) {
           this.renderTabContent();
-          
+
           setTimeout(() => {
             this.bindTabEvents();
           }, 50);
@@ -981,7 +1097,7 @@ export class KBDetail {
         btn.addEventListener('click', () => {
           buttons.forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
-          
+
           if (group.id === 'segmentation-type-group') {
             const type = btn.dataset.type;
             const panels = document.querySelectorAll('.config-panel');
@@ -1002,7 +1118,7 @@ export class KBDetail {
         item.addEventListener('click', () => {
           tabItems.forEach((tab) => tab.classList.remove('active'));
           item.classList.add('active');
-          
+
           const type = item.dataset.type;
           const panels = document.querySelectorAll('.config-panel');
           panels.forEach((panel) => panel.classList.add('hidden'));
@@ -1021,12 +1137,16 @@ export class KBDetail {
           e.preventDefault();
           const keyword = docSearchInput.value.trim();
           if (keyword) {
-            const matchedDocs = this.documents.filter(doc => 
-              doc.name.toLowerCase().includes(keyword.toLowerCase()) ||
-              doc.type.toLowerCase().includes(keyword.toLowerCase())
+            const matchedDocs = this.documents.filter(
+              (doc) =>
+                doc.name.toLowerCase().includes(keyword.toLowerCase()) ||
+                doc.type.toLowerCase().includes(keyword.toLowerCase())
             );
             if (matchedDocs.length > 0) {
-              this.showToast(`搜索到 ${matchedDocs.length} 个匹配的文档`, 'success');
+              this.showToast(
+                `搜索到 ${matchedDocs.length} 个匹配的文档`,
+                'success'
+              );
             } else {
               this.showToast(`未找到包含"${keyword}"的文档`, 'error');
             }
@@ -1051,7 +1171,7 @@ export class KBDetail {
         input.accept = '.pdf,.doc,.docx,.txt,.md';
         input.onchange = (e) => {
           const files = Array.from(e.target.files);
-          files.forEach(file => {
+          files.forEach((file) => {
             this.showToast(`正在上传: ${file.name}`, 'success');
           });
         };
@@ -1098,15 +1218,18 @@ export class KBDetail {
     const saveCrawlBtn = document.getElementById('save-crawl-btn');
     if (saveCrawlBtn) {
       saveCrawlBtn.addEventListener('click', () => {
-        const urls = document.getElementById('crawl-url-input')?.value.trim() || '';
-        const depth = document.getElementById('crawl-depth-input')?.value || '2';
-        const interval = document.getElementById('crawl-interval-input')?.value || '3';
-        
+        const urls =
+          document.getElementById('crawl-url-input')?.value.trim() || '';
+        const depth =
+          document.getElementById('crawl-depth-input')?.value || '2';
+        const interval =
+          document.getElementById('crawl-interval-input')?.value || '3';
+
         if (!urls) {
           this.showToast('请输入爬取URL', 'error');
           return;
         }
-        
+
         this.showToast('配置已保存', 'success');
       });
     }
@@ -1120,7 +1243,8 @@ export class KBDetail {
       });
     });
 
-    const crawlDeleteBtns = this.container.querySelectorAll('.crawl-delete-btn');
+    const crawlDeleteBtns =
+      this.container.querySelectorAll('.crawl-delete-btn');
     crawlDeleteBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const taskId = btn.dataset.id;
@@ -1244,21 +1368,21 @@ export class KBDetail {
     if (modal) {
       modal.classList.remove('active');
     }
-  }
+  };
 
   qaModalCancelHandler = () => {
     const modal = document.getElementById('qa-modal');
     if (modal) {
       modal.classList.remove('active');
     }
-  }
+  };
 
   importQACancelHandler = () => {
     const modal = document.getElementById('import-qa-modal');
     if (modal) {
       modal.classList.remove('active');
     }
-  }
+  };
 
   showToast(message, type = 'info') {
     const toast = document.createElement('div');
@@ -1327,22 +1451,32 @@ export class KBDetail {
       </div>
     `;
     document.body.appendChild(modal);
-    
-    document.getElementById('adv-search-close').addEventListener('click', () => {
-      modal.remove();
-    });
-    
-    document.getElementById('adv-search-reset').addEventListener('click', () => {
-      modal.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-      modal.querySelectorAll('input[type="radio"]')[0].checked = true;
-      modal.querySelectorAll('input[type="number"]').forEach(inp => inp.value = '');
-      modal.querySelector('select').value = '';
-    });
-    
-    document.getElementById('adv-search-apply').addEventListener('click', () => {
-      modal.remove();
-      this.showToast('筛选条件已应用', 'success');
-    });
+
+    document
+      .getElementById('adv-search-close')
+      .addEventListener('click', () => {
+        modal.remove();
+      });
+
+    document
+      .getElementById('adv-search-reset')
+      .addEventListener('click', () => {
+        modal
+          .querySelectorAll('input[type="checkbox"]')
+          .forEach((cb) => (cb.checked = false));
+        modal.querySelectorAll('input[type="radio"]')[0].checked = true;
+        modal
+          .querySelectorAll('input[type="number"]')
+          .forEach((inp) => (inp.value = ''));
+        modal.querySelector('select').value = '';
+      });
+
+    document
+      .getElementById('adv-search-apply')
+      .addEventListener('click', () => {
+        modal.remove();
+        this.showToast('筛选条件已应用', 'success');
+      });
   }
 
   showDocPreview(doc) {
@@ -1421,7 +1555,7 @@ export class KBDetail {
       setTimeout(() => {
         const now = new Date();
         step.time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-        
+
         const logContainer = document.querySelector('.log-timeline');
         if (logContainer) {
           const logItem = document.createElement('div');
@@ -1451,23 +1585,23 @@ export class KBDetail {
   startCrawl() {
     const urls = document.getElementById('crawl-url-input')?.value.trim() || '';
     const depth = document.getElementById('crawl-depth-input')?.value || '2';
-    
+
     if (!urls) {
       this.showToast('请输入爬取URL', 'error');
       return;
     }
-    
-    const urlList = urls.split('\n').filter(u => u.trim());
+
+    const urlList = urls.split('\n').filter((u) => u.trim());
     if (urlList.length === 0) {
       this.showToast('请输入有效的URL', 'error');
       return;
     }
-    
+
     const progressModal = document.getElementById('crawl-progress-modal');
     if (progressModal) {
       progressModal.style.display = 'flex';
     }
-    
+
     this.simulateCrawlProgress(urlList, parseInt(depth));
   }
 
@@ -1475,11 +1609,11 @@ export class KBDetail {
     let progress = 0;
     let pages = 0;
     let currentUrlIndex = 0;
-    
+
     const interval = setInterval(() => {
       progress += Math.random() * 8;
       pages += Math.floor(Math.random() * 3);
-      
+
       if (currentUrlIndex < urls.length) {
         const currentUrl = document.getElementById('crawl-current-url');
         if (currentUrl) {
@@ -1489,7 +1623,7 @@ export class KBDetail {
           currentUrlIndex++;
         }
       }
-      
+
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
@@ -1501,11 +1635,11 @@ export class KBDetail {
           this.showToast(`爬取完成！共爬取 ${pages} 页`, 'success');
         }, 500);
       }
-      
+
       const progressFill = document.getElementById('crawl-progress-fill');
       const progressText = document.getElementById('crawl-progress-text');
       const crawlPages = document.getElementById('crawl-pages');
-      
+
       if (progressFill) progressFill.style.width = `${progress}%`;
       if (progressText) progressText.textContent = `${Math.round(progress)}%`;
       if (crawlPages) crawlPages.textContent = pages;
@@ -1635,13 +1769,15 @@ export class KBDetail {
       record: record,
       onSubmit: (tuningData) => {
         this.handleTuningSubmit(tuningData);
-      }
+      },
     });
     tuningModal.show();
   }
 
   handleTuningSubmit(tuningData) {
-    const recordIndex = this.evaluationRecords.findIndex(r => r.id === tuningData.recordId);
+    const recordIndex = this.evaluationRecords.findIndex(
+      (r) => r.id === tuningData.recordId
+    );
     if (recordIndex !== -1) {
       this.evaluationRecords[recordIndex].status = tuningData.status;
       if (tuningData.type === 'update') {
@@ -1687,10 +1823,13 @@ export class KBDetail {
       </div>
     `;
     document.body.appendChild(modal);
-    
+
     document.getElementById('create-key-btn').addEventListener('click', () => {
       modal.remove();
-      document.body.insertAdjacentHTML('beforeend', '<div class="toast toast-success show"><i class="fa-solid fa-check"></i> 密钥已创建</div>');
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        '<div class="toast toast-success show"><i class="fa-solid fa-check"></i> 密钥已创建</div>'
+      );
       setTimeout(() => document.querySelector('.toast')?.remove(), 3000);
     });
   }

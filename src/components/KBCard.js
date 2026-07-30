@@ -8,7 +8,15 @@ export class KBCard {
   }
 
   render() {
-    const { name, type, description, documentCount, lastUpdate, views, status } = this.kbData;
+    const {
+      name,
+      type,
+      description,
+      documentCount,
+      lastUpdate,
+      views,
+      status,
+    } = this.kbData;
     const statusClass = getStatusClass(status);
     const typeIcon = getTypeIcon(type);
 

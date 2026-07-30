@@ -8,7 +8,7 @@ export const kbTemplates = [
     icon: 'message',
     preset: {
       kbName: '智能客服知识库',
-      kbDescription: '整合产品文档、常见问题、业务指南的客服知识库'
+      kbDescription: '整合产品文档、常见问题、业务指南的客服知识库',
     },
     dataSources: [
       {
@@ -16,8 +16,8 @@ export const kbTemplates = [
         name: '产品文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx', 'txt'],
-          maxFileSize: 50
-        }
+          maxFileSize: 50,
+        },
       },
       {
         type: 'qa',
@@ -25,8 +25,8 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.8,
           enableFuzzyMatch: true,
-          maxQACount: 1000
-        }
+          maxQACount: 1000,
+        },
       },
       {
         type: 'web',
@@ -35,10 +35,10 @@ export const kbTemplates = [
           baseUrl: '',
           crawlDepth: 2,
           interval: 3,
-          enableRecursive: true
-        }
-      }
-    ]
+          enableRecursive: true,
+        },
+      },
+    ],
   },
   {
     id: 'template_product_manual',
@@ -49,7 +49,7 @@ export const kbTemplates = [
     icon: 'book-open',
     preset: {
       kbName: '产品手册知识库',
-      kbDescription: '产品文档与在线帮助的整合知识库'
+      kbDescription: '产品文档与在线帮助的整合知识库',
     },
     dataSources: [
       {
@@ -57,8 +57,8 @@ export const kbTemplates = [
         name: '产品文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx'],
-          maxFileSize: 100
-        }
+          maxFileSize: 100,
+        },
       },
       {
         type: 'web',
@@ -67,10 +67,10 @@ export const kbTemplates = [
           baseUrl: '',
           crawlDepth: 3,
           interval: 5,
-          enableRecursive: true
-        }
-      }
-    ]
+          enableRecursive: true,
+        },
+      },
+    ],
   },
   {
     id: 'template_data_analysis',
@@ -81,7 +81,7 @@ export const kbTemplates = [
     icon: 'chart-bar',
     preset: {
       kbName: '数据分析知识库',
-      kbDescription: '整合数据库数据与分析文档的知识库'
+      kbDescription: '整合数据库数据与分析文档的知识库',
     },
     dataSources: [
       {
@@ -94,18 +94,18 @@ export const kbTemplates = [
           username: '',
           password: '',
           tableName: '',
-          query: ''
-        }
+          query: '',
+        },
       },
       {
         type: 'document',
         name: '分析报告',
         config: {
           supportedFormats: ['pdf', 'xlsx', 'csv'],
-          maxFileSize: 200
-        }
-      }
-    ]
+          maxFileSize: 200,
+        },
+      },
+    ],
   },
   {
     id: 'template_employee_training',
@@ -116,7 +116,7 @@ export const kbTemplates = [
     icon: 'graduation-cap',
     preset: {
       kbName: '员工培训知识库',
-      kbDescription: '包含培训文档和常见问题的员工知识库'
+      kbDescription: '包含培训文档和常见问题的员工知识库',
     },
     dataSources: [
       {
@@ -124,8 +124,8 @@ export const kbTemplates = [
         name: '培训文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx', 'ppt', 'pptx'],
-          maxFileSize: 100
-        }
+          maxFileSize: 100,
+        },
       },
       {
         type: 'qa',
@@ -133,10 +133,10 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.7,
           enableFuzzyMatch: true,
-          maxQACount: 500
-        }
-      }
-    ]
+          maxQACount: 500,
+        },
+      },
+    ],
   },
   {
     id: 'template_marketing_faq',
@@ -147,7 +147,7 @@ export const kbTemplates = [
     icon: 'bullhorn',
     preset: {
       kbName: '营销FAQ知识库',
-      kbDescription: '整合营销文档和常见问题的知识库'
+      kbDescription: '整合营销文档和常见问题的知识库',
     },
     dataSources: [
       {
@@ -155,8 +155,8 @@ export const kbTemplates = [
         name: '营销文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx'],
-          maxFileSize: 50
-        }
+          maxFileSize: 50,
+        },
       },
       {
         type: 'qa',
@@ -164,10 +164,10 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.75,
           enableFuzzyMatch: true,
-          maxQACount: 300
-        }
-      }
-    ]
+          maxQACount: 300,
+        },
+      },
+    ],
   },
   {
     id: 'template_finance_regulations',
@@ -178,7 +178,7 @@ export const kbTemplates = [
     icon: 'building-columns',
     preset: {
       kbName: '金融合规知识库',
-      kbDescription: '包含金融法规文档和合规问答的知识库'
+      kbDescription: '包含金融法规文档和合规问答的知识库',
     },
     dataSources: [
       {
@@ -186,8 +186,8 @@ export const kbTemplates = [
         name: '法规文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx'],
-          maxFileSize: 100
-        }
+          maxFileSize: 100,
+        },
       },
       {
         type: 'qa',
@@ -195,8 +195,8 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.85,
           enableFuzzyMatch: false,
-          maxQACount: 200
-        }
+          maxQACount: 200,
+        },
       },
       {
         type: 'web',
@@ -205,10 +205,10 @@ export const kbTemplates = [
           baseUrl: '',
           crawlDepth: 1,
           interval: 24,
-          enableRecursive: false
-        }
-      }
-    ]
+          enableRecursive: false,
+        },
+      },
+    ],
   },
   {
     id: 'template_medical_guide',
@@ -219,7 +219,7 @@ export const kbTemplates = [
     icon: 'hospitals',
     preset: {
       kbName: '医疗指南知识库',
-      kbDescription: '整合医疗文档和健康问答的知识库'
+      kbDescription: '整合医疗文档和健康问答的知识库',
     },
     dataSources: [
       {
@@ -227,8 +227,8 @@ export const kbTemplates = [
         name: '医疗文档',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx'],
-          maxFileSize: 100
-        }
+          maxFileSize: 100,
+        },
       },
       {
         type: 'qa',
@@ -236,10 +236,10 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.8,
           enableFuzzyMatch: true,
-          maxQACount: 500
-        }
-      }
-    ]
+          maxQACount: 500,
+        },
+      },
+    ],
   },
   {
     id: 'template_ecommerce_faq',
@@ -250,7 +250,7 @@ export const kbTemplates = [
     icon: 'cart',
     preset: {
       kbName: '电商客服知识库',
-      kbDescription: '整合产品信息、订单问题、售后政策的知识库'
+      kbDescription: '整合产品信息、订单问题、售后政策的知识库',
     },
     dataSources: [
       {
@@ -258,8 +258,8 @@ export const kbTemplates = [
         name: '产品手册',
         config: {
           supportedFormats: ['pdf', 'doc', 'docx'],
-          maxFileSize: 50
-        }
+          maxFileSize: 50,
+        },
       },
       {
         type: 'qa',
@@ -267,8 +267,8 @@ export const kbTemplates = [
         config: {
           matchThreshold: 0.75,
           enableFuzzyMatch: true,
-          maxQACount: 800
-        }
+          maxQACount: 800,
+        },
       },
       {
         type: 'database',
@@ -280,9 +280,9 @@ export const kbTemplates = [
           username: '',
           password: '',
           tableName: 'products',
-          query: 'SELECT id, name, description FROM products'
-        }
-      }
-    ]
-  }
+          query: 'SELECT id, name, description FROM products',
+        },
+      },
+    ],
+  },
 ];
