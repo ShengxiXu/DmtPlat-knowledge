@@ -19,7 +19,7 @@
 新增公共 helper：
 
 ```js
-renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
+renderCreatorPanel({ variant, title, desc, progress, config, preview, footer });
 ```
 
 `variant` 为 `form` / `chat` / `extract`，用于各自微调高度与内边距。结构为：
@@ -78,7 +78,9 @@ renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
   background: #fff;
   border: 1px solid #e8e8e8;
   border-radius: 20px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02), 0 16px 40px rgba(0,0,0,0.05);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.02),
+    0 16px 40px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -94,8 +96,18 @@ renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
   border-bottom: 1px solid #f0f0f0;
 }
 
-.wa-creator-panel-title { font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.01em; }
-.wa-creator-panel-desc { font-size: 13px; color: #6b7280; margin-top: 4px; line-height: 1.5; }
+.wa-creator-panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+.wa-creator-panel-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
+  line-height: 1.5;
+}
 
 .wa-creator-panel-body {
   display: grid;
@@ -104,7 +116,10 @@ renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
   min-height: 0;
 }
 
-.wa-creator-panel-config { padding: 28px 32px; min-width: 0; }
+.wa-creator-panel-config {
+  padding: 28px 32px;
+  min-width: 0;
+}
 
 .wa-creator-panel-preview {
   padding: 28px 32px;
@@ -149,8 +164,13 @@ renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
   overflow: hidden;
 }
 
-.wa-creator-chat-config .wa-conversation-messages { flex: 1; padding: 28px; }
-.wa-creator-chat-config .wa-conversation-input-wrapper { padding: 16px 28px 24px; }
+.wa-creator-chat-config .wa-conversation-messages {
+  flex: 1;
+  padding: 28px;
+}
+.wa-creator-chat-config .wa-conversation-input-wrapper {
+  padding: 16px 28px 24px;
+}
 ```
 
 #### 清理旧两卡样式
@@ -170,19 +190,31 @@ renderCreatorPanel({ variant, title, desc, progress, config, preview, footer })
 
 ```css
 @media (max-width: 1024px) {
-  .wa-creator-panel-body { grid-template-columns: 1fr; }
+  .wa-creator-panel-body {
+    grid-template-columns: 1fr;
+  }
   .wa-creator-panel-preview {
     border-left: none;
     border-top: 1px solid #f0f0f0;
   }
-  .wa-creator-chat-panel .wa-creator-panel-body { height: auto; min-height: auto; }
+  .wa-creator-chat-panel .wa-creator-panel-body {
+    height: auto;
+    min-height: auto;
+  }
 }
 
 @media (max-width: 768px) {
   .wa-creator-panel-header,
-  .wa-creator-panel-footer { padding: 16px 20px; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .wa-creator-panel-footer {
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
   .wa-creator-panel-config,
-  .wa-creator-panel-preview { padding: 20px; }
+  .wa-creator-panel-preview {
+    padding: 20px;
+  }
 }
 ```
 

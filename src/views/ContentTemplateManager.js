@@ -61,6 +61,7 @@ export class ContentTemplateManager {
     this.options = options;
     this.onSelect = options.onSelect || (() => {});
     this.onClose = options.onClose || null;
+    this.onBack = options.onBack || null;
     this.initialDocumentId = options.initialDocumentId || null;
     this.currentCategory = options.initialCategory || 'all';
     this.currentFormat = 'all';
@@ -218,8 +219,11 @@ export class ContentTemplateManager {
         <div class="ctm-lib-header">
           <div class="ctm-lib-header-inner">
             <div class="ctm-lib-title-section">
-              <h1 class="ctm-lib-title">模板中心</h1>
-              <p class="ctm-lib-subtitle">精选模板，助你高效完成工作</p>
+              ${this.onBack ? `<button class="ctm-lib-back-btn" data-action="ctm-back" title="返回"><i class="fa-solid fa-arrow-left"></i></button>` : ''}
+              <div class="ctm-lib-title-text">
+                <h1 class="ctm-lib-title">模板中心</h1>
+                <p class="ctm-lib-subtitle">精选模板，助你高效完成工作</p>
+              </div>
             </div>
             <div class="ctm-lib-search-row">
               <div class="ctm-lib-search-box">
@@ -1745,6 +1749,13 @@ export class ContentTemplateManager {
 
   bindEvents() {
     const container = this.container;
+
+    const backBtn = container.querySelector('[data-action="ctm-back"]');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        if (this.onBack) this.onBack();
+      });
+    }
 
     container.querySelectorAll('.ctm-lib-cat-item').forEach((el) => {
       el.addEventListener('click', () => {

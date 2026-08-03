@@ -22,6 +22,8 @@ export const outputTypes = {
   QA: 'qa',
   STEPS: 'steps',
   REPORT: 'report',
+  VIDEO: 'video',
+  MUSIC: 'music',
 };
 
 // PPT 视觉主题定义
@@ -1020,11 +1022,182 @@ export function getAllTemplates() {
   return [...workTemplates, ...getCustomTemplates(), ...getTeamTemplates().filter((t) => t.status === 'approved')];
 }
 
+// 首页内容类型选择生成的统一入口：按类型 + 用户配置（篇幅/风格/行数等）产出内容
+// 支持 markdown / ppt / table / email / list / steps
+function generateByChatType(template, formData, mode, kbNames, options = {}) {
+  const topic = (formData.topic || '').trim() || '指定主题';
+  const type = template.chatContentType;
+  const refs = getCitations(mode, template);
+  const attachmentSuffix = options.attachmentContext
+    ? `\n\n---\n\n## 参考附件\n\n以下内容结合了上传附件中的信息：\n${options.attachmentContext}`
+    : '';
+
+  // ---------- 文档 ----------
+  if (type === 'markdown') {
+    const lengthMap = {
+      short: ['概述', '核心要点', '小结'],
+      standard: ['背景', '核心要点', '实施步骤', '小结'],
+      detailed: ['背景与目标', '现状分析', '核心要点', '实施步骤', '风险与应对', '小结'],
+    };
+    const styleTone = { formal: '正式严谨', plain: '通俗易懂', professional: '专业务实' }[options.style] || '专业';
+    const sections = lengthMap[options.length] || lengthMap.standard;
+    const body = sections.map((s) => `## ${s}\n\n围绕「${topic}」，从${styleTone}的角度展开：这里是关于${s}的要点说明，可结合实际情况补充细节。`).join('\n\n');
+    return {
+      title: `${topic}`,
+      content: `# ${topic}\n\n> 类型：文档 · 风格：${styleTone} · 篇幅：${sections.length} 段\n\n${body}${attachmentSuffix}`,
+      citations: refs,
+    };
+  }
+
+  // ---------- PPT ----------
+  if (type === 'ppt') {
+    const styleLabelMap = { business: '商务正式', tech: '科技现代', minimal: '简约清新', lively: '活泼生动', academic: '学术严谨' };
+    const colorHexMap = { business: '1C64F2', tech: '111827', minimal: '0E9F6E', lively: 'F05252', academic: '78716C' };
+    const style = styleLabelMap[options.style] || '商务正式';
+    const colorHex = colorHexMap[options.style] || '0E9F6E';
+    const pageCount = parseInt(options.length, 10) || 12;
+    const styleTone = { '商务正式': '稳重、专业、数据驱动', '科技现代': '前沿、简洁、强调创新', '简约清新': '清晰、留白、重点突出', '活泼生动': '亲和、故事化、场景化', '学术严谨': '严谨、规范、论证充分' }[style] || '专业';
+
+    const sectionTitles = ['背景与目标', '现状分析', '核心策略', '关键举措', '预期成果', '风险与应对', '推进计划', '总结展望'];
+    const pages = [
+      { type: 'cover', title: topic, subtitle: `风格：${style}`, bullets: [], note: `开场点明汇报目标，风格基调：${styleTone}`, visual: `封面建议：${style}主题背景，突出标题`, layout: 'center' },
+      { type: 'catalog', title: '汇报目录', bullets: sectionTitles.slice(0, Math.max(4, pageCount - 2)), note: '简要介绍汇报结构', visual: '目录页', layout: 'list' },
+    ];
+    for (let i = 0; i < pageCount - 2 && i < sectionTitles.length; i++) {
+      pages.push({
+        type: 'content',
+        title: sectionTitles[i],
+        bullets: [`关于「${topic}」的${sectionTitles[i]}要点一`, `关于「${topic}」的${sectionTitles[i]}要点二`, `关于「${topic}」的${sectionTitles[i]}要点三`],
+        note: `${sectionTitles[i]}的讲解思路，保持${styleTone}。`,
+        visual: `${sectionTitles[i]}页建议图表/图示`,
+        layout: 'bullets',
+      });
+    }
+    pages.push({ type: 'end', title: '谢谢', subtitle: '欢迎交流', bullets: [], note: '结尾致谢并引导问答', visual: '结尾页', layout: 'center' });
+    return { title: topic, style, styleTone, color: '品牌绿', colorHex, coreMessage: topic, pages, citations: refs };
+  }
+
+  // ---------- 表格 ----------
+  if (type === 'table') {
+    const rowCount = parseInt(options.rows, 10) || 10;
+    const columns = ['维度', '说明', '备注'];
+    const dims = ['名称', '定位', '目标', '优势', '挑战', '资源', '节奏', '风险', '成果', '复盘', '扩展', '优化', '规范', '协同', '反馈'];
+    const rows = [];
+    for (let i = 0; i < rowCount; i++) {
+      const dim = dims[i % dims.length];
+      rows.push([dim, `围绕「${topic}」的${dim}相关说明`, '']);
+    }
+    return { title: `${topic}表`, columns, rows, citations: refs };
+  }
+
+  // ---------- 邮件 ----------
+  if (type === 'email') {
+    const toneMap = {
+      formal: { greeting: '尊敬的对方：', closing: '顺颂商祺。' },
+      friendly: { greeting: '您好呀：', closing: '祝好！' },
+      serious: { greeting: '对方您好：', closing: '此致敬礼。' },
+    };
+    const t = toneMap[options.tone] || toneMap.formal;
+    return {
+      title: `${topic}邮件`,
+      content: `**主题：${topic}**\n\n${t.greeting}\n\n关于「${topic}」，特此沟通如下：\n\n1. 背景说明：围绕${topic}的背景情况。\n2. 核心诉求：希望就${topic}达成共识。\n3. 下一步：期待您的反馈与确认。\n\n${t.closing}${attachmentSuffix}`,
+      citations: refs,
+    };
+  }
+
+  // ---------- 列表 ----------
+  if (type === 'list') {
+    const count = parseInt(options.count, 10) || 10;
+    const items = [];
+    for (let i = 1; i <= count; i++) {
+      items.push(`${i}. 关于「${topic}」的第 ${i} 条要点`);
+    }
+    return { title: `${topic}清单`, content: `# ${topic}清单\n\n${items.join('\n')}${attachmentSuffix}`, citations: refs };
+  }
+
+  // ---------- 步骤 ----------
+  if (type === 'steps') {
+    const detailMap = {
+      brief: ['明确目标', '制定方案', '执行推进', '复盘优化'],
+      standard: ['明确目标', '拆解任务', '制定方案', '执行推进', '跟踪反馈', '复盘优化'],
+      detailed: ['明确目标与范围', '现状调研与分析', '拆解任务与排期', '制定详细方案', '资源配置与动员', '分步执行推进', '持续跟踪反馈', '复盘总结与优化'],
+    };
+    const steps = detailMap[options.detail] || detailMap.standard;
+    const body = steps.map((s, i) => `### 第 ${i + 1} 步：${s}\n围绕「${topic}」，说明本步骤的关键动作与注意事项。`).join('\n\n');
+    return { title: `${topic}步骤`, content: `# ${topic}步骤\n\n${body}${attachmentSuffix}`, citations: refs };
+  }
+
+  // ---------- 视频 ----------
+  if (type === 'video') {
+    const styleMap = { realistic: '写实', anime: '动画', cinematic: '电影感', cartoon: '卡通' };
+    const style = styleMap[options.style] || '电影感';
+    const duration = parseInt(options.duration, 10) || 10;
+    const ratio = options.ratio || '16:9';
+    const sceneCount = Math.max(3, Math.min(6, Math.ceil(duration / 3)));
+    const scenes = [];
+    for (let i = 1; i <= sceneCount; i++) {
+      scenes.push({
+        index: i,
+        time: `${(i - 1) * Math.ceil(duration / sceneCount)}s - ${i * Math.ceil(duration / sceneCount)}s`,
+        shot: `镜头 ${i}：围绕「${topic}」的${style}画面`,
+        desc: `${style}风格画面描述：以${topic}为核心，呈现第 ${i} 段叙事，注重光影与构图。`,
+        audio: i === 1 ? '开场配乐渐入' : (i === sceneCount ? '配乐渐弱收尾' : '环境音 + 配乐推进'),
+      });
+    }
+    return {
+      title: `${topic}视频`,
+      type: 'video',
+      style, duration, ratio,
+      resolution: ratio === '9:16' ? '1080×1920' : (ratio === '1:1' ? '1080×1080' : '1920×1080'),
+      scenes,
+      citations: refs,
+    };
+  }
+
+  // ---------- 音乐 ----------
+  if (type === 'music') {
+    const genreMap = { pop: '流行', classical: '古典', electronic: '电子', light: '轻音乐', folk: '民谣' };
+    const moodMap = { happy: '欢快', calm: '舒缓', energetic: '激昂', sad: '忧伤' };
+    const genre = genreMap[options.genre] || '流行';
+    const mood = moodMap[options.mood] || '欢快';
+    const duration = parseInt(options.duration, 10) || 60;
+    const tempo = { 流行: '100 BPM', 古典: '80 BPM', 电子: '124 BPM', 轻音乐: '90 BPM', 民谣: '85 BPM' }[genre] || '100 BPM';
+    const instrumentMap = { 流行: '钢琴 + 木吉他 + 弦乐', 古典: '小提琴 + 大提琴 + 钢琴', 电子: '合成器 + 鼓机', 轻音乐: '钢琴 + 长笛', 民谣: '木吉他 + 口琴' };
+    const instruments = instrumentMap[genre] || '钢琴 + 吉他';
+    const sectionCount = Math.max(3, Math.min(5, Math.ceil(duration / 20)));
+    const sections = [];
+    const labels = ['前奏', '主歌', '副歌', '桥段', '尾奏'];
+    for (let i = 0; i < sectionCount; i++) {
+      const label = labels[i] || `段落 ${i + 1}`;
+      sections.push({
+        label,
+        time: `${Math.round(i * duration / sectionCount)}s - ${Math.round((i + 1) * duration / sectionCount)}s`,
+        desc: `${label}：${mood}情绪的${genre}段落，围绕「${topic}」展开旋律。`,
+      });
+    }
+    const lyrics = `（歌词草稿）\n围绕「${topic}」，以${mood}的基调展开：\n第 1 句：点明${topic}的场景与情感\n第 2 句：深化主题，承接情绪\n第 3 句：推向高潮，呼应核心\n第 4 句：收束余韵，留有余味`;
+    return {
+      title: `${topic}音乐`,
+      type: 'music',
+      genre, mood, duration, tempo, instruments,
+      sections, lyrics,
+      citations: refs,
+    };
+  }
+
+  return { title: topic, content: `暂未实现该类型的生成逻辑。${attachmentSuffix}`, citations: refs };
+}
+
 // 模拟生成内容
 export function mockGenerateContent(template, formData, mode, selectedKBs, options = {}) {
   const kbNames = selectedKBs.map((kb) => kb.name).join('、') || '大语言模型';
   const attachmentContext = getAttachmentContext(options.attachments);
   const opts = { ...options, attachmentContext };
+
+  // 首页内容类型选择生成的临时模板：按类型 + 配置项生成
+  if (template.chatContentType) {
+    return generateByChatType(template, formData, mode, kbNames, opts);
+  }
 
   switch (template.outputType) {
     case outputTypes.TABLE:
@@ -1960,6 +2133,8 @@ function generateReport(template, formData, mode, kbNames, options = {}) {
 const STORAGE_KEY = 'workAssistantHistory';
 const STORAGE_DRAFT_KEY = 'workAssistantDraft';
 const STORAGE_ROLE_KEY = 'workAssistantLastRole';
+const STORAGE_QUICK_SCENE_KEY = 'workAssistantQuickScene';
+const STORAGE_QUICK_CONTENT_KEY = 'workAssistantQuickContent';
 
 export function getWorkHistory() {
   try {
@@ -2007,6 +2182,26 @@ export function getLastRole() {
 export function setLastRole(roleId) {
   localStorage.setItem(STORAGE_ROLE_KEY, roleId);
 }
+
+// 首页「场景模板 / 内容模板」快速入口配置（最多3个模板 id）
+function readQuickIds(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string' && x).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+function writeQuickIds(key, ids) {
+  const safe = Array.isArray(ids) ? ids.filter((x) => typeof x === 'string' && x).slice(0, 3) : [];
+  localStorage.setItem(key, JSON.stringify(safe));
+}
+export function getQuickSceneTemplateIds() { return readQuickIds(STORAGE_QUICK_SCENE_KEY); }
+export function setQuickSceneTemplateIds(ids) { writeQuickIds(STORAGE_QUICK_SCENE_KEY, ids); }
+export function getQuickContentTemplateIds() { return readQuickIds(STORAGE_QUICK_CONTENT_KEY); }
+export function setQuickContentTemplateIds(ids) { writeQuickIds(STORAGE_QUICK_CONTENT_KEY, ids); }
 
 export function createWorkRecord(template, formData, mode, selectedKBs, result) {
   const kbs = Array.isArray(selectedKBs) ? selectedKBs : [];

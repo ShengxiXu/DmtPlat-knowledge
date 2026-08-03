@@ -34,8 +34,33 @@ function resultToStreamText(result, template, selectedKBs) {
   // 表格类型转 HTML
   if (result.columns && result.rows) {
     const thead = `<tr>${result.columns.map((c) => `<th>${c}</th>`).join('')}</tr>`;
-    const tbody = result.rows.map((r) => `<tr>${result.columns.map((c) => `<td>${r[c] || ''}</td>`).join('')}</tr>`).join('');
+    const tbody = result.rows.map((r) => `<tr>${result.columns.map((c, i) => `<td>${r[i] != null ? r[i] : (r[c] || '')}</td>`).join('')}</tr>`).join('');
     return `${kbNote}<table class="wa-chat-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+  }
+  // PPT 类型：输出可读大纲（避免流式输出原始 JSON）
+  if (result.pages && Array.isArray(result.pages)) {
+    const styleLine = result.style ? `> 风格：${result.style} · 共 ${result.pages.length} 页\n\n` : '';
+    const outline = result.pages.map((p, i) => {
+      const bullets = (p.bullets || []).map((b) => `  - ${b}`).join('\n');
+      return `### 第 ${i + 1} 页：${p.title || ''}${p.subtitle ? `（${p.subtitle}）` : ''}${bullets ? '\n' + bullets : ''}`;
+    }).join('\n\n');
+    return `${kbNote}${styleLine}${outline}`;
+  }
+  // 视频类型：输出分镜脚本
+  if (result.type === 'video' && Array.isArray(result.scenes)) {
+    const meta = `> 风格：${result.style} · 时长：${result.duration}s · 比例：${result.ratio} · 分辨率：${result.resolution}\n\n`;
+    const body = result.scenes.map((s) => {
+      return `### ${s.shot}\n- 时间：${s.time}\n- 画面：${s.desc}\n- 音频：${s.audio}`;
+    }).join('\n\n');
+    return `${kbNote}${meta}${body}`;
+  }
+  // 音乐类型：输出曲谱结构 + 歌词
+  if (result.type === 'music' && Array.isArray(result.sections)) {
+    const meta = `> 曲风：${result.genre} · 情绪：${result.mood} · 时长：${result.duration}s · 节奏：${result.tempo} · 乐器：${result.instruments}\n\n`;
+    const body = result.sections.map((s) => {
+      return `### ${s.label}（${s.time}）\n${s.desc}`;
+    }).join('\n\n');
+    return `${kbNote}${meta}${body}\n\n---\n\n${result.lyrics || ''}`;
   }
   // 其他类型降级为字符串
   return kbNote + (typeof result === 'string' ? result : JSON.stringify(result, null, 2));

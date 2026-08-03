@@ -9,9 +9,9 @@ const iconReplacements = {
   'message-square': 'message',
   'bar-chart-2': 'chart-bar',
   'graduation-cap': 'graduation-cap',
-  'megaphone': 'bullhorn',
-  'landmark': 'building-columns',
-  'hospital': 'hospitals',
+  megaphone: 'bullhorn',
+  landmark: 'building-columns',
+  hospital: 'hospitals',
   'shopping-cart': 'cart',
 };
 

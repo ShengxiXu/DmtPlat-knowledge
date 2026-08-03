@@ -30,12 +30,17 @@ import {
   saveDraft,
   createWorkRecord,
   addWorkHistory,
+  getQuickSceneTemplateIds,
+  setQuickSceneTemplateIds,
+  getQuickContentTemplateIds,
+  setQuickContentTemplateIds,
   mockGenerateContent,
   generatePPTContentFromOutline,
 } from '../data/workAssistantData.js';
 import {
   getAllContentTemplates,
   getContentTemplateById,
+  defaultContentTemplates,
   pptSkeletonTemplates,
   sceneCategories,
   sceneCategoryColors,
@@ -72,6 +77,19 @@ export class WorkAssistant {
     this.chatStreaming = false; // 是否正在流式生成
     this.homeSelectedKBs = []; // 首页对话输入框关联的知识库
     this.homeKBPickerOpen = false; // 首页知识库选择器是否展开
+    // 首页内容类型选择（参考豆包/Kimi：选择生成类型后展示对应配置项）
+    this.chatContentType = 'chat'; // 'chat' | 'markdown' | 'ppt' | 'table' | 'video' | 'music'
+    this.chatContentConfig = {}; // 当前类型下的配置取值
+    this.initChatContentConfig(this.chatContentType);
+    // 首页模型选择（替代原"深度思考"开关）
+    this.homeModel = 'glm-4.6'; // 当前选中模型
+    this.homeModelOpen = false; // 模型下拉是否展开
+    // 首页加号菜单（合并知识库 + 附件入口）
+    this.homePlusOpen = false;
+    this.homeAttachments = []; // 首页附件列表
+    // 首页「场景模板 / 内容模板」快速入口配置（最多3个，可自定义）
+    this.quickSceneIds = getQuickSceneTemplateIds();
+    this.quickContentIds = getQuickContentTemplateIds();
     this.currentResult = null;
     this.currentFormData = null;
     this.currentMode = null;
@@ -315,6 +333,8 @@ export class WorkAssistant {
   }
 
   render() {
+    // 页面切换时清理可能残留的弹窗
+    this.closePPTThemePicker();
     if (this.activeTab === 'editor' && this.selectedTemplate) {
       this.renderEditor();
       return;
@@ -414,11 +434,9 @@ export class WorkAssistant {
     const docCount = this.getChatDocCount();
     const hasMessages = this.chatMessages.length > 0;
     const recents = this.getRecentHistory();
-    const prompts = this.getQuickStartPrompts();
-    const kbCount = (this.homeSelectedKBs || []).length;
 
     this.container.innerHTML = `
-      <div class="wa-chat-wrap">
+      <div class="wa-chat-wrap ${hasMessages ? 'has-messages' : ''}">
         <div class="wa-chat-ambient"></div>
 
         <header class="wa-chat-topbar">
@@ -429,15 +447,8 @@ export class WorkAssistant {
           <div class="wa-chat-top-actions">
             <button class="wa-chat-top-btn" id="wa-chat-docs" title="我的文档">
               <i class="fa-regular fa-folder-open"></i>
-              <span>文档</span>
+              <span>我的文档</span>
               ${docCount > 0 ? `<span class="count">${docCount}</span>` : ''}
-            </button>
-            <button class="wa-chat-top-btn" id="wa-chat-history" title="最近创作">
-              <i class="fa-regular fa-clock"></i>
-              <span>历史</span>
-            </button>
-            <button class="wa-chat-top-btn icon-only" id="wa-chat-new" title="新对话">
-              <i class="fa-solid fa-plus"></i>
             </button>
             <button class="wa-chat-theme-toggle" id="wa-chat-theme-toggle" title="切换主题">
               <i class="fa-solid fa-${isDark ? 'sun' : 'moon'}"></i>
@@ -460,57 +471,46 @@ export class WorkAssistant {
             <div class="wa-chat-hero-composer">
               <div class="wa-chat-composer wa-chat-composer--hero">
                 <textarea class="wa-chat-composer-input" id="wa-chat-input"
-                          placeholder="描述你想创作的内容，比如：帮我写一份产品竞品分析"
+                          placeholder="${this.getChatInputPlaceholder()}"
                           rows="1" autocomplete="off" ${this.chatStreaming ? 'disabled' : ''}></textarea>
-                <div class="wa-chat-composer-toolbar">
-                  <div class="wa-chat-composer-tools">
-                    <button class="wa-chat-tool-btn ${kbCount > 0 ? 'active' : ''}" id="wa-chat-pick-kb" title="关联知识库">
-                      <i class="fa-solid fa-book"></i>
-                      <span>${kbCount > 0 ? `知识库 ${kbCount}` : '知识库'}</span>
-                    </button>
-                    <button class="wa-chat-tool-btn" id="wa-chat-attach" title="上传文件">
-                      <i class="fa-solid fa-paperclip"></i>
-                    </button>
-                    <div class="wa-chat-tool-divider"></div>
-                    <button class="wa-chat-tool-btn" id="wa-chat-deepthink" title="深度思考">
-                      <i class="fa-solid fa-brain"></i>
-                      <span>深度思考</span>
+                <div class="wa-chat-config-row" id="wa-chat-config-row">${this.renderConfigRowInner(this.chatContentType)}</div>
+                <div class="wa-chat-control-bar">
+                  <div class="wa-chat-type-row" id="wa-chat-type-row">${this.renderTypeChips()}</div>
+                  <div class="wa-chat-control-actions">
+                    ${this.renderPlusButton()}
+                    ${this.renderModelSelector()}
+                    <button class="wa-chat-send-btn" id="wa-chat-send" type="button" ${this.chatStreaming ? 'disabled' : ''}>
+                      <i class="fa-solid fa-arrow-up"></i>
                     </button>
                   </div>
-                  <button class="wa-chat-send-btn" id="wa-chat-send" ${this.chatStreaming ? 'disabled' : ''}>
-                    <i class="fa-solid fa-arrow-up"></i>
-                  </button>
                 </div>
+                ${this.renderHomeKBPicker()}
               </div>
-              ${this.homeKBPickerOpen ? this.renderHomeKBPicker() : ''}
-            </div>
-
-            <div class="wa-chat-prompts">
-              ${prompts.map((p) => `
-                <div class="wa-chat-prompt-chip" data-prompt="${this.escapeHtml(p.prompt)}">
-                  <span class="wa-chat-prompt-dot"></span>
-                  <span>${this.escapeHtml(p.label)}</span>
-                </div>
-              `).join('')}
             </div>
 
             <div class="wa-chat-alt-divider"><span>或使用结构化模板</span></div>
             <div class="wa-chat-alt-modes">
               <div class="wa-chat-alt-mode" data-mode="scene">
-                <div class="wa-chat-alt-mode-icon"><i class="fa-solid fa-layer-group"></i></div>
-                <div class="wa-chat-alt-mode-body">
-                  <div class="wa-chat-alt-mode-title">场景模板 <span class="wa-chat-alt-mode-tag">结构化</span></div>
-                  <div class="wa-chat-alt-mode-desc">选岗位模板，按字段生成 PPT/报告</div>
+                <div class="wa-chat-alt-mode-head" data-mode="scene">
+                  <div class="wa-chat-alt-mode-icon"><i class="fa-solid fa-layer-group"></i></div>
+                  <div class="wa-chat-alt-mode-body">
+                    <div class="wa-chat-alt-mode-title">场景模板 <span class="wa-chat-alt-mode-tag">结构化</span></div>
+                    <div class="wa-chat-alt-mode-desc">选岗位模板，按字段生成 PPT/报告</div>
+                  </div>
+                  <div class="wa-chat-alt-mode-arrow"><i class="fa-solid fa-arrow-right"></i></div>
                 </div>
-                <div class="wa-chat-alt-mode-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                ${this.renderQuickEntries('scene')}
               </div>
               <div class="wa-chat-alt-mode" data-mode="content">
-                <div class="wa-chat-alt-mode-icon"><i class="fa-solid fa-file-lines"></i></div>
-                <div class="wa-chat-alt-mode-body">
-                  <div class="wa-chat-alt-mode-title">内容模板 <span class="wa-chat-alt-mode-tag">文档</span></div>
-                  <div class="wa-chat-alt-mode-desc">选文档模板，直接进入编辑器</div>
+                <div class="wa-chat-alt-mode-head" data-mode="content">
+                  <div class="wa-chat-alt-mode-icon"><i class="fa-solid fa-file-lines"></i></div>
+                  <div class="wa-chat-alt-mode-body">
+                    <div class="wa-chat-alt-mode-title">内容模板 <span class="wa-chat-alt-mode-tag">文档</span></div>
+                    <div class="wa-chat-alt-mode-desc">选文档模板，直接进入编辑器</div>
+                  </div>
+                  <div class="wa-chat-alt-mode-arrow"><i class="fa-solid fa-arrow-right"></i></div>
                 </div>
-                <div class="wa-chat-alt-mode-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                ${this.renderQuickEntries('content')}
               </div>
             </div>
 
@@ -540,20 +540,22 @@ export class WorkAssistant {
 
         ${hasMessages ? `
           <div class="wa-chat-composer-wrap">
-            <div class="wa-chat-composer">
-              <input type="text" class="wa-chat-composer-input" id="wa-chat-input"
-                     placeholder="继续描述新需求..."
-                     autocomplete="off" ${this.chatStreaming ? 'disabled' : ''}>
-              <div class="wa-chat-composer-toolbar">
-                <div class="wa-chat-composer-tools">
-                  <button class="wa-chat-tool-btn" id="wa-chat-pick-template" title="选择模板">
-                    <i class="fa-solid fa-layer-group"></i>
+            <div class="wa-chat-composer wa-chat-composer--hero wa-chat-composer--floating">
+              <textarea class="wa-chat-composer-input" id="wa-chat-input"
+                        placeholder="继续描述新需求..."
+                        rows="1" autocomplete="off" ${this.chatStreaming ? 'disabled' : ''}></textarea>
+              <div class="wa-chat-config-row" id="wa-chat-config-row">${this.renderConfigRowInner(this.chatContentType)}</div>
+              <div class="wa-chat-control-bar">
+                <div class="wa-chat-type-row" id="wa-chat-type-row">${this.renderTypeChips()}</div>
+                <div class="wa-chat-control-actions">
+                  ${this.renderPlusButton()}
+                  ${this.renderModelSelector()}
+                  <button class="wa-chat-send-btn" id="wa-chat-send" type="button" ${this.chatStreaming ? 'disabled' : ''}>
+                    <i class="fa-solid fa-arrow-up"></i>
                   </button>
                 </div>
-                <button class="wa-chat-send-btn" id="wa-chat-send" ${this.chatStreaming ? 'disabled' : ''}>
-                  <i class="fa-solid fa-paper-plane"></i>
-                </button>
               </div>
+              ${this.renderHomeKBPicker()}
             </div>
           </div>
         ` : ''}
@@ -569,10 +571,10 @@ export class WorkAssistant {
     const kbs = knowledgeBases || [];
     const selected = this.homeSelectedKBs || [];
     return `
-      <div class="wa-chat-kb-picker" id="wa-chat-kb-picker">
+      <div class="wa-chat-kb-picker ${this.homeKBPickerOpen ? 'show' : ''}" id="wa-chat-kb-picker">
         <div class="wa-chat-kb-picker-header">
           <span>关联知识库</span>
-          <button class="wa-chat-kb-picker-close" id="wa-chat-kb-close"><i class="fa-solid fa-xmark"></i></button>
+          <button class="wa-chat-kb-picker-close" id="wa-chat-kb-close" type="button"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="wa-chat-kb-picker-list">
           ${kbs.map((kb) => {
@@ -624,6 +626,43 @@ export class WorkAssistant {
         <div class="wa-chat-card-name">${this.escapeHtml(template.name)}</div>
         <div class="wa-chat-card-desc">${this.escapeHtml(template.description || '')}</div>
         ${fieldChips ? `<div class="wa-chat-card-fields">${fieldChips}${extraCount}</div>` : ''}
+      </div>
+    `;
+  }
+
+  // 首页「场景模板 / 内容模板」卡片内嵌的快速入口区（最多3个，可自定义配置）
+  // 无外层卡片：直接返回「常用标题 + 管理按钮 + mini卡片行」，嵌入 alt-mode 卡片底部
+  renderQuickEntries(type) {
+    const isScene = type === 'scene';
+    const ids = isScene ? this.quickSceneIds : this.quickContentIds;
+    const all = isScene ? getAllTemplates() : defaultContentTemplates;
+    const items = ids
+      .map((id) => all.find((t) => t && t.id === id))
+      .filter(Boolean);
+
+    const cards = items.length > 0
+      ? items.map((t) => {
+          const ic = isScene
+            ? this.getSceneIcon(t.outputType)
+            : this.getContentIcon(t.format);
+          return `
+            <button class="wa-quick-card" type="button" data-quick-type="${type}" data-template-id="${t.id}">
+              <span class="wa-quick-card-icon"><i class="fa-solid fa-${ic}"></i></span>
+              <span class="wa-quick-card-name">${this.escapeHtml(t.name)}</span>
+            </button>
+          `;
+        }).join('')
+      : `<div class="wa-quick-empty">点击「管理」添加常用模板</div>`;
+
+    return `
+      <div class="wa-quick-section" data-quick-type="${type}">
+        <div class="wa-quick-section-bar">
+          <span class="wa-quick-section-label">常用</span>
+          <button class="wa-quick-manage" type="button" data-quick-type="${type}" title="管理常用模板">
+            <i class="fa-solid fa-sliders"></i>
+          </button>
+        </div>
+        <div class="wa-quick-cards">${cards}</div>
       </div>
     `;
   }
@@ -767,7 +806,7 @@ export class WorkAssistant {
     }).open();
   }
 
-  async startChatGeneration({ template, formData, selectedKBs, mode }) {
+  async startChatGeneration({ template, formData, selectedKBs, mode, options = {} }) {
     const userMsg = {
       id: generateId('chatmsg'),
       role: 'user',
@@ -794,7 +833,7 @@ export class WorkAssistant {
     this.render();
 
     try {
-      const stream = generateContent(template, formData, mode, selectedKBs, {});
+      const stream = generateContent(template, formData, mode, selectedKBs, options);
       for await (const event of stream) {
         if (event.type === 'thinking') {
           aiMsg.thinkingSteps.push({ text: event.step, status: 'active' });
@@ -918,6 +957,133 @@ export class WorkAssistant {
     this.render();
   }
 
+  // ===================== 快速入口配置弹窗 =====================
+
+  // 绑定首页快速入口区事件（卡片点击 + 管理按钮）；保存配置后局部刷新时复用
+  bindQuickEntryEvents() {
+    this.container.querySelectorAll('.wa-quick-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const type = card.dataset.quickType;
+        const id = card.dataset.templateId;
+        if (!id) return;
+        if (type === 'scene') {
+          const tpl = getAllTemplates().find((t) => t && t.id === id);
+          if (tpl) {
+            this.selectedTemplate = tpl;
+            this.activeTab = 'editor';
+            this.render();
+          }
+        } else {
+          if (this.onNavigate) this.onNavigate('contentTemplates', { initialContentTemplateId: id });
+        }
+      });
+    });
+    this.container.querySelectorAll('.wa-quick-manage').forEach((btn) => {
+      btn.addEventListener('click', () => this.openQuickConfigModal(btn.dataset.quickType));
+    });
+  }
+
+  openQuickConfigModal(type) {
+    if (document.getElementById('wa-quick-config-modal')) return;
+    const isScene = type === 'scene';
+    const all = isScene ? getAllTemplates() : defaultContentTemplates;
+    const selectedIds = new Set(isScene ? this.quickSceneIds : this.quickContentIds);
+    const title = isScene ? '管理常用场景模板' : '管理常用内容模板';
+
+    const items = all.map((t) => {
+      if (!t) return '';
+      const ic = isScene
+        ? this.getSceneIcon(t.outputType)
+        : this.getContentIcon(t.format);
+      const tag = isScene
+        ? this.getOutputTypeLabel(t.outputType)
+        : (formatLabels[t.format] && formatLabels[t.format].label) || t.format;
+      const checked = selectedIds.has(t.id) ? ' selected' : '';
+      return `
+        <div class="wa-quick-opt${checked}" data-id="${t.id}">
+          <span class="wa-quick-opt-icon"><i class="fa-solid fa-${ic}"></i></span>
+          <span class="wa-quick-opt-body">
+            <span class="wa-quick-opt-name">${this.escapeHtml(t.name)}</span>
+            <span class="wa-quick-opt-tag">${this.escapeHtml(String(tag))}</span>
+          </span>
+          <span class="wa-quick-opt-check"><i class="fa-solid fa-check"></i></span>
+        </div>
+      `;
+    }).join('');
+
+    const html = `
+      <div class="wa-modal-overlay wa-quick-config-overlay" id="wa-quick-config-modal">
+        <div class="wa-modal wa-quick-config-modal" onclick="event.stopPropagation()">
+          <div class="wa-modal-header">
+            <div class="wa-modal-title"><i class="fa-solid fa-sliders"></i> ${title}</div>
+            <button class="wa-modal-close" id="wa-quick-config-close" type="button"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="wa-modal-body wa-quick-config-body">
+            <div class="wa-quick-config-tip">最多选择 3 个，将展示在首页快速入口。已选 <b id="wa-quick-config-count">${selectedIds.size}</b>/3</div>
+            <div class="wa-quick-opt-list">${items}</div>
+          </div>
+          <div class="wa-modal-footer">
+            <button class="btn btn-ghost" id="wa-quick-config-cancel" type="button">取消</button>
+            <button class="btn btn-primary" id="wa-quick-config-save" type="button">保存</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+    this.bindQuickConfigModalEvents(type);
+  }
+
+  bindQuickConfigModalEvents(type) {
+    const modal = document.getElementById('wa-quick-config-modal');
+    if (!modal) return;
+    const isScene = type === 'scene';
+    const countEl = document.getElementById('wa-quick-config-count');
+    const MAX = 3;
+
+    const getSelected = () => Array.from(modal.querySelectorAll('.wa-quick-opt.selected'))
+      .map((el) => el.dataset.id);
+    const updateCount = () => { if (countEl) countEl.textContent = getSelected().length; };
+
+    const close = () => modal.remove();
+    document.getElementById('wa-quick-config-close')?.addEventListener('click', close);
+    document.getElementById('wa-quick-config-cancel')?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    modal.querySelectorAll('.wa-quick-opt').forEach((opt) => {
+      opt.addEventListener('click', () => {
+        const isSelected = opt.classList.contains('selected');
+        if (!isSelected && getSelected().length >= MAX) {
+          this.showToast(`最多只能选择 ${MAX} 个`, 'info');
+          return;
+        }
+        opt.classList.toggle('selected', !isSelected);
+        updateCount();
+      });
+    });
+
+    document.getElementById('wa-quick-config-save')?.addEventListener('click', () => {
+      const ids = getSelected();
+      if (isScene) {
+        setQuickSceneTemplateIds(ids);
+        this.quickSceneIds = getQuickSceneTemplateIds();
+      } else {
+        setQuickContentTemplateIds(ids);
+        this.quickContentIds = getQuickContentTemplateIds();
+      }
+      close();
+      // 局部刷新对应 alt-mode 卡片内的快速入口区，避免整体 re-render 导致输入框失焦
+      ['scene', 'content'].forEach((t) => {
+        const modeCard = this.container.querySelector(`.wa-chat-alt-mode[data-mode="${t}"]`);
+        const oldSection = modeCard?.querySelector('.wa-quick-section');
+        if (oldSection) {
+          oldSection.outerHTML = this.renderQuickEntries(t);
+        }
+      });
+      this.bindQuickEntryEvents();
+      this.showToast('已更新常用模板', 'success');
+    });
+  }
+
   getQuickStartPrompts() {
     return [
       { label: '客户方案 PPT', prompt: '给客户写一份产品方案 PPT' },
@@ -967,7 +1133,7 @@ export class WorkAssistant {
       const initial = this.getRecentItemInitial(title, source);
 
       return `
-        <div class="wa-recent-item" data-id="${item.id}">
+        <a class="wa-recent-item" href="?view=myDocuments" data-id="${item.id}">
           <div class="wa-recent-inner">
             <div class="wa-recent-avatar" style="background:${config.bgColor};color:${config.iconColor}">
               ${initial}
@@ -981,7 +1147,7 @@ export class WorkAssistant {
               <i class="fa-solid fa-chevron-right wa-recent-chevron"></i>
             </div>
           </div>
-        </div>
+        </a>
       `;
     } catch (e) {
       console.warn('渲染最近创作项失败:', item, e);
@@ -1042,8 +1208,407 @@ export class WorkAssistant {
   }
 
   handleNaturalLanguageCreate(value) {
-    // 纯对话模式：不再匹配模板弹窗，直接进入流式对话
-    this.startFreeChat(value);
+    const type = this.chatContentType || 'chat';
+    if (type === 'chat') {
+      // 聊天模式：直接进入流式对话
+      this.startFreeChat(value);
+      return;
+    }
+    // 结构化生成模式：按所选类型 + 配置项流式生成
+    this.startTypedGeneration(value, type, { ...this.chatContentConfig, model: this.homeModel });
+  }
+
+  // ===================== 内容类型选择 + 按类型配置（参考豆包/Kimi） =====================
+
+  getContentTypeOptions() {
+    // 聊天是默认状态（无芯片），不作为内容输出类型选项
+    return [
+      { id: 'markdown', label: '文档', icon: 'file-lines' },
+      { id: 'ppt', label: 'PPT', icon: 'file-powerpoint' },
+      { id: 'table', label: '表格', icon: 'table-cells' },
+      { id: 'video', label: '视频', icon: 'film' },
+      { id: 'music', label: '音乐', icon: 'music' },
+    ];
+  }
+
+  getContentTypeConfigSpec(type) {
+    const specs = {
+      ppt: [
+        {
+          id: 'length',
+          label: '篇幅',
+          type: 'select',
+          options: [
+            { v: '5', l: '5 页' },
+            { v: '8', l: '8 页' },
+            { v: '10', l: '10 页' },
+            { v: '12', l: '12 页' },
+            { v: '15', l: '15 页' },
+            { v: '18', l: '18 页' },
+            { v: '20', l: '20 页' },
+            { v: '25', l: '25 页' },
+            { v: '30', l: '30 页' },
+          ],
+          default: '12',
+        },
+        { id: 'style', label: '风格模板', type: 'theme_picker', default: 'business' },
+      ],
+      markdown: [
+        { id: 'length', label: '篇幅', options: [{ v: 'short', l: '简短' }, { v: 'standard', l: '标准' }, { v: 'detailed', l: '详细' }], default: 'standard' },
+        { id: 'style', label: '风格', options: [{ v: 'formal', l: '正式' }, { v: 'plain', l: '通俗' }, { v: 'professional', l: '专业' }], default: 'professional' },
+      ],
+      table: [],
+      video: [
+        { id: 'duration', label: '时长', options: [{ v: '5', l: '5 秒' }, { v: '10', l: '10 秒' }, { v: '15', l: '15 秒' }], default: '10' },
+        { id: 'style', label: '风格', options: [{ v: 'realistic', l: '写实' }, { v: 'anime', l: '动画' }, { v: 'cinematic', l: '电影感' }, { v: 'cartoon', l: '卡通' }], default: 'cinematic' },
+        { id: 'ratio', label: '画面比例', options: [{ v: '16:9', l: '16:9' }, { v: '9:16', l: '9:16' }, { v: '1:1', l: '1:1' }], default: '16:9' },
+      ],
+      music: [
+        { id: 'duration', label: '时长', options: [{ v: '30', l: '30 秒' }, { v: '60', l: '1 分钟' }, { v: '120', l: '2 分钟' }], default: '60' },
+        { id: 'genre', label: '曲风', options: [{ v: 'pop', l: '流行' }, { v: 'classical', l: '古典' }, { v: 'electronic', l: '电子' }, { v: 'light', l: '轻音乐' }, { v: 'folk', l: '民谣' }], default: 'pop' },
+        { id: 'mood', label: '情绪', options: [{ v: 'happy', l: '欢快' }, { v: 'calm', l: '舒缓' }, { v: 'energetic', l: '激昂' }, { v: 'sad', l: '忧伤' }], default: 'happy' },
+      ],
+    };
+    return specs[type] || [];
+  }
+
+  getChatInputPlaceholder() {
+    const type = this.chatContentType;
+    const map = {
+      chat: '给 AI 助手发消息，或选择下方内容类型生成结构化内容',
+      markdown: '描述要生成的文档报告，比如：写一份项目复盘报告',
+      ppt: '描述 PPT 主题，比如：Q3 销售业绩汇报',
+      table: '描述表格主题，比如：竞品功能对比表',
+      video: '描述视频画面主题，比如：城市夜景延时摄影',
+      music: '描述音乐主题或氛围，比如：轻松的咖啡馆背景音乐',
+    };
+    return map[type] || map.chat;
+  }
+
+  // ===================== 模型选择（替代"深度思考"开关） =====================
+
+  getChatModels() {
+    return [
+      { id: 'glm-4-air', name: 'GLM-4 Air', vendor: '智谱', abbr: 'Z', tag: '快速' },
+      { id: 'glm-4.6', name: 'GLM-4.6', vendor: '智谱', abbr: 'Z', tag: '均衡' },
+      { id: 'glm-z1', name: 'GLM-Z1', vendor: '智谱', abbr: 'Z', tag: '推理' },
+      { id: 'gpt-4o', name: 'GPT-4o', vendor: 'OpenAI', abbr: 'O', tag: '多模态' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o mini', vendor: 'OpenAI', abbr: 'O', tag: '轻量' },
+      { id: 'o3-mini', name: 'o3-mini', vendor: 'OpenAI', abbr: 'O', tag: '推理' },
+      { id: 'claude-sonnet', name: 'Claude Sonnet', vendor: 'Anthropic', abbr: 'A', tag: '长文' },
+      { id: 'claude-haiku', name: 'Claude Haiku', vendor: 'Anthropic', abbr: 'A', tag: '极速' },
+      { id: 'gemini-pro', name: 'Gemini Pro', vendor: 'Google', abbr: 'G', tag: '长上下文' },
+      { id: 'gemini-flash', name: 'Gemini Flash', vendor: 'Google', abbr: 'G', tag: '经济' },
+      { id: 'deepseek-chat', name: 'DeepSeek Chat', vendor: 'DeepSeek', abbr: 'D', tag: '高性价比' },
+      { id: 'deepseek-r1', name: 'DeepSeek R1', vendor: 'DeepSeek', abbr: 'D', tag: '代码' },
+    ];
+  }
+
+  getCurrentModel() {
+    return this.getChatModels().find((m) => m.id === this.homeModel) || this.getChatModels()[1];
+  }
+
+  renderModelSelector() {
+    const current = this.getCurrentModel();
+    const models = this.getChatModels();
+    const listHtml = models.map((m) => `
+      <button type="button" class="wa-chat-model-item ${m.id === this.homeModel ? 'active' : ''}" data-model="${m.id}">
+        <div class="wa-chat-model-item-main">
+          <span class="wa-chat-model-item-abbr">${m.abbr || m.vendor[0]}</span>
+          <span class="wa-chat-model-item-name">${m.name}</span>
+          ${m.tag ? `<span class="wa-chat-model-item-tag">${m.tag}</span>` : ''}
+        </div>
+        ${m.id === this.homeModel ? '<i class="fa-solid fa-check wa-chat-model-item-check"></i>' : ''}
+      </button>
+    `).join('');
+    return `
+      <div class="wa-chat-model-wrap">
+        <button class="wa-chat-model-btn" id="wa-chat-model" type="button" title="选择模型">
+          <span class="wa-chat-model-dot"></span>
+          <span id="wa-chat-model-label">${current.name}</span>
+          <i class="fa-solid fa-chevron-down wa-chat-model-caret"></i>
+        </button>
+        <div class="wa-chat-model-popover" id="wa-chat-model-popover">
+          <div class="wa-chat-model-popover-body">${listHtml}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ===================== 加号菜单（合并知识库 + 附件入口） =====================
+
+  renderPlusButton() {
+    const kbCount = (this.homeSelectedKBs || []).length;
+    const attachCount = (this.homeAttachments || []).length;
+    const hasActive = kbCount > 0 || attachCount > 0;
+    return `
+      <div class="wa-chat-plus-wrap">
+        <button class="wa-chat-tool-btn wa-chat-plus-btn ${hasActive ? 'active' : ''}" id="wa-chat-plus" type="button" title="关联知识库 / 上传附件">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+        <div class="wa-chat-plus-popover" id="wa-chat-plus-popover">
+          <div class="wa-chat-plus-popover-header">
+            <span class="wa-chat-plus-popover-title">添加到对话</span>
+          </div>
+          <div class="wa-chat-plus-list">
+            <button type="button" class="wa-chat-plus-item ${kbCount > 0 ? 'active' : ''}" id="wa-chat-plus-kb">
+              <div class="wa-chat-plus-item-icon"><i class="fa-solid fa-book"></i></div>
+              <div class="wa-chat-plus-item-body">
+                <div class="wa-chat-plus-item-name">关联知识库</div>
+                <div class="wa-chat-plus-item-desc" id="wa-chat-plus-kb-desc">${kbCount > 0 ? `已选 ${kbCount} 个` : '从知识库检索资料'}</div>
+              </div>
+              ${kbCount > 0 ? '<i class="fa-solid fa-circle-check wa-chat-plus-item-check"></i>' : '<i class="fa-solid fa-chevron-right wa-chat-plus-item-arrow"></i>'}
+            </button>
+            <button type="button" class="wa-chat-plus-item ${attachCount > 0 ? 'active' : ''}" id="wa-chat-plus-attach">
+              <div class="wa-chat-plus-item-icon"><i class="fa-solid fa-paperclip"></i></div>
+              <div class="wa-chat-plus-item-body">
+                <div class="wa-chat-plus-item-name">上传附件</div>
+                <div class="wa-chat-plus-item-desc" id="wa-chat-plus-attach-desc">${attachCount > 0 ? `已上传 ${attachCount} 个` : '结合附件内容生成'}</div>
+              </div>
+              ${attachCount > 0 ? '<i class="fa-solid fa-circle-check wa-chat-plus-item-check"></i>' : '<i class="fa-solid fa-chevron-right wa-chat-plus-item-arrow"></i>'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 切换类型时初始化该类型的默认配置
+  initChatContentConfig(type) {
+    const spec = this.getContentTypeConfigSpec(type);
+    const config = {};
+    spec.forEach((g) => { config[g.id] = g.default; });
+    this.chatContentConfig = config;
+  }
+
+  // ===================== 局部更新（不刷新页面） =====================
+  // 所有 composer 交互均通过以下方法做 surgical DOM 更新，避免整体 renderHome 造成的闪烁。
+
+  // 切换内容类型：点击已激活类型 → 回到聊天模式（toggle）
+  selectChatType(type) {
+    if (!type) return;
+    const nextType = type === this.chatContentType ? 'chat' : type;
+    this.chatContentType = nextType;
+    this.initChatContentConfig(nextType);
+    // 1) 类型芯片激活态
+    this.container.querySelectorAll('.wa-chat-type-chip').forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.type === nextType);
+    });
+    // 2) 配置行局部刷新（聊天类型无配置 → 隐藏）
+    const configRow = this.container.querySelector('#wa-chat-config-row');
+    if (configRow) {
+      configRow.innerHTML = this.renderConfigRowInner(nextType);
+      configRow.classList.toggle('has-config', !!configRow.innerHTML.trim());
+      this._bindConfigChips();
+    }
+    // 3) 占位符
+    const input = this.container.querySelector('#wa-chat-input');
+    if (input) {
+      input.placeholder = this.getChatInputPlaceholder();
+      input.focus();
+    }
+  }
+
+  // 切换某配置项取值：仅更新该组芯片激活态
+  selectChatConfig(key, val) {
+    if (!key || !val) return;
+    this.chatContentConfig = { ...this.chatContentConfig, [key]: val };
+    this.container.querySelectorAll(`.wa-chat-config-chip[data-config="${key}"]`).forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.value === val);
+    });
+  }
+
+  // 加号菜单展开/收起
+  togglePlusMenu(open) {
+    this.homePlusOpen = open;
+    const pop = this.container.querySelector('#wa-chat-plus-popover');
+    const btn = this.container.querySelector('#wa-chat-plus');
+    if (pop) pop.classList.toggle('show', open);
+    if (btn) btn.classList.toggle('open', open);
+    if (open) this.toggleModelMenu(false);
+  }
+
+  // 同步加号按钮激活态与菜单内数量描述
+  syncPlusButton() {
+    const kbCount = (this.homeSelectedKBs || []).length;
+    const attachCount = (this.homeAttachments || []).length;
+    const hasActive = kbCount > 0 || attachCount > 0;
+    const btn = this.container.querySelector('#wa-chat-plus');
+    if (btn) btn.classList.toggle('active', hasActive);
+    const kbDesc = this.container.querySelector('#wa-chat-plus-kb-desc');
+    if (kbDesc) kbDesc.textContent = kbCount > 0 ? `已选 ${kbCount} 个` : '从知识库检索资料';
+    const kbItem = this.container.querySelector('#wa-chat-plus-kb');
+    if (kbItem) kbItem.classList.toggle('active', kbCount > 0);
+    const attachDesc = this.container.querySelector('#wa-chat-plus-attach-desc');
+    if (attachDesc) attachDesc.textContent = attachCount > 0 ? `已上传 ${attachCount} 个` : '结合附件内容生成';
+    const attachItem = this.container.querySelector('#wa-chat-plus-attach');
+    if (attachItem) attachItem.classList.toggle('active', attachCount > 0);
+  }
+
+  // 模型下拉展开/收起
+  toggleModelMenu(open) {
+    this.homeModelOpen = open;
+    const pop = this.container.querySelector('#wa-chat-model-popover');
+    const btn = this.container.querySelector('#wa-chat-model');
+    if (pop) pop.classList.toggle('show', open);
+    if (btn) btn.classList.toggle('open', open);
+    if (open) this.togglePlusMenu(false);
+  }
+
+  // 选择模型：更新按钮显示 + 激活态 + 收起
+  selectModel(id) {
+    if (!id) return;
+    this.homeModel = id;
+    const m = this.getCurrentModel();
+    const label = this.container.querySelector('#wa-chat-model-label');
+    if (label) label.textContent = m.name;
+    this.container.querySelectorAll('.wa-chat-model-item').forEach((item) => {
+      const isActive = item.dataset.model === id;
+      item.classList.toggle('active', isActive);
+      const existing = item.querySelector('.wa-chat-model-item-check');
+      if (isActive && !existing) {
+        const check = document.createElement('i');
+        check.className = 'fa-solid fa-check wa-chat-model-item-check';
+        item.appendChild(check);
+      } else if (!isActive && existing) {
+        existing.remove();
+      }
+    });
+    this.toggleModelMenu(false);
+  }
+
+  // 知识库选择器展开/收起
+  toggleKBPicker(open) {
+    this.homeKBPickerOpen = open;
+    const picker = this.container.querySelector('#wa-chat-kb-picker');
+    if (picker) picker.classList.toggle('show', open);
+  }
+
+  // 绑定配置项控件事件（局部刷新后重新绑定）
+  _bindConfigChips() {
+    // 1) chip 点击
+    this.container.querySelectorAll('.wa-chat-config-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        if (this.chatStreaming) return;
+        this.selectChatConfig(chip.dataset.config, chip.dataset.value);
+      });
+    });
+    // 2) select 下拉
+    this.container.querySelectorAll('.wa-chat-config-select').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        if (this.chatStreaming) return;
+        this.selectChatConfig(sel.dataset.config, sel.value);
+      });
+    });
+    // 3) 主题模板选择器
+    this.container.querySelectorAll('.wa-chat-config-theme-trigger').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (this.chatStreaming) return;
+        this.openPPTThemeModal(btn.dataset.config);
+      });
+    });
+  }
+
+  // 仅渲染类型芯片 innerHTML（外层容器由模板提供，支持局部刷新）
+  renderTypeChips() {
+    const options = this.getContentTypeOptions();
+    const current = this.chatContentType;
+    return options.map((o) => `
+      <button type="button" class="wa-chat-type-chip ${o.id === current ? 'active' : ''}" data-type="${o.id}" title="${o.label}">
+        <i class="fa-solid fa-${o.icon}"></i>
+        <span>${o.label}</span>
+      </button>
+    `).join('');
+  }
+
+  // 生成当前类型配置项的 innerHTML（供初始渲染与切换类型时局部更新）
+  renderConfigRowInner(type) {
+    const spec = this.getContentTypeConfigSpec(type);
+    if (!spec || spec.length === 0) return '';
+    const config = this.chatContentConfig || {};
+    return spec.map((g) => {
+      const controlType = g.type || 'chip';
+      if (controlType === 'select') {
+        const selectOptions = g.options.map((opt) => `
+          <option value="${opt.v}" ${config[g.id] === opt.v ? 'selected' : ''}>${opt.l}</option>
+        `).join('');
+        return `
+          <div class="wa-chat-config-group wa-chat-config-group--select">
+            <span class="wa-chat-config-label">${g.label}</span>
+            <div class="wa-chat-config-options">
+              <select class="wa-chat-config-select" data-config="${g.id}">${selectOptions}</select>
+            </div>
+          </div>
+        `;
+      }
+      if (controlType === 'theme_picker') {
+        const themeId = config[g.id] || g.default;
+        const theme = pptThemes[themeId] || Object.values(pptThemes)[0];
+        return `
+          <div class="wa-chat-config-group wa-chat-config-group--theme">
+            <span class="wa-chat-config-label">${g.label}</span>
+            <button type="button" class="wa-chat-config-theme-trigger" data-config="${g.id}" data-theme="${themeId}">
+              <span class="wa-chat-config-theme-dot" style="background:${theme.coverBg};"></span>
+              <span class="wa-chat-config-theme-name">${theme.label}</span>
+              <i class="fa-solid fa-chevron-right wa-chat-config-theme-arrow"></i>
+            </button>
+          </div>
+        `;
+      }
+      const chips = g.options.map((opt) => `
+        <div class="wa-chat-config-chip ${config[g.id] === opt.v ? 'active' : ''}" data-config="${g.id}" data-value="${opt.v}">${opt.l}</div>
+      `).join('');
+      return `
+        <div class="wa-chat-config-group">
+          <span class="wa-chat-config-label">${g.label}</span>
+          <div class="wa-chat-config-options">${chips}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 按所选类型构建临时模板与表单数据，复用流式生成管线
+  startTypedGeneration(prompt, type, config) {
+    const typeMap = {
+      markdown: { outputType: outputTypes.MARKDOWN, abilityId: 'writing', name: '文档报告', icon: 'file-lines' },
+      ppt: { outputType: outputTypes.PPT, abilityId: 'ppt', name: 'PPT', icon: 'file-powerpoint' },
+      table: { outputType: outputTypes.TABLE, abilityId: 'table', name: '表格', icon: 'table-cells' },
+      video: { outputType: outputTypes.VIDEO, abilityId: 'video', name: '视频', icon: 'film' },
+      music: { outputType: outputTypes.MUSIC, abilityId: 'music', name: '音乐', icon: 'music' },
+    };
+    const m = typeMap[type];
+    if (!m) { this.startFreeChat(prompt); return; }
+    const template = {
+      id: `chat_type_${type}`,
+      name: `${m.name}生成`,
+      roleId: 'sales',
+      abilityId: m.abilityId,
+      outputType: m.outputType,
+      icon: m.icon,
+      defaultMode: 'free',
+      fields: [{ id: 'topic', type: fieldTypes.TEXT, label: '主题', required: true }],
+      chatContentType: type,
+    };
+    const formData = { topic: prompt };
+    // PPT 配置字段映射：length -> pageCount, style -> theme
+    const mappedOptions = { ...config, chatContentType: type, attachments: this.homeAttachments || [] };
+    if (type === 'ppt') {
+      if (mappedOptions.length) {
+        mappedOptions.pageCount = mappedOptions.length;
+        delete mappedOptions.length;
+      }
+      if (mappedOptions.style) {
+        mappedOptions.theme = mappedOptions.style;
+        delete mappedOptions.style;
+      }
+    }
+    this.startChatGeneration({
+      template,
+      formData,
+      selectedKBs: this.homeSelectedKBs || [],
+      mode: 'free',
+      options: mappedOptions,
+    });
   }
 
   // 纯对话流式生成（不依赖模板，类似 ChatGPT）
@@ -1750,6 +2315,90 @@ export class WorkAssistant {
         ${options.showName !== false ? `<div class="wa-ppt-template-card-name">${shortName}</div>` : ''}
       </div>
     `;
+  }
+
+  // 渲染 PPT 风格模板选择弹窗（与 renderPPTTemplateModal 结构保持一致）
+  renderPPTThemeModal(configKey) {
+    const currentTheme = (this.chatContentConfig || {})[configKey] || 'business';
+    const themeColorMap = { business: 'green', tech: 'blue', minimal: 'green', lively: 'orange', academic: 'gray', dark: 'purple' };
+    const templates = Object.values(pptThemes).map((theme) => ({
+      id: `theme_${theme.id}`,
+      name: theme.label,
+      style: { theme: theme.id, color: themeColorMap[theme.id] || 'green' },
+    }));
+    return `
+      <div class="wa-modal-overlay" id="wa-chat-theme-modal">
+        <div class="wa-modal wa-modal-lg">
+          <div class="wa-modal-header">
+            <div class="wa-modal-title"><i class="fa-solid fa-layer-group"></i> 选择风格模板</div>
+            <button class="wa-modal-close" id="wa-chat-theme-modal-close"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="wa-modal-body">
+            <div class="wa-ppt-template-modal-desc">选择一个视觉风格，系统将自动应用对应的配色、字体和版式。</div>
+            <div class="wa-ppt-template-grid wa-ppt-template-grid-modal">
+              ${templates.map((t) => {
+                const selected = t.style.theme === currentTheme ? 'selected' : '';
+                return `<div class="wa-ppt-theme-card-wrap ${selected}" data-theme="${t.style.theme}">${this.renderPPTTemplateCard(t, { size: 'compact' })}</div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  openPPTThemeModal(configKey) {
+    if (document.getElementById('wa-chat-theme-modal')) return;
+    this._currentThemeConfigKey = configKey;
+    const modalHTML = this.renderPPTThemeModal(configKey);
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    this.bindPPTThemeModalEvents();
+  }
+
+  bindPPTThemeModalEvents() {
+    const modal = document.getElementById('wa-chat-theme-modal');
+    if (!modal) return;
+
+    const close = () => modal.remove();
+    const configKey = this._currentThemeConfigKey;
+
+    document.getElementById('wa-chat-theme-modal-close')?.addEventListener('click', close);
+
+    // 预览按钮
+    modal.querySelectorAll('.wa-ppt-preview-eye').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.preview;
+        if (id) this.openTemplatePreview(id);
+      });
+    });
+
+    // 选择风格模板
+    modal.querySelectorAll('.wa-ppt-theme-card-wrap').forEach((card) => {
+      card.addEventListener('click', () => {
+        const theme = card.dataset.theme;
+        if (configKey) this.selectChatConfig(configKey, theme);
+        // 同步更新触发按钮显示
+        const trigger = this.container.querySelector('.wa-chat-config-theme-trigger');
+        if (trigger) {
+          const t = pptThemes[theme] || Object.values(pptThemes)[0];
+          trigger.dataset.theme = theme;
+          const dot = trigger.querySelector('.wa-chat-config-theme-dot');
+          const name = trigger.querySelector('.wa-chat-config-theme-name');
+          if (dot) dot.style.background = t.coverBg;
+          if (name) name.textContent = t.label;
+        }
+        close();
+      });
+    });
+
+    // 点击遮罩关闭
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  }
+
+  closePPTThemePicker() {
+    const modal = document.getElementById('wa-chat-theme-modal');
+    if (modal) modal.remove();
   }
 
   renderCoverScene(theme, title, accent) {
@@ -3261,6 +3910,20 @@ export class WorkAssistant {
         handleSend();
       }
     });
+
+    // 内容类型选择：局部更新（不刷新页面），点击已激活类型 → 回到聊天模式
+    this.container.querySelectorAll('.wa-chat-type-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        if (this.chatStreaming) return;
+        const type = chip.dataset.type;
+        if (!type) return;
+        this.selectChatType(type);
+      });
+    });
+
+    // 按类型配置项：局部切换激活态
+    this._bindConfigChips();
+
     // textarea 自动增高
     if (chatInput && chatInput.tagName === 'TEXTAREA') {
       chatInput.addEventListener('input', () => {
@@ -3269,25 +3932,10 @@ export class WorkAssistant {
       });
     }
 
-    // 提示词 chip 点击 → 填入输入框
-    this.container.querySelectorAll('.wa-chat-prompt-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const prompt = chip.dataset.prompt || '';
-        if (chatInput) {
-          chatInput.value = prompt;
-          chatInput.focus();
-          if (chatInput.tagName === 'TEXTAREA') {
-            chatInput.style.height = 'auto';
-            chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
-          }
-        }
-      });
-    });
-
-    // 辅助模式入口：场景模板 / 内容模板
-    this.container.querySelectorAll('.wa-chat-alt-mode').forEach((mode) => {
-      mode.addEventListener('click', () => {
-        const type = mode.dataset.mode;
+    // 辅助模式入口：场景模板 / 内容模板（点击头部跳转，快速入口区单独处理）
+    this.container.querySelectorAll('.wa-chat-alt-mode-head').forEach((head) => {
+      head.addEventListener('click', () => {
+        const type = head.dataset.mode;
         if (type === 'scene') {
           this.activeTab = 'templateMarket';
           this.render();
@@ -3297,16 +3945,41 @@ export class WorkAssistant {
       });
     });
 
-    // 知识库按钮 → 切换选择器
-    this.container.querySelector('#wa-chat-pick-kb')?.addEventListener('click', (e) => {
+    // 加号按钮 → 展开知识库 / 附件菜单（局部切换）
+    this.container.querySelector('#wa-chat-plus')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.homeKBPickerOpen = !this.homeKBPickerOpen;
-      this.renderHome();
+      this.togglePlusMenu(!this.homePlusOpen);
     });
+    // 加号菜单项：关联知识库 → 打开知识库选择器
+    this.container.querySelector('#wa-chat-plus-kb')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePlusMenu(false);
+      this.toggleKBPicker(true);
+    });
+    // 加号菜单项：上传附件（占位提示）
+    this.container.querySelector('#wa-chat-plus-attach')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePlusMenu(false);
+      this.showToast('附件上传功能开发中', 'info');
+    });
+
+    // 模型选择按钮 → 展开/收起下拉（局部切换）
+    this.container.querySelector('#wa-chat-model')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleModelMenu(!this.homeModelOpen);
+    });
+    // 模型项点击 → 切换模型（局部更新）
+    this.container.querySelectorAll('.wa-chat-model-item').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectModel(item.dataset.model);
+      });
+    });
+
+    // 知识库选择器关闭（局部切换）
     this.container.querySelector('#wa-chat-kb-close')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.homeKBPickerOpen = false;
-      this.renderHome();
+      this.toggleKBPicker(false);
     });
     this.container.querySelectorAll('#wa-chat-kb-picker input[type="checkbox"]').forEach((cb) => {
       cb.addEventListener('change', () => {
@@ -3321,41 +3994,50 @@ export class WorkAssistant {
         } else {
           this.homeSelectedKBs = this.homeSelectedKBs.filter((s) => s.id !== kbId);
         }
-        const btn = this.container.querySelector('#wa-chat-pick-kb');
-        if (btn) {
-          const span = btn.querySelector('span');
-          if (span) span.textContent = this.homeSelectedKBs.length > 0 ? `知识库 ${this.homeSelectedKBs.length}` : '知识库';
-          btn.classList.toggle('active', this.homeSelectedKBs.length > 0);
-        }
         cb.closest('.wa-chat-kb-item')?.classList.toggle('checked', cb.checked);
+        this.syncPlusButton();
       });
     });
 
-    // 附件 / 深度思考按钮（占位提示）
-    this.container.querySelector('#wa-chat-attach')?.addEventListener('click', () => {
-      this.showToast('附件上传功能开发中', 'info');
-    });
-    this.container.querySelector('#wa-chat-deepthink')?.addEventListener('click', () => {
-      this.showToast('深度思考模式开发中', 'info');
-    });
+    // 点击页面空白处收起加号菜单 / 模型下拉 / 知识库选择器（局部切换，不刷新）
+    if (this._homePopoverDocHandler) {
+      document.removeEventListener('click', this._homePopoverDocHandler);
+    }
+    this._homePopoverDocHandler = (e) => {
+      const t = e.target;
+      const inPlus = t.closest && t.closest('.wa-chat-plus-wrap');
+      const inModel = t.closest && t.closest('.wa-chat-model-wrap');
+      const inKB = t.closest && t.closest('#wa-chat-kb-picker');
+      let changed = false;
+      if (!inPlus && this.homePlusOpen) { this.togglePlusMenu(false); changed = true; }
+      if (!inModel && this.homeModelOpen) { this.toggleModelMenu(false); changed = true; }
+      if (!inKB && this.homeKBPickerOpen) { this.toggleKBPicker(false); changed = true; }
+      // 阻止后续无意义处理
+      if (changed) return;
+    };
+    document.addEventListener('click', this._homePopoverDocHandler);
 
     // 选择模板按钮（消息状态下）→ 新对话回到首页
     this.container.querySelector('#wa-chat-pick-template')?.addEventListener('click', () => {
       this.startNewChat();
     });
 
-    // 最近创作项点击 → 打开历史
+    // 最近创作项点击 → 跳转到我的文档
     this.container.querySelectorAll('.wa-recent-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        this.activeTab = 'history';
-        this.render();
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.onNavigate) this.onNavigate('myDocuments');
       });
     });
     this.container.querySelector('#wa-chat-recents-more')?.addEventListener('click', () => {
-      this.activeTab = 'history';
-      this.render();
+      if (this.onNavigate) this.onNavigate('myDocuments');
     });
 
+    // 快速入口卡片点击 → 直接进入对应编辑器
+    this.bindQuickEntryEvents();
+
+    // 「管理」按钮 → 打开配置弹窗（包含在 bindQuickEntryEvents 内）
     // 主题切换（统一使用 theme.js）
     const themeToggle = this.container.querySelector('#wa-chat-theme-toggle');
     themeToggle?.addEventListener('click', () => {
@@ -3372,18 +4054,6 @@ export class WorkAssistant {
     // 我的文档
     this.container.querySelector('#wa-chat-docs')?.addEventListener('click', () => {
       if (this.onNavigate) this.onNavigate('myDocuments');
-    });
-
-    // 最近创作（顶栏历史按钮）
-    this.container.querySelector('#wa-chat-history')?.addEventListener('click', () => {
-      this.activeTab = 'history';
-      this.render();
-    });
-
-    // 新对话
-    this.container.querySelector('#wa-chat-new')?.addEventListener('click', () => {
-      if (this.chatStreaming) return;
-      this.startNewChat();
     });
 
     // 结果卡片操作（事件委托）

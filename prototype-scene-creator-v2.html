@@ -1,1409 +1,1691 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>场景创建 v2 - 提示词为核心</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-    background: #f5f6f8;
-    color: #1f2937;
-    line-height: 1.6;
-    height: 100vh;
-    overflow: hidden;
-  }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>场景创建 v2 - 提示词为核心</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        background: #f5f6f8;
+        color: #1f2937;
+        line-height: 1.6;
+        height: 100vh;
+        overflow: hidden;
+      }
 
-  /* 顶部栏 */
-  .top-bar {
-    height: 56px;
-    background: #fff;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    gap: 16px;
-    flex-shrink: 0;
-  }
-  .back-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: #f3f4f6;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6b7280;
-    font-size: 14px;
-    transition: all 0.2s;
-  }
-  .back-btn:hover { background: #e5e7eb; color: #374151; }
-  .top-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #111827;
-  }
-  .top-actions {
-    margin-left: auto;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-  .btn {
-    height: 34px;
-    padding: 0 16px;
-    border-radius: 8px;
-    border: none;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-  .btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-  }
-  .btn-secondary:hover { background: #e5e7eb; }
-  .btn-ghost {
-    background: transparent;
-    color: #6b7280;
-  }
-  .btn-ghost:hover { background: #f3f4f6; color: #374151; }
+      /* 顶部栏 */
+      .top-bar {
+        height: 56px;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+      .back-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: none;
+        background: #f3f4f6;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6b7280;
+        font-size: 14px;
+        transition: all 0.2s;
+      }
+      .back-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+      }
+      .top-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+      }
+      .top-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .btn {
+        height: 34px;
+        padding: 0 16px;
+        border-radius: 8px;
+        border: none;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      }
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+      }
+      .btn-secondary:hover {
+        background: #e5e7eb;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: #6b7280;
+      }
+      .btn-ghost:hover {
+        background: #f3f4f6;
+        color: #374151;
+      }
 
-  /* 步骤条 */
-  .steps-bar {
-    height: 72px;
-    background: #fff;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 24px;
-    flex-shrink: 0;
-  }
-  .steps-track {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    max-width: 720px;
-    width: 100%;
-  }
-  .step-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    padding: 8px 12px;
-    border-radius: 10px;
-    transition: all 0.2s;
-    flex: 1;
-    justify-content: center;
-  }
-  .step-item:hover { background: #f9fafb; }
-  .step-item.active { background: #f0f1ff; }
-  .step-item.completed { cursor: pointer; }
-  .step-num {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    background: #f3f4f6;
-    color: #9ca3af;
-    border: 2px solid transparent;
-    transition: all 0.3s;
-  }
-  .step-item.active .step-num {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(102,126,234,0.3);
-  }
-  .step-item.completed .step-num {
-    background: #10b981;
-    color: #fff;
-  }
-  .step-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-  .step-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #6b7280;
-  }
-  .step-item.active .step-title { color: #667eea; }
-  .step-item.completed .step-title { color: #10b981; }
-  .step-desc {
-    font-size: 11px;
-    color: #9ca3af;
-  }
-  .step-connector {
-    width: 40px;
-    height: 2px;
-    background: #e5e7eb;
-    border-radius: 1px;
-    flex-shrink: 0;
-  }
-  .step-connector.completed { background: #10b981; }
+      /* 步骤条 */
+      .steps-bar {
+        height: 72px;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 24px;
+        flex-shrink: 0;
+      }
+      .steps-track {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 720px;
+        width: 100%;
+      }
+      .step-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        padding: 8px 12px;
+        border-radius: 10px;
+        transition: all 0.2s;
+        flex: 1;
+        justify-content: center;
+      }
+      .step-item:hover {
+        background: #f9fafb;
+      }
+      .step-item.active {
+        background: #f0f1ff;
+      }
+      .step-item.completed {
+        cursor: pointer;
+      }
+      .step-num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        background: #f3f4f6;
+        color: #9ca3af;
+        border: 2px solid transparent;
+        transition: all 0.3s;
+      }
+      .step-item.active .step-num {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+      }
+      .step-item.completed .step-num {
+        background: #10b981;
+        color: #fff;
+      }
+      .step-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .step-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #6b7280;
+      }
+      .step-item.active .step-title {
+        color: #667eea;
+      }
+      .step-item.completed .step-title {
+        color: #10b981;
+      }
+      .step-desc {
+        font-size: 11px;
+        color: #9ca3af;
+      }
+      .step-connector {
+        width: 40px;
+        height: 2px;
+        background: #e5e7eb;
+        border-radius: 1px;
+        flex-shrink: 0;
+      }
+      .step-connector.completed {
+        background: #10b981;
+      }
 
-  /* 主布局 */
-  .main-layout {
-    display: grid;
-    grid-template-columns: 420px 1fr;
-    height: calc(100vh - 128px);
-    overflow: hidden;
-  }
+      /* 主布局 */
+      .main-layout {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        height: calc(100vh - 128px);
+        overflow: hidden;
+      }
 
-  /* 左侧配置面板 */
-  .config-panel {
-    background: #fff;
-    border-right: 1px solid #e5e7eb;
-    overflow-y: auto;
-    padding: 24px;
-  }
-  .config-panel::-webkit-scrollbar { width: 6px; }
-  .config-panel::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+      /* 左侧配置面板 */
+      .config-panel {
+        background: #fff;
+        border-right: 1px solid #e5e7eb;
+        overflow-y: auto;
+        padding: 24px;
+      }
+      .config-panel::-webkit-scrollbar {
+        width: 6px;
+      }
+      .config-panel::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 3px;
+      }
 
-  .step-content { display: none; }
-  .step-content.active { display: block; }
+      .step-content {
+        display: none;
+      }
+      .step-content.active {
+        display: block;
+      }
 
-  .panel-header {
-    margin-bottom: 20px;
-  }
-  .panel-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: #111827;
-    margin-bottom: 6px;
-  }
-  .panel-subtitle {
-    font-size: 13px;
-    color: #6b7280;
-    line-height: 1.5;
-  }
+      .panel-header {
+        margin-bottom: 20px;
+      }
+      .panel-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 6px;
+      }
+      .panel-subtitle {
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.5;
+      }
 
-  .form-group {
-    margin-bottom: 18px;
-  }
-  .form-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .form-label .required {
-    color: #ef4444;
-    font-size: 11px;
-  }
-  .form-input {
-    width: 100%;
-    height: 40px;
-    padding: 0 12px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 13px;
-    color: #374151;
-    outline: none;
-    transition: all 0.2s;
-  }
-  .form-input:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-  .form-input::placeholder { color: #9ca3af; }
+      .form-group {
+        margin-bottom: 18px;
+      }
+      .form-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .form-label .required {
+        color: #ef4444;
+        font-size: 11px;
+      }
+      .form-input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #374151;
+        outline: none;
+        transition: all 0.2s;
+      }
+      .form-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      .form-input::placeholder {
+        color: #9ca3af;
+      }
 
-  .icon-picker {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    border: 1.5px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    color: #667eea;
-    background: linear-gradient(135deg, #667eea10, #764ba210);
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .icon-picker:hover { border-color: #667eea; transform: translateY(-1px); }
+      .icon-picker {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        border: 1.5px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #667eea;
+        background: linear-gradient(135deg, #667eea10, #764ba210);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .icon-picker:hover {
+        border-color: #667eea;
+        transform: translateY(-1px);
+      }
 
-  .type-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .type-card {
-    padding: 14px 8px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-  }
-  .type-card:hover { border-color: #c7d2fe; background: #fafbff; }
-  .type-card.active {
-    border-color: #667eea;
-    background: linear-gradient(135deg, #667eea08, #764ba208);
-    box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-  }
-  .type-card-icon { font-size: 20px; color: #667eea; margin-bottom: 6px; }
-  .type-card-name { font-size: 12px; font-weight: 600; color: #374151; }
+      .type-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .type-card {
+        padding: 14px 8px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .type-card:hover {
+        border-color: #c7d2fe;
+        background: #fafbff;
+      }
+      .type-card.active {
+        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea08, #764ba208);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      .type-card-icon {
+        font-size: 20px;
+        color: #667eea;
+        margin-bottom: 6px;
+      }
+      .type-card-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+      }
 
-  .format-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .format-pill {
-    padding: 8px 14px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .format-pill:hover { border-color: #c7d2fe; color: #667eea; }
-  .format-pill.active {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-color: transparent;
-    color: #fff;
-  }
+      .format-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .format-pill {
+        padding: 8px 14px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .format-pill:hover {
+        border-color: #c7d2fe;
+        color: #667eea;
+      }
+      .format-pill.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: transparent;
+        color: #fff;
+      }
 
-  .role-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .role-tag {
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1.5px solid transparent;
-    background: #f3f4f6;
-    color: #6b7280;
-  }
-  .role-tag:hover { transform: translateY(-1px); }
-  .role-tag.active {
-    background: #f0f1ff;
-    color: #667eea;
-    border-color: #667eea;
-    font-weight: 600;
-  }
+      .role-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .role-tag {
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1.5px solid transparent;
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+      .role-tag:hover {
+        transform: translateY(-1px);
+      }
+      .role-tag.active {
+        background: #f0f1ff;
+        color: #667eea;
+        border-color: #667eea;
+        font-weight: 600;
+      }
 
-  /* 字段设计 */
-  .fields-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .field-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #fafafa;
-    border-radius: 10px;
-    border: 1px solid #eee;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .field-item:hover { background: #f5f5f5; border-color: #ddd; }
-  .field-item.active {
-    background: #eef2ff;
-    border-color: #c7d2fe;
-  }
-  .field-drag { color: #d1d5db; font-size: 12px; cursor: grab; }
-  .field-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: #667eea;
-  }
-  .field-info { flex: 1; }
-  .field-name { font-size: 13px; font-weight: 600; color: #374151; }
-  .field-meta { font-size: 11px; color: #9ca3af; }
-  .add-field-btn {
-    width: 100%;
-    padding: 12px;
-    border: 1.5px dashed #d1d5db;
-    border-radius: 10px;
-    background: #fafafa;
-    color: #6b7280;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-  }
-  .add-field-btn:hover {
-    border-color: #667eea;
-    color: #667eea;
-    background: #f0f1ff;
-  }
+      /* 字段设计 */
+      .fields-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .field-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #fafafa;
+        border-radius: 10px;
+        border: 1px solid #eee;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .field-item:hover {
+        background: #f5f5f5;
+        border-color: #ddd;
+      }
+      .field-item.active {
+        background: #eef2ff;
+        border-color: #c7d2fe;
+      }
+      .field-drag {
+        color: #d1d5db;
+        font-size: 12px;
+        cursor: grab;
+      }
+      .field-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #667eea;
+      }
+      .field-info {
+        flex: 1;
+      }
+      .field-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+      }
+      .field-meta {
+        font-size: 11px;
+        color: #9ca3af;
+      }
+      .add-field-btn {
+        width: 100%;
+        padding: 12px;
+        border: 1.5px dashed #d1d5db;
+        border-radius: 10px;
+        background: #fafafa;
+        color: #6b7280;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .add-field-btn:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f0f1ff;
+      }
 
-  /* 字段编辑表单 */
-  .field-edit-form {
-    margin-top: 16px;
-    padding: 14px;
-    background: #f9fafb;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-  }
-  .field-edit-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .field-edit-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .field-edit-grid .form-group { margin-bottom: 10px; }
-  .form-select {
-    width: 100%;
-    height: 36px;
-    padding: 0 10px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 8px;
-    font-size: 13px;
-    color: #374151;
-    outline: none;
-    background: #fff;
-  }
+      /* 字段编辑表单 */
+      .field-edit-form {
+        margin-top: 16px;
+        padding: 14px;
+        background: #f9fafb;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+      }
+      .field-edit-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .field-edit-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .field-edit-grid .form-group {
+        margin-bottom: 10px;
+      }
+      .form-select {
+        width: 100%;
+        height: 36px;
+        padding: 0 10px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #374151;
+        outline: none;
+        background: #fff;
+      }
 
-  /* 提示词编辑器 */
-  .prompt-editor-wrap {
-    border: 1.5px solid #e5e7eb;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #fff;
-  }
-  .prompt-editor-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
-  }
-  .prompt-editor-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #374151;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .prompt-editor-actions {
-    display: flex;
-    gap: 6px;
-  }
-  .toolbar-btn {
-    padding: 5px 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    background: #fff;
-    color: #6b7280;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .toolbar-btn:hover {
-    border-color: #667eea;
-    color: #667eea;
-    background: #f0f1ff;
-  }
-  .prompt-textarea {
-    width: 100%;
-    min-height: 320px;
-    padding: 16px;
-    border: none;
-    font-size: 13px;
-    line-height: 1.8;
-    color: #374151;
-    outline: none;
-    resize: vertical;
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-    background: #fff;
-  }
+      /* 提示词编辑器 */
+      .prompt-editor-wrap {
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .prompt-editor-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .prompt-editor-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .prompt-editor-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .toolbar-btn {
+        padding: 5px 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: #fff;
+        color: #6b7280;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .toolbar-btn:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f0f1ff;
+      }
+      .prompt-textarea {
+        width: 100%;
+        min-height: 320px;
+        padding: 16px;
+        border: none;
+        font-size: 13px;
+        line-height: 1.8;
+        color: #374151;
+        outline: none;
+        resize: vertical;
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        background: #fff;
+      }
 
-  /* 输出结构选择 */
-  .structure-section {
-    margin-top: 18px;
-  }
-  .structure-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-  .structure-section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #374151;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .structure-section-title i { color: #667eea; }
-  .structure-section-desc {
-    font-size: 11px;
-    color: #9ca3af;
-  }
-  .structure-cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .structure-card {
-    padding: 12px;
-    background: #fff;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-  }
-  .structure-card:hover {
-    border-color: #667eea;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102,126,234,0.12);
-  }
-  .structure-card.active {
-    border-color: #667eea;
-    background: linear-gradient(135deg, #f0f1ff, #faf5ff);
-    box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-  }
-  .structure-card-check {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    width: 20px;
-    height: 20px;
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: 700;
-    box-shadow: 0 2px 6px rgba(16,185,129,0.3);
-    transform: scale(0);
-    opacity: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .structure-card.active .structure-card-check { transform: scale(1); opacity: 1; }
-  .structure-card-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #667eea15, #764ba215);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #667eea;
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  .structure-card-name {
-    font-size: 12px;
-    font-weight: 700;
-    color: #374151;
-    margin-bottom: 2px;
-  }
-  .structure-card.active .structure-card-name { color: #4f46e5; }
-  .structure-card-meta {
-    font-size: 10px;
-    color: #9ca3af;
-  }
-  .structure-card-free {
-    border-style: dashed;
-    border-color: #c7d2fe;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 82px;
-    color: #667eea;
-    gap: 4px;
-  }
-  .structure-card-free i { font-size: 18px; }
-  .structure-card-free span { font-size: 11px; font-weight: 600; }
+      /* 输出结构选择 */
+      .structure-section {
+        margin-top: 18px;
+      }
+      .structure-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .structure-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .structure-section-title i {
+        color: #667eea;
+      }
+      .structure-section-desc {
+        font-size: 11px;
+        color: #9ca3af;
+      }
+      .structure-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .structure-card {
+        padding: 12px;
+        background: #fff;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+      }
+      .structure-card:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.12);
+      }
+      .structure-card.active {
+        border-color: #667eea;
+        background: linear-gradient(135deg, #f0f1ff, #faf5ff);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+      .structure-card-check {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 20px;
+        height: 20px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+        transform: scale(0);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .structure-card.active .structure-card-check {
+        transform: scale(1);
+        opacity: 1;
+      }
+      .structure-card-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #667eea15, #764ba215);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #667eea;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      .structure-card-name {
+        font-size: 12px;
+        font-weight: 700;
+        color: #374151;
+        margin-bottom: 2px;
+      }
+      .structure-card.active .structure-card-name {
+        color: #4f46e5;
+      }
+      .structure-card-meta {
+        font-size: 10px;
+        color: #9ca3af;
+      }
+      .structure-card-free {
+        border-style: dashed;
+        border-color: #c7d2fe;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 82px;
+        color: #667eea;
+        gap: 4px;
+      }
+      .structure-card-free i {
+        font-size: 18px;
+      }
+      .structure-card-free span {
+        font-size: 11px;
+        font-weight: 600;
+      }
 
-  /* 变量快捷插入 */
-  .var-panel {
-    margin-top: 16px;
-    padding: 12px;
-    background: #f0f1ff;
-    border-radius: 10px;
-    border: 1px solid #e0e7ff;
-  }
-  .var-panel-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #4f46e5;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .var-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .var-tag {
-    padding: 5px 10px;
-    background: #fff;
-    border: 1px solid #c7d2fe;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-    color: #667eea;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .var-tag:hover {
-    background: #667eea;
-    color: #fff;
-    border-color: #667eea;
-  }
+      /* 变量快捷插入 */
+      .var-panel {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f0f1ff;
+        border-radius: 10px;
+        border: 1px solid #e0e7ff;
+      }
+      .var-panel-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #4f46e5;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .var-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .var-tag {
+        padding: 5px 10px;
+        background: #fff;
+        border: 1px solid #c7d2fe;
+        border-radius: 6px;
+        font-size: 12px;
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        color: #667eea;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .var-tag:hover {
+        background: #667eea;
+        color: #fff;
+        border-color: #667eea;
+      }
 
-  /* 右侧预览区 */
-  .preview-panel {
-    background: #f5f6f8;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .preview-tabs {
-    display: flex;
-    gap: 4px;
-    padding: 16px 20px 0;
-  }
-  .preview-tab {
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    color: #6b7280;
-    background: #e5e7eb;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .preview-tab:hover { background: #d1d5db; }
-  .preview-tab.active {
-    background: #fff;
-    color: #667eea;
-    font-weight: 600;
-  }
-  .preview-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 20px 20px;
-  }
-  .preview-card {
-    background: #fff;
-    border-radius: 0 12px 12px 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-    min-height: calc(100% - 20px);
-    border: 1px solid #e5e7eb;
-  }
-  .preview-pane { display: none; }
-  .preview-pane.active { display: block; }
+      /* 右侧预览区 */
+      .preview-panel {
+        background: #f5f6f8;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .preview-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 16px 20px 0;
+      }
+      .preview-tab {
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        color: #6b7280;
+        background: #e5e7eb;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .preview-tab:hover {
+        background: #d1d5db;
+      }
+      .preview-tab.active {
+        background: #fff;
+        color: #667eea;
+        font-weight: 600;
+      }
+      .preview-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 20px 20px;
+      }
+      .preview-card {
+        background: #fff;
+        border-radius: 0 12px 12px 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        min-height: calc(100% - 20px);
+        border: 1px solid #e5e7eb;
+      }
+      .preview-pane {
+        display: none;
+      }
+      .preview-pane.active {
+        display: block;
+      }
 
-  /* 提示词预览样式 */
-  .prompt-preview-header {
-    padding: 14px 18px;
-    background: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .prompt-preview-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #374151;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .prompt-preview-title i { color: #667eea; }
-  .prompt-preview-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  .prompt-preview-status.linked {
-    background: #ecfdf5;
-    color: #10b981;
-  }
-  .prompt-preview-status.free {
-    background: #fef3c7;
-    color: #d97706;
-  }
-  .prompt-render {
-    padding: 20px;
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-    font-size: 13px;
-    line-height: 1.9;
-    color: #374151;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .prompt-section-title {
-    color: #667eea;
-    font-weight: 700;
-    margin: 16px 0 8px;
-    display: block;
-  }
-  .prompt-section-title:first-child { margin-top: 0; }
-  .prompt-var {
-    background: linear-gradient(135deg, #f0f1ff, #faf5ff);
-    color: #4f46e5;
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px solid #c7d2fe;
-    font-weight: 600;
-  }
-  .prompt-structure-item {
-    color: #374151;
-    padding-left: 12px;
-    border-left: 2px solid #e5e7eb;
-    margin: 4px 0;
-    display: block;
-  }
-  .prompt-structure-item.level-2 {
-    padding-left: 28px;
-    color: #6b7280;
-  }
+      /* 提示词预览样式 */
+      .prompt-preview-header {
+        padding: 14px 18px;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .prompt-preview-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .prompt-preview-title i {
+        color: #667eea;
+      }
+      .prompt-preview-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .prompt-preview-status.linked {
+        background: #ecfdf5;
+        color: #10b981;
+      }
+      .prompt-preview-status.free {
+        background: #fef3c7;
+        color: #d97706;
+      }
+      .prompt-render {
+        padding: 20px;
+        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        font-size: 13px;
+        line-height: 1.9;
+        color: #374151;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .prompt-section-title {
+        color: #667eea;
+        font-weight: 700;
+        margin: 16px 0 8px;
+        display: block;
+      }
+      .prompt-section-title:first-child {
+        margin-top: 0;
+      }
+      .prompt-var {
+        background: linear-gradient(135deg, #f0f1ff, #faf5ff);
+        color: #4f46e5;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid #c7d2fe;
+        font-weight: 600;
+      }
+      .prompt-structure-item {
+        color: #374151;
+        padding-left: 12px;
+        border-left: 2px solid #e5e7eb;
+        margin: 4px 0;
+        display: block;
+      }
+      .prompt-structure-item.level-2 {
+        padding-left: 28px;
+        color: #6b7280;
+      }
 
-  /* 表单预览 */
-  .form-preview-card {
-    max-width: 520px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-    border: 1px solid rgba(0,0,0,0.03);
-  }
-  .form-preview-header {
-    padding: 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-  }
-  .form-preview-tag {
-    font-size: 11px;
-    padding: 3px 10px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 20px;
-    display: inline-block;
-    margin-bottom: 10px;
-  }
-  .form-preview-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  .form-preview-desc { font-size: 12px; opacity: 0.85; }
-  .form-preview-body { padding: 24px; }
-  .form-preview-field { margin-bottom: 16px; }
-  .form-preview-field:last-child { margin-bottom: 0; }
-  .form-preview-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .form-preview-required { color: #ef4444; }
-  .form-preview-input {
-    width: 100%;
-    height: 42px;
-    padding: 0 14px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    background: #f9fafb;
-    color: #9ca3af;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-  }
-  .form-preview-textarea {
-    width: 100%;
-    min-height: 80px;
-    padding: 10px 14px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    background: #f9fafb;
-    color: #9ca3af;
-    font-size: 13px;
-  }
-  .form-preview-generate {
-    width: 100%;
-    height: 46px;
-    margin-top: 8px;
-    border-radius: 10px;
-    border: none;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    box-shadow: 0 4px 12px rgba(102,126,234,0.3);
-  }
+      /* 表单预览 */
+      .form-preview-card {
+        max-width: 520px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        border: 1px solid rgba(0, 0, 0, 0.03);
+      }
+      .form-preview-header {
+        padding: 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+      }
+      .form-preview-tag {
+        font-size: 11px;
+        padding: 3px 10px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        display: inline-block;
+        margin-bottom: 10px;
+      }
+      .form-preview-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .form-preview-desc {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .form-preview-body {
+        padding: 24px;
+      }
+      .form-preview-field {
+        margin-bottom: 16px;
+      }
+      .form-preview-field:last-child {
+        margin-bottom: 0;
+      }
+      .form-preview-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .form-preview-required {
+        color: #ef4444;
+      }
+      .form-preview-input {
+        width: 100%;
+        height: 42px;
+        padding: 0 14px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        background: #f9fafb;
+        color: #9ca3af;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+      }
+      .form-preview-textarea {
+        width: 100%;
+        min-height: 80px;
+        padding: 10px 14px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        background: #f9fafb;
+        color: #9ca3af;
+        font-size: 13px;
+      }
+      .form-preview-generate {
+        width: 100%;
+        height: 46px;
+        margin-top: 8px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      }
 
-  /* 第4步测试生成 */
-  .test-form { margin-bottom: 20px; }
-  .generate-result {
-    padding: 16px;
-    background: #f9fafb;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    font-size: 13px;
-    line-height: 1.7;
-    color: #374151;
-    min-height: 120px;
-  }
-  .generate-result-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #667eea;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
+      /* 第4步测试生成 */
+      .test-form {
+        margin-bottom: 20px;
+      }
+      .generate-result {
+        padding: 16px;
+        background: #f9fafb;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #374151;
+        min-height: 120px;
+      }
+      .generate-result-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #667eea;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
 
-  /* 底部按钮区 */
-  .bottom-bar {
-    height: 64px;
-    background: #fff;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    flex-shrink: 0;
-  }
-  .bottom-left { display: flex; gap: 10px; }
+      /* 底部按钮区 */
+      .bottom-bar {
+        height: 64px;
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        flex-shrink: 0;
+      }
+      .bottom-left {
+        display: flex;
+        gap: 10px;
+      }
 
-  .empty-state {
-    padding: 40px;
-    text-align: center;
-    color: #9ca3af;
-    font-size: 13px;
-  }
-  .empty-state i { font-size: 32px; margin-bottom: 12px; color: #d1d5db; }
-</style>
-</head>
-<body>
-
-<!-- 顶部栏 -->
-<div class="top-bar">
-  <button class="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-  <div class="top-title">创建场景模板</div>
-  <div class="top-actions">
-    <button class="btn btn-ghost">保存草稿</button>
-    <button class="btn btn-primary"><i class="fa-solid fa-save"></i> 保存模板</button>
-  </div>
-</div>
-
-<!-- 步骤条 -->
-<div class="steps-bar">
-  <div class="steps-track">
-    <div class="step-item active" data-step="1" onclick="goToStep(1)">
-      <div class="step-num">1</div>
-      <div class="step-text">
-        <div class="step-title">基本信息</div>
-        <div class="step-desc">命名与类型</div>
+      .empty-state {
+        padding: 40px;
+        text-align: center;
+        color: #9ca3af;
+        font-size: 13px;
+      }
+      .empty-state i {
+        font-size: 32px;
+        margin-bottom: 12px;
+        color: #d1d5db;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 顶部栏 -->
+    <div class="top-bar">
+      <button class="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+      <div class="top-title">创建场景模板</div>
+      <div class="top-actions">
+        <button class="btn btn-ghost">保存草稿</button>
+        <button class="btn btn-primary">
+          <i class="fa-solid fa-save"></i> 保存模板
+        </button>
       </div>
     </div>
-    <div class="step-connector"></div>
-    <div class="step-item" data-step="2" onclick="goToStep(2)">
-      <div class="step-num">2</div>
-      <div class="step-text">
-        <div class="step-title">输入字段</div>
-        <div class="step-desc">设计表单</div>
-      </div>
-    </div>
-    <div class="step-connector"></div>
-    <div class="step-item" data-step="3" onclick="goToStep(3)">
-      <div class="step-num">3</div>
-      <div class="step-text">
-        <div class="step-title">提示词编辑</div>
-        <div class="step-desc">输出结构</div>
-      </div>
-    </div>
-    <div class="step-connector"></div>
-    <div class="step-item" data-step="4" onclick="goToStep(4)">
-      <div class="step-num">4</div>
-      <div class="step-text">
-        <div class="step-title">预览与保存</div>
-        <div class="step-desc">测试生成</div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- 主布局 -->
-<div class="main-layout">
-  <!-- 左侧配置面板 -->
-  <div class="config-panel">
-
-    <!-- 第1步：基本信息 -->
-    <div class="step-content active" id="step1">
-      <div class="panel-header">
-        <div class="panel-title">基本信息</div>
-        <div class="panel-subtitle">给场景模板起个名字，选择它的类型和输出格式。这些信息会作为提示词的基础。</div>
-      </div>
-
-      <div class="form-group">
-        <div class="form-label">模板名称 <span class="required">*</span></div>
-        <input class="form-input" placeholder="例如：客户方案生成" value="客户方案生成" oninput="updateName(this.value)" />
-      </div>
-
-      <div class="form-group">
-        <div class="form-label">图标</div>
-        <div class="icon-picker"><i class="fa-solid fa-pen-nib"></i></div>
-      </div>
-
-      <div class="form-group">
-        <div class="form-label">内容类型</div>
-        <div class="type-grid">
-          <div class="type-card active" onclick="selectType(this, 'document')">
-            <div class="type-card-icon"><i class="fa-solid fa-file-lines"></i></div>
-            <div class="type-card-name">文档写作</div>
-          </div>
-          <div class="type-card" onclick="selectType(this, 'table')">
-            <div class="type-card-icon"><i class="fa-solid fa-table-cells"></i></div>
-            <div class="type-card-name">表格生成</div>
-          </div>
-          <div class="type-card" onclick="selectType(this, 'ppt')">
-            <div class="type-card-icon"><i class="fa-solid fa-presentation-screen"></i></div>
-            <div class="type-card-name">PPT制作</div>
-          </div>
-          <div class="type-card" onclick="selectType(this, 'email')">
-            <div class="type-card-icon"><i class="fa-solid fa-envelope"></i></div>
-            <div class="type-card-name">邮件</div>
-          </div>
-          <div class="type-card" onclick="selectType(this, 'report')">
-            <div class="type-card-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
-            <div class="type-card-name">研究报告</div>
-          </div>
-          <div class="type-card" onclick="selectType(this, 'list')">
-            <div class="type-card-icon"><i class="fa-solid fa-list-check"></i></div>
-            <div class="type-card-name">列表/步骤</div>
+    <!-- 步骤条 -->
+    <div class="steps-bar">
+      <div class="steps-track">
+        <div class="step-item active" data-step="1" onclick="goToStep(1)">
+          <div class="step-num">1</div>
+          <div class="step-text">
+            <div class="step-title">基本信息</div>
+            <div class="step-desc">命名与类型</div>
           </div>
         </div>
-      </div>
-
-      <div class="form-group">
-        <div class="form-label">输出格式</div>
-        <div class="format-row">
-          <div class="format-pill active" onclick="selectFormat(this, 'markdown')"><i class="fa-brands fa-markdown"></i> Markdown</div>
-          <div class="format-pill" onclick="selectFormat(this, 'text')"><i class="fa-solid fa-file-lines"></i> 纯文本</div>
-          <div class="format-pill" onclick="selectFormat(this, 'email')"><i class="fa-solid fa-envelope"></i> 邮件格式</div>
-          <div class="format-pill" onclick="selectFormat(this, 'list')"><i class="fa-solid fa-list-ul"></i> 清单列表</div>
-          <div class="format-pill" onclick="selectFormat(this, 'steps')"><i class="fa-solid fa-person-walking"></i> 步骤流程</div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="2" onclick="goToStep(2)">
+          <div class="step-num">2</div>
+          <div class="step-text">
+            <div class="step-title">输入字段</div>
+            <div class="step-desc">设计表单</div>
+          </div>
         </div>
-      </div>
-
-      <div class="form-group">
-        <div class="form-label">适用岗位</div>
-        <div class="role-row">
-          <div class="role-tag active" onclick="toggleRole(this)">销售</div>
-          <div class="role-tag" onclick="toggleRole(this)">市场</div>
-          <div class="role-tag" onclick="toggleRole(this)">运营</div>
-          <div class="role-tag active" onclick="toggleRole(this)">产品</div>
-          <div class="role-tag" onclick="toggleRole(this)">人力</div>
-          <div class="role-tag" onclick="toggleRole(this)">客服</div>
-          <div class="role-tag" onclick="toggleRole(this)">研发</div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="3" onclick="goToStep(3)">
+          <div class="step-num">3</div>
+          <div class="step-text">
+            <div class="step-title">提示词编辑</div>
+            <div class="step-desc">输出结构</div>
+          </div>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" data-step="4" onclick="goToStep(4)">
+          <div class="step-num">4</div>
+          <div class="step-text">
+            <div class="step-title">预览与保存</div>
+            <div class="step-desc">测试生成</div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 第2步：输入字段 -->
-    <div class="step-content" id="step2">
-      <div class="panel-header">
-        <div class="panel-title">输入字段</div>
-        <div class="panel-subtitle">设计用户填写表单时需要输入的内容。每个字段会自动变成提示词中的变量。</div>
-      </div>
+    <!-- 主布局 -->
+    <div class="main-layout">
+      <!-- 左侧配置面板 -->
+      <div class="config-panel">
+        <!-- 第1步：基本信息 -->
+        <div class="step-content active" id="step1">
+          <div class="panel-header">
+            <div class="panel-title">基本信息</div>
+            <div class="panel-subtitle">
+              给场景模板起个名字，选择它的类型和输出格式。这些信息会作为提示词的基础。
+            </div>
+          </div>
 
-      <div class="fields-list" id="fieldsList">
-        <div class="field-item active" onclick="selectField(this, 0)">
-          <i class="fa-solid fa-grip-vertical field-drag"></i>
-          <div class="field-icon"><i class="fa-solid fa-font"></i></div>
-          <div class="field-info">
-            <div class="field-name">主题</div>
-            <div class="field-meta">短文本 · 必填</div>
+          <div class="form-group">
+            <div class="form-label">
+              模板名称 <span class="required">*</span>
+            </div>
+            <input
+              class="form-input"
+              placeholder="例如：客户方案生成"
+              value="客户方案生成"
+              oninput="updateName(this.value)"
+            />
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">图标</div>
+            <div class="icon-picker"><i class="fa-solid fa-pen-nib"></i></div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">内容类型</div>
+            <div class="type-grid">
+              <div
+                class="type-card active"
+                onclick="selectType(this, 'document')"
+              >
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-file-lines"></i>
+                </div>
+                <div class="type-card-name">文档写作</div>
+              </div>
+              <div class="type-card" onclick="selectType(this, 'table')">
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-table-cells"></i>
+                </div>
+                <div class="type-card-name">表格生成</div>
+              </div>
+              <div class="type-card" onclick="selectType(this, 'ppt')">
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-presentation-screen"></i>
+                </div>
+                <div class="type-card-name">PPT制作</div>
+              </div>
+              <div class="type-card" onclick="selectType(this, 'email')">
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-envelope"></i>
+                </div>
+                <div class="type-card-name">邮件</div>
+              </div>
+              <div class="type-card" onclick="selectType(this, 'report')">
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-magnifying-glass-chart"></i>
+                </div>
+                <div class="type-card-name">研究报告</div>
+              </div>
+              <div class="type-card" onclick="selectType(this, 'list')">
+                <div class="type-card-icon">
+                  <i class="fa-solid fa-list-check"></i>
+                </div>
+                <div class="type-card-name">列表/步骤</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">输出格式</div>
+            <div class="format-row">
+              <div
+                class="format-pill active"
+                onclick="selectFormat(this, 'markdown')"
+              >
+                <i class="fa-brands fa-markdown"></i> Markdown
+              </div>
+              <div class="format-pill" onclick="selectFormat(this, 'text')">
+                <i class="fa-solid fa-file-lines"></i> 纯文本
+              </div>
+              <div class="format-pill" onclick="selectFormat(this, 'email')">
+                <i class="fa-solid fa-envelope"></i> 邮件格式
+              </div>
+              <div class="format-pill" onclick="selectFormat(this, 'list')">
+                <i class="fa-solid fa-list-ul"></i> 清单列表
+              </div>
+              <div class="format-pill" onclick="selectFormat(this, 'steps')">
+                <i class="fa-solid fa-person-walking"></i> 步骤流程
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">适用岗位</div>
+            <div class="role-row">
+              <div class="role-tag active" onclick="toggleRole(this)">销售</div>
+              <div class="role-tag" onclick="toggleRole(this)">市场</div>
+              <div class="role-tag" onclick="toggleRole(this)">运营</div>
+              <div class="role-tag active" onclick="toggleRole(this)">产品</div>
+              <div class="role-tag" onclick="toggleRole(this)">人力</div>
+              <div class="role-tag" onclick="toggleRole(this)">客服</div>
+              <div class="role-tag" onclick="toggleRole(this)">研发</div>
+            </div>
           </div>
         </div>
-        <div class="field-item" onclick="selectField(this, 1)">
-          <i class="fa-solid fa-grip-vertical field-drag"></i>
-          <div class="field-icon"><i class="fa-solid fa-align-left"></i></div>
-          <div class="field-info">
-            <div class="field-name">客户需求</div>
-            <div class="field-meta">长文本 · 必填</div>
-          </div>
-        </div>
-        <div class="field-item" onclick="selectField(this, 2)">
-          <i class="fa-solid fa-grip-vertical field-drag"></i>
-          <div class="field-icon"><i class="fa-solid fa-building"></i></div>
-          <div class="field-info">
-            <div class="field-name">公司名称</div>
-            <div class="field-meta">短文本 · 选填</div>
-          </div>
-        </div>
-      </div>
 
-      <button class="add-field-btn" onclick="addField()">
-        <i class="fa-solid fa-plus"></i> 添加字段
-      </button>
+        <!-- 第2步：输入字段 -->
+        <div class="step-content" id="step2">
+          <div class="panel-header">
+            <div class="panel-title">输入字段</div>
+            <div class="panel-subtitle">
+              设计用户填写表单时需要输入的内容。每个字段会自动变成提示词中的变量。
+            </div>
+          </div>
 
-      <div class="field-edit-form">
-        <div class="field-edit-title">
-          <span>编辑字段</span>
-          <button class="btn btn-secondary" style="height:28px;padding:0 10px;font-size:11px;">
-            <i class="fa-solid fa-trash"></i> 删除
+          <div class="fields-list" id="fieldsList">
+            <div class="field-item active" onclick="selectField(this, 0)">
+              <i class="fa-solid fa-grip-vertical field-drag"></i>
+              <div class="field-icon"><i class="fa-solid fa-font"></i></div>
+              <div class="field-info">
+                <div class="field-name">主题</div>
+                <div class="field-meta">短文本 · 必填</div>
+              </div>
+            </div>
+            <div class="field-item" onclick="selectField(this, 1)">
+              <i class="fa-solid fa-grip-vertical field-drag"></i>
+              <div class="field-icon">
+                <i class="fa-solid fa-align-left"></i>
+              </div>
+              <div class="field-info">
+                <div class="field-name">客户需求</div>
+                <div class="field-meta">长文本 · 必填</div>
+              </div>
+            </div>
+            <div class="field-item" onclick="selectField(this, 2)">
+              <i class="fa-solid fa-grip-vertical field-drag"></i>
+              <div class="field-icon"><i class="fa-solid fa-building"></i></div>
+              <div class="field-info">
+                <div class="field-name">公司名称</div>
+                <div class="field-meta">短文本 · 选填</div>
+              </div>
+            </div>
+          </div>
+
+          <button class="add-field-btn" onclick="addField()">
+            <i class="fa-solid fa-plus"></i> 添加字段
           </button>
+
+          <div class="field-edit-form">
+            <div class="field-edit-title">
+              <span>编辑字段</span>
+              <button
+                class="btn btn-secondary"
+                style="height: 28px; padding: 0 10px; font-size: 11px"
+              >
+                <i class="fa-solid fa-trash"></i> 删除
+              </button>
+            </div>
+            <div class="field-edit-grid">
+              <div class="form-group">
+                <div class="form-label">字段名称</div>
+                <input class="form-input" value="主题" />
+              </div>
+              <div class="form-group">
+                <div class="form-label">字段ID</div>
+                <input
+                  class="form-input"
+                  value="topic"
+                  style="font-family: monospace"
+                />
+              </div>
+              <div class="form-group">
+                <div class="form-label">字段类型</div>
+                <select class="form-select">
+                  <option>短文本</option>
+                  <option>长文本</option>
+                  <option>数字</option>
+                  <option>单选</option>
+                  <option>多选</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div class="form-label">是否必填</div>
+                <select class="form-select">
+                  <option>必填</option>
+                  <option>选填</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top: 10px; margin-bottom: 0">
+              <div class="form-label">占位提示</div>
+              <input class="form-input" value="请输入方案主题" />
+            </div>
+          </div>
         </div>
-        <div class="field-edit-grid">
-          <div class="form-group">
-            <div class="form-label">字段名称</div>
-            <input class="form-input" value="主题" />
+
+        <!-- 第3步：提示词编辑 -->
+        <div class="step-content" id="step3">
+          <div class="panel-header">
+            <div class="panel-title">提示词编辑</div>
+            <div class="panel-subtitle">
+              这是场景模板的核心。系统会根据字段自动生成提示词，您也可以直接编辑。
+            </div>
           </div>
-          <div class="form-group">
-            <div class="form-label">字段ID</div>
-            <input class="form-input" value="topic" style="font-family:monospace;" />
+
+          <button
+            class="btn btn-primary"
+            style="width: 100%; margin-bottom: 16px"
+            onclick="autoGeneratePrompt()"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles"></i> AI 自动生成提示词
+          </button>
+
+          <div class="prompt-editor-wrap">
+            <div class="prompt-editor-toolbar">
+              <div class="prompt-editor-label">
+                <i class="fa-solid fa-pen-to-square"></i>
+                提示词编辑器
+              </div>
+              <div class="prompt-editor-actions">
+                <button class="toolbar-btn" onclick="copyPrompt()">
+                  <i class="fa-regular fa-copy"></i> 复制
+                </button>
+                <button class="toolbar-btn" onclick="resetPrompt()">
+                  <i class="fa-solid fa-rotate-left"></i> 重置
+                </button>
+              </div>
+            </div>
+            <textarea
+              class="prompt-textarea"
+              id="promptEditor"
+              oninput="onPromptEdit()"
+            ></textarea>
           </div>
-          <div class="form-group">
-            <div class="form-label">字段类型</div>
-            <select class="form-select">
-              <option>短文本</option>
-              <option>长文本</option>
-              <option>数字</option>
-              <option>单选</option>
-              <option>多选</option>
-            </select>
+
+          <!-- 输出结构选择 -->
+          <div class="structure-section">
+            <div class="structure-section-header">
+              <div>
+                <div class="structure-section-title">
+                  <i class="fa-solid fa-sitemap"></i>
+                  输出结构
+                </div>
+                <div class="structure-section-desc">
+                  选择结构后，提示词会自动追加输出结构要求
+                </div>
+              </div>
+            </div>
+            <div class="structure-cards">
+              <div
+                class="structure-card structure-card-free"
+                onclick="selectStructure(this, 'free')"
+              >
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>自由结构</span>
+              </div>
+              <div
+                class="structure-card active"
+                onclick="selectStructure(this, 'scheme')"
+              >
+                <div class="structure-card-check">
+                  <i class="fa-solid fa-check"></i>
+                </div>
+                <div class="structure-card-icon">
+                  <i class="fa-solid fa-file-lines"></i>
+                </div>
+                <div class="structure-card-name">方案文档结构</div>
+                <div class="structure-card-meta">5 个主章节</div>
+              </div>
+              <div
+                class="structure-card"
+                onclick="selectStructure(this, 'weekly')"
+              >
+                <div class="structure-card-check">
+                  <i class="fa-solid fa-check"></i>
+                </div>
+                <div class="structure-card-icon">
+                  <i class="fa-solid fa-calendar-week"></i>
+                </div>
+                <div class="structure-card-name">周报结构</div>
+                <div class="structure-card-meta">5 个主章节</div>
+              </div>
+              <div
+                class="structure-card"
+                onclick="selectStructure(this, 'meeting')"
+              >
+                <div class="structure-card-check">
+                  <i class="fa-solid fa-check"></i>
+                </div>
+                <div class="structure-card-icon">
+                  <i class="fa-solid fa-handshake"></i>
+                </div>
+                <div class="structure-card-name">会议纪要结构</div>
+                <div class="structure-card-meta">5 个主章节</div>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <div class="form-label">是否必填</div>
-            <select class="form-select">
-              <option>必填</option>
-              <option>选填</option>
-            </select>
+
+          <!-- 变量快捷插入 -->
+          <div class="var-panel">
+            <div class="var-panel-title">
+              <i class="fa-solid fa-tags"></i>
+              点击插入变量
+            </div>
+            <div class="var-tags" id="varTags">
+              <span class="var-tag" onclick="insertVar('主题')">{主题}</span>
+              <span class="var-tag" onclick="insertVar('客户需求')"
+                >{客户需求}</span
+              >
+              <span class="var-tag" onclick="insertVar('公司名称')"
+                >{公司名称}</span
+              >
+            </div>
           </div>
         </div>
-        <div class="form-group" style="margin-top:10px;margin-bottom:0;">
-          <div class="form-label">占位提示</div>
-          <input class="form-input" value="请输入方案主题" />
+
+        <!-- 第4步：预览与保存 -->
+        <div class="step-content" id="step4">
+          <div class="panel-header">
+            <div class="panel-title">预览与保存</div>
+            <div class="panel-subtitle">
+              填入测试值，模拟用户真实使用场景，确认生成效果。
+            </div>
+          </div>
+
+          <div class="test-form" id="testForm">
+            <div class="form-group">
+              <div class="form-label">主题</div>
+              <input class="form-input" value="某制造业客户数字化转型方案" />
+            </div>
+            <div class="form-group">
+              <div class="form-label">客户需求</div>
+              <textarea
+                class="prompt-textarea"
+                style="min-height: 80px; font-family: inherit"
+                placeholder="请描述客户具体需求..."
+              >
+客户希望提升生产线效率，降低人工成本，实现数据可视化管理。</textarea
+              >
+            </div>
+            <div class="form-group">
+              <div class="form-label">公司名称</div>
+              <input class="form-input" value="某某科技有限公司" />
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary"
+            style="width: 100%; margin-bottom: 16px"
+            onclick="simulateGenerate()"
+          >
+            <i class="fa-solid fa-play"></i> 测试生成
+          </button>
+
+          <div class="generate-result" id="generateResult">
+            <div class="generate-result-title">
+              <i class="fa-solid fa-sparkles"></i>
+              模拟生成结果
+            </div>
+            点击"测试生成"按钮，将基于当前提示词和测试值生成模拟结果...
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧预览区 -->
+      <div class="preview-panel">
+        <div class="preview-tabs">
+          <div
+            class="preview-tab active"
+            onclick="switchPreviewTab(this, 'prompt')"
+          >
+            <i class="fa-solid fa-file-code"></i>
+            最终提示词
+          </div>
+          <div class="preview-tab" onclick="switchPreviewTab(this, 'form')">
+            <i class="fa-regular fa-rectangle-list"></i>
+            表单预览
+          </div>
+        </div>
+        <div class="preview-content">
+          <div class="preview-card">
+            <!-- 提示词预览 -->
+            <div class="preview-pane active" id="previewPrompt">
+              <div class="prompt-preview-header">
+                <div class="prompt-preview-title">
+                  <i class="fa-solid fa-terminal"></i>
+                  AI 将收到这条提示词
+                </div>
+                <div class="prompt-preview-status linked" id="promptStatus">
+                  <i class="fa-solid fa-link"></i>
+                  已关联输出结构
+                </div>
+              </div>
+              <div class="prompt-render" id="promptRender"></div>
+            </div>
+
+            <!-- 表单预览 -->
+            <div class="preview-pane" id="previewForm">
+              <div class="form-preview-card">
+                <div class="form-preview-header">
+                  <div class="form-preview-tag" id="formPreviewTag">
+                    文档写作 · Markdown
+                  </div>
+                  <div class="form-preview-title" id="formPreviewTitle">
+                    客户方案生成
+                  </div>
+                  <div class="form-preview-desc">
+                    请输入以下信息，AI 将为您生成专业内容
+                  </div>
+                </div>
+                <div class="form-preview-body" id="formPreviewBody">
+                  <!-- 动态生成 -->
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 第3步：提示词编辑 -->
-    <div class="step-content" id="step3">
-      <div class="panel-header">
-        <div class="panel-title">提示词编辑</div>
-        <div class="panel-subtitle">这是场景模板的核心。系统会根据字段自动生成提示词，您也可以直接编辑。</div>
+    <!-- 底部操作栏 -->
+    <div class="bottom-bar">
+      <div class="bottom-left">
+        <button
+          class="btn btn-secondary"
+          id="prevBtn"
+          onclick="prevStep()"
+          disabled
+        >
+          上一步
+        </button>
       </div>
-
-      <button class="btn btn-primary" style="width:100%;margin-bottom:16px;" onclick="autoGeneratePrompt()">
-        <i class="fa-solid fa-wand-magic-sparkles"></i> AI 自动生成提示词
-      </button>
-
-      <div class="prompt-editor-wrap">
-        <div class="prompt-editor-toolbar">
-          <div class="prompt-editor-label">
-            <i class="fa-solid fa-pen-to-square"></i>
-            提示词编辑器
-          </div>
-          <div class="prompt-editor-actions">
-            <button class="toolbar-btn" onclick="copyPrompt()"><i class="fa-regular fa-copy"></i> 复制</button>
-            <button class="toolbar-btn" onclick="resetPrompt()"><i class="fa-solid fa-rotate-left"></i> 重置</button>
-          </div>
-        </div>
-        <textarea class="prompt-textarea" id="promptEditor" oninput="onPromptEdit()"></textarea>
-      </div>
-
-      <!-- 输出结构选择 -->
-      <div class="structure-section">
-        <div class="structure-section-header">
-          <div>
-            <div class="structure-section-title">
-              <i class="fa-solid fa-sitemap"></i>
-              输出结构
-            </div>
-            <div class="structure-section-desc">选择结构后，提示词会自动追加输出结构要求</div>
-          </div>
-        </div>
-        <div class="structure-cards">
-          <div class="structure-card structure-card-free" onclick="selectStructure(this, 'free')">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>自由结构</span>
-          </div>
-          <div class="structure-card active" onclick="selectStructure(this, 'scheme')">
-            <div class="structure-card-check"><i class="fa-solid fa-check"></i></div>
-            <div class="structure-card-icon"><i class="fa-solid fa-file-lines"></i></div>
-            <div class="structure-card-name">方案文档结构</div>
-            <div class="structure-card-meta">5 个主章节</div>
-          </div>
-          <div class="structure-card" onclick="selectStructure(this, 'weekly')">
-            <div class="structure-card-check"><i class="fa-solid fa-check"></i></div>
-            <div class="structure-card-icon"><i class="fa-solid fa-calendar-week"></i></div>
-            <div class="structure-card-name">周报结构</div>
-            <div class="structure-card-meta">5 个主章节</div>
-          </div>
-          <div class="structure-card" onclick="selectStructure(this, 'meeting')">
-            <div class="structure-card-check"><i class="fa-solid fa-check"></i></div>
-            <div class="structure-card-icon"><i class="fa-solid fa-handshake"></i></div>
-            <div class="structure-card-name">会议纪要结构</div>
-            <div class="structure-card-meta">5 个主章节</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 变量快捷插入 -->
-      <div class="var-panel">
-        <div class="var-panel-title">
-          <i class="fa-solid fa-tags"></i>
-          点击插入变量
-        </div>
-        <div class="var-tags" id="varTags">
-          <span class="var-tag" onclick="insertVar('主题')">{主题}</span>
-          <span class="var-tag" onclick="insertVar('客户需求')">{客户需求}</span>
-          <span class="var-tag" onclick="insertVar('公司名称')">{公司名称}</span>
-        </div>
+      <div class="bottom-left">
+        <button class="btn btn-secondary" onclick="goToStep(1)">
+          返回第1步
+        </button>
+        <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+          下一步 <i class="fa-solid fa-arrow-right"></i>
+        </button>
       </div>
     </div>
 
-    <!-- 第4步：预览与保存 -->
-    <div class="step-content" id="step4">
-      <div class="panel-header">
-        <div class="panel-title">预览与保存</div>
-        <div class="panel-subtitle">填入测试值，模拟用户真实使用场景，确认生成效果。</div>
-      </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script>
+      let currentStep = 1;
+      let currentType = 'document';
+      let currentFormat = 'markdown';
+      let currentStructure = 'scheme';
+      let templateName = '客户方案生成';
 
-      <div class="test-form" id="testForm">
-        <div class="form-group">
-          <div class="form-label">主题</div>
-          <input class="form-input" value="某制造业客户数字化转型方案" />
-        </div>
-        <div class="form-group">
-          <div class="form-label">客户需求</div>
-          <textarea class="prompt-textarea" style="min-height:80px;font-family:inherit;" placeholder="请描述客户具体需求...">客户希望提升生产线效率，降低人工成本，实现数据可视化管理。</textarea>
-        </div>
-        <div class="form-group">
-          <div class="form-label">公司名称</div>
-          <input class="form-input" value="某某科技有限公司" />
-        </div>
-      </div>
+      const fields = [
+        {
+          name: '主题',
+          id: 'topic',
+          type: 'short',
+          required: true,
+          placeholder: '请输入方案主题',
+        },
+        {
+          name: '客户需求',
+          id: 'demand',
+          type: 'long',
+          required: true,
+          placeholder: '请描述客户具体需求',
+        },
+        {
+          name: '公司名称',
+          id: 'company',
+          type: 'short',
+          required: false,
+          placeholder: '请输入公司名称',
+        },
+      ];
 
-      <button class="btn btn-primary" style="width:100%;margin-bottom:16px;" onclick="simulateGenerate()">
-        <i class="fa-solid fa-play"></i> 测试生成
-      </button>
+      const structures = {
+        free: {
+          name: '自由结构',
+          chapters: [],
+        },
+        scheme: {
+          name: '方案文档结构',
+          chapters: [
+            { title: '一、项目背景与需求分析', level: 1 },
+            { title: '1.1 客户业务现状', level: 2 },
+            { title: '1.2 核心痛点与挑战', level: 2 },
+            { title: '二、整体解决方案', level: 1 },
+            { title: '2.1 方案架构设计', level: 2 },
+            { title: '2.2 核心功能介绍', level: 2 },
+            { title: '2.3 技术实现路径', level: 2 },
+            { title: '三、产品优势与价值', level: 1 },
+            { title: '3.1 差异化优势', level: 2 },
+            { title: '3.2 客户价值体现', level: 2 },
+            { title: '四、实施与服务方案', level: 1 },
+            { title: '4.1 实施计划', level: 2 },
+            { title: '4.2 服务保障', level: 2 },
+            { title: '五、总结与建议', level: 1 },
+          ],
+        },
+        weekly: {
+          name: '周报结构',
+          chapters: [
+            { title: '一、本周工作概述', level: 1 },
+            { title: '二、重点工作进展', level: 1 },
+            { title: '2.1 项目A进展', level: 2 },
+            { title: '2.2 项目B进展', level: 2 },
+            { title: '三、遇到的问题与解决方案', level: 1 },
+            { title: '四、下周工作计划', level: 1 },
+            { title: '4.1 重点任务', level: 2 },
+            { title: '4.2 时间规划', level: 2 },
+            { title: '五、需要协调的事项', level: 1 },
+          ],
+        },
+        meeting: {
+          name: '会议纪要结构',
+          chapters: [
+            { title: '一、会议基本信息', level: 1 },
+            { title: '二、会议议题与讨论', level: 1 },
+            { title: '2.1 议题一：项目进度汇报', level: 2 },
+            { title: '2.2 议题二：问题与风险', level: 2 },
+            { title: '2.3 议题三：下一步计划', level: 2 },
+            { title: '三、会议决议', level: 1 },
+            { title: '四、行动项跟踪', level: 1 },
+            { title: '4.1 待办事项清单', level: 2 },
+            { title: '4.2 责任人与截止时间', level: 2 },
+            { title: '五、附件', level: 1 },
+          ],
+        },
+      };
 
-      <div class="generate-result" id="generateResult">
-        <div class="generate-result-title">
-          <i class="fa-solid fa-sparkles"></i>
-          模拟生成结果
-        </div>
-        点击"测试生成"按钮，将基于当前提示词和测试值生成模拟结果...
-      </div>
-    </div>
+      const typeLabels = {
+        document: '文档写作',
+        table: '表格生成',
+        ppt: 'PPT制作',
+        email: '邮件',
+        report: '研究报告',
+        list: '列表/步骤',
+      };
 
-  </div>
+      const formatLabels = {
+        markdown: 'Markdown',
+        text: '纯文本',
+        email: '邮件格式',
+        list: '清单列表',
+        steps: '步骤流程',
+      };
 
-  <!-- 右侧预览区 -->
-  <div class="preview-panel">
-    <div class="preview-tabs">
-      <div class="preview-tab active" onclick="switchPreviewTab(this, 'prompt')">
-        <i class="fa-solid fa-file-code"></i>
-        最终提示词
-      </div>
-      <div class="preview-tab" onclick="switchPreviewTab(this, 'form')">
-        <i class="fa-regular fa-rectangle-list"></i>
-        表单预览
-      </div>
-    </div>
-    <div class="preview-content">
-      <div class="preview-card">
-        <!-- 提示词预览 -->
-        <div class="preview-pane active" id="previewPrompt">
-          <div class="prompt-preview-header">
-            <div class="prompt-preview-title">
-              <i class="fa-solid fa-terminal"></i>
-              AI 将收到这条提示词
-            </div>
-            <div class="prompt-preview-status linked" id="promptStatus">
-              <i class="fa-solid fa-link"></i>
-              已关联输出结构
-            </div>
-          </div>
-          <div class="prompt-render" id="promptRender"></div>
-        </div>
+      let promptText = '';
 
-        <!-- 表单预览 -->
-        <div class="preview-pane" id="previewForm">
-          <div class="form-preview-card">
-            <div class="form-preview-header">
-              <div class="form-preview-tag" id="formPreviewTag">文档写作 · Markdown</div>
-              <div class="form-preview-title" id="formPreviewTitle">客户方案生成</div>
-              <div class="form-preview-desc">请输入以下信息，AI 将为您生成专业内容</div>
-            </div>
-            <div class="form-preview-body" id="formPreviewBody">
-              <!-- 动态生成 -->
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+      function init() {
+        autoGeneratePrompt();
+        updateFormPreview();
+      }
 
-<!-- 底部操作栏 -->
-<div class="bottom-bar">
-  <div class="bottom-left">
-    <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" disabled>上一步</button>
-  </div>
-  <div class="bottom-left">
-    <button class="btn btn-secondary" onclick="goToStep(1)">返回第1步</button>
-    <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">下一步 <i class="fa-solid fa-arrow-right"></i></button>
-  </div>
-</div>
+      function goToStep(step) {
+        if (step < 1 || step > 4) return;
+        currentStep = step;
+        updateStepsUI();
+      }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-<script>
-  let currentStep = 1;
-  let currentType = 'document';
-  let currentFormat = 'markdown';
-  let currentStructure = 'scheme';
-  let templateName = '客户方案生成';
+      function nextStep() {
+        if (currentStep < 4) goToStep(currentStep + 1);
+      }
 
-  const fields = [
-    { name: '主题', id: 'topic', type: 'short', required: true, placeholder: '请输入方案主题' },
-    { name: '客户需求', id: 'demand', type: 'long', required: true, placeholder: '请描述客户具体需求' },
-    { name: '公司名称', id: 'company', type: 'short', required: false, placeholder: '请输入公司名称' }
-  ];
+      function prevStep() {
+        if (currentStep > 1) goToStep(currentStep - 1);
+      }
 
-  const structures = {
-    free: {
-      name: '自由结构',
-      chapters: []
-    },
-    scheme: {
-      name: '方案文档结构',
-      chapters: [
-        { title: '一、项目背景与需求分析', level: 1 },
-        { title: '1.1 客户业务现状', level: 2 },
-        { title: '1.2 核心痛点与挑战', level: 2 },
-        { title: '二、整体解决方案', level: 1 },
-        { title: '2.1 方案架构设计', level: 2 },
-        { title: '2.2 核心功能介绍', level: 2 },
-        { title: '2.3 技术实现路径', level: 2 },
-        { title: '三、产品优势与价值', level: 1 },
-        { title: '3.1 差异化优势', level: 2 },
-        { title: '3.2 客户价值体现', level: 2 },
-        { title: '四、实施与服务方案', level: 1 },
-        { title: '4.1 实施计划', level: 2 },
-        { title: '4.2 服务保障', level: 2 },
-        { title: '五、总结与建议', level: 1 }
-      ]
-    },
-    weekly: {
-      name: '周报结构',
-      chapters: [
-        { title: '一、本周工作概述', level: 1 },
-        { title: '二、重点工作进展', level: 1 },
-        { title: '2.1 项目A进展', level: 2 },
-        { title: '2.2 项目B进展', level: 2 },
-        { title: '三、遇到的问题与解决方案', level: 1 },
-        { title: '四、下周工作计划', level: 1 },
-        { title: '4.1 重点任务', level: 2 },
-        { title: '4.2 时间规划', level: 2 },
-        { title: '五、需要协调的事项', level: 1 }
-      ]
-    },
-    meeting: {
-      name: '会议纪要结构',
-      chapters: [
-        { title: '一、会议基本信息', level: 1 },
-        { title: '二、会议议题与讨论', level: 1 },
-        { title: '2.1 议题一：项目进度汇报', level: 2 },
-        { title: '2.2 议题二：问题与风险', level: 2 },
-        { title: '2.3 议题三：下一步计划', level: 2 },
-        { title: '三、会议决议', level: 1 },
-        { title: '四、行动项跟踪', level: 1 },
-        { title: '4.1 待办事项清单', level: 2 },
-        { title: '4.2 责任人与截止时间', level: 2 },
-        { title: '五、附件', level: 1 }
-      ]
-    }
-  };
+      function updateStepsUI() {
+        document.querySelectorAll('.step-item').forEach((item, idx) => {
+          const step = idx + 1;
+          item.classList.remove('active', 'completed');
+          if (step === currentStep) item.classList.add('active');
+          else if (step < currentStep) item.classList.add('completed');
+        });
 
-  const typeLabels = {
-    document: '文档写作',
-    table: '表格生成',
-    ppt: 'PPT制作',
-    email: '邮件',
-    report: '研究报告',
-    list: '列表/步骤'
-  };
+        document.querySelectorAll('.step-connector').forEach((conn, idx) => {
+          conn.classList.toggle('completed', idx < currentStep - 1);
+        });
 
-  const formatLabels = {
-    markdown: 'Markdown',
-    text: '纯文本',
-    email: '邮件格式',
-    list: '清单列表',
-    steps: '步骤流程'
-  };
+        document.querySelectorAll('.step-content').forEach((content, idx) => {
+          content.classList.toggle('active', idx + 1 === currentStep);
+        });
 
-  let promptText = '';
+        document.getElementById('prevBtn').disabled = currentStep === 1;
+        const nextBtn = document.getElementById('nextBtn');
+        if (currentStep === 4) {
+          nextBtn.innerHTML = '<i class="fa-solid fa-save"></i> 保存模板';
+        } else {
+          nextBtn.innerHTML = '下一步 <i class="fa-solid fa-arrow-right"></i>';
+        }
+      }
 
-  function init() {
-    autoGeneratePrompt();
-    updateFormPreview();
-  }
+      function selectType(el, type) {
+        document
+          .querySelectorAll('#step1 .type-card')
+          .forEach((c) => c.classList.remove('active'));
+        el.classList.add('active');
+        currentType = type;
+        updateFormPreview();
+      }
 
-  function goToStep(step) {
-    if (step < 1 || step > 4) return;
-    currentStep = step;
-    updateStepsUI();
-  }
+      function selectFormat(el, format) {
+        document
+          .querySelectorAll('#step1 .format-pill')
+          .forEach((c) => c.classList.remove('active'));
+        el.classList.add('active');
+        currentFormat = format;
+        updateFormPreview();
+      }
 
-  function nextStep() {
-    if (currentStep < 4) goToStep(currentStep + 1);
-  }
+      function toggleRole(el) {
+        el.classList.toggle('active');
+      }
 
-  function prevStep() {
-    if (currentStep > 1) goToStep(currentStep - 1);
-  }
+      function updateName(value) {
+        templateName = value || '未命名场景模板';
+        document.getElementById('formPreviewTitle').textContent = templateName;
+      }
 
-  function updateStepsUI() {
-    document.querySelectorAll('.step-item').forEach((item, idx) => {
-      const step = idx + 1;
-      item.classList.remove('active', 'completed');
-      if (step === currentStep) item.classList.add('active');
-      else if (step < currentStep) item.classList.add('completed');
-    });
+      function selectField(el, index) {
+        document
+          .querySelectorAll('#step2 .field-item')
+          .forEach((c) => c.classList.remove('active'));
+        el.classList.add('active');
+      }
 
-    document.querySelectorAll('.step-connector').forEach((conn, idx) => {
-      conn.classList.toggle('completed', idx < currentStep - 1);
-    });
+      function addField() {
+        const newField = {
+          name: '新字段',
+          id: 'new_field',
+          type: 'short',
+          required: false,
+          placeholder: '请输入',
+        };
+        fields.push(newField);
+        renderFieldsList();
+        updateVarTags();
+        updateFormPreview();
+      }
 
-    document.querySelectorAll('.step-content').forEach((content, idx) => {
-      content.classList.toggle('active', idx + 1 === currentStep);
-    });
-
-    document.getElementById('prevBtn').disabled = currentStep === 1;
-    const nextBtn = document.getElementById('nextBtn');
-    if (currentStep === 4) {
-      nextBtn.innerHTML = '<i class="fa-solid fa-save"></i> 保存模板';
-    } else {
-      nextBtn.innerHTML = '下一步 <i class="fa-solid fa-arrow-right"></i>';
-    }
-  }
-
-  function selectType(el, type) {
-    document.querySelectorAll('#step1 .type-card').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-    currentType = type;
-    updateFormPreview();
-  }
-
-  function selectFormat(el, format) {
-    document.querySelectorAll('#step1 .format-pill').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-    currentFormat = format;
-    updateFormPreview();
-  }
-
-  function toggleRole(el) {
-    el.classList.toggle('active');
-  }
-
-  function updateName(value) {
-    templateName = value || '未命名场景模板';
-    document.getElementById('formPreviewTitle').textContent = templateName;
-  }
-
-  function selectField(el, index) {
-    document.querySelectorAll('#step2 .field-item').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-  }
-
-  function addField() {
-    const newField = { name: '新字段', id: 'new_field', type: 'short', required: false, placeholder: '请输入' };
-    fields.push(newField);
-    renderFieldsList();
-    updateVarTags();
-    updateFormPreview();
-  }
-
-  function renderFieldsList() {
-    const list = document.getElementById('fieldsList');
-    list.innerHTML = fields.map((field, idx) => `
+      function renderFieldsList() {
+        const list = document.getElementById('fieldsList');
+        list.innerHTML = fields
+          .map(
+            (field, idx) => `
       <div class="field-item ${idx === 0 ? 'active' : ''}" onclick="selectField(this, ${idx})">
         <i class="fa-solid fa-grip-vertical field-drag"></i>
         <div class="field-icon"><i class="fa-solid ${field.type === 'long' ? 'fa-align-left' : 'fa-font'}"></i></div>
@@ -1412,131 +1694,164 @@
           <div class="field-meta">${field.type === 'long' ? '长文本' : '短文本'} · ${field.required ? '必填' : '选填'}</div>
         </div>
       </div>
-    `).join('');
-  }
+    `
+          )
+          .join('');
+      }
 
-  function updateVarTags() {
-    const tags = document.getElementById('varTags');
-    tags.innerHTML = fields.map(f => `<span class="var-tag" onclick="insertVar('${f.name}')">{${f.name}}</span>`).join('');
-  }
+      function updateVarTags() {
+        const tags = document.getElementById('varTags');
+        tags.innerHTML = fields
+          .map(
+            (f) =>
+              `<span class="var-tag" onclick="insertVar('${f.name}')">{${f.name}}</span>`
+          )
+          .join('');
+      }
 
-  function insertVar(name) {
-    const editor = document.getElementById('promptEditor');
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    const text = editor.value;
-    editor.value = text.substring(0, start) + '{' + name + '}' + text.substring(end);
-    onPromptEdit();
-    editor.focus();
-    editor.setSelectionRange(start + name.length + 2, start + name.length + 2);
-  }
+      function insertVar(name) {
+        const editor = document.getElementById('promptEditor');
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const text = editor.value;
+        editor.value =
+          text.substring(0, start) + '{' + name + '}' + text.substring(end);
+        onPromptEdit();
+        editor.focus();
+        editor.setSelectionRange(
+          start + name.length + 2,
+          start + name.length + 2
+        );
+      }
 
-  function autoGeneratePrompt() {
-    const role = `你是一位资深的${typeLabels[currentType]}专家，擅长根据用户提供的信息生成高质量、专业、结构清晰的内容。`;
-    const task = `请基于以下信息，为用户生成一份「${templateName}」。`;
-    const inputSection = fields.map(f => `- ${f.name}：{${f.name}}`).join('\n');
-    const formatReq = `输出格式：${formatLabels[currentFormat]}。`;
+      function autoGeneratePrompt() {
+        const role = `你是一位资深的${typeLabels[currentType]}专家，擅长根据用户提供的信息生成高质量、专业、结构清晰的内容。`;
+        const task = `请基于以下信息，为用户生成一份「${templateName}」。`;
+        const inputSection = fields
+          .map((f) => `- ${f.name}：{${f.name}}`)
+          .join('\n');
+        const formatReq = `输出格式：${formatLabels[currentFormat]}。`;
 
-    let prompt = `# Role\n${role}\n\n# Task\n${task}\n\n# Input\n${inputSection}\n\n# Output Requirements\n${formatReq}\n- 内容专业、逻辑清晰、表达准确\n- 不要添加与输入无关的内容`;
+        let prompt = `# Role\n${role}\n\n# Task\n${task}\n\n# Input\n${inputSection}\n\n# Output Requirements\n${formatReq}\n- 内容专业、逻辑清晰、表达准确\n- 不要添加与输入无关的内容`;
 
-    if (currentStructure !== 'free') {
-      const structure = structures[currentStructure];
-      prompt += `\n\n# Output Structure\n请严格按照以下结构生成内容：\n${structure.chapters.map(c => c.title).join('\n')}`;
-    }
+        if (currentStructure !== 'free') {
+          const structure = structures[currentStructure];
+          prompt += `\n\n# Output Structure\n请严格按照以下结构生成内容：\n${structure.chapters.map((c) => c.title).join('\n')}`;
+        }
 
-    document.getElementById('promptEditor').value = prompt;
-    onPromptEdit();
-  }
+        document.getElementById('promptEditor').value = prompt;
+        onPromptEdit();
+      }
 
-  function onPromptEdit() {
-    promptText = document.getElementById('promptEditor').value;
-    renderPromptPreview();
-  }
+      function onPromptEdit() {
+        promptText = document.getElementById('promptEditor').value;
+        renderPromptPreview();
+      }
 
-  function selectStructure(el, structure) {
-    document.querySelectorAll('.structure-card').forEach(c => c.classList.remove('active'));
-    el.classList.add('active');
-    currentStructure = structure;
+      function selectStructure(el, structure) {
+        document
+          .querySelectorAll('.structure-card')
+          .forEach((c) => c.classList.remove('active'));
+        el.classList.add('active');
+        currentStructure = structure;
 
-    // 自动在提示词末尾追加/更新结构要求
-    appendStructureToPrompt();
-    updatePromptStatus();
-  }
+        // 自动在提示词末尾追加/更新结构要求
+        appendStructureToPrompt();
+        updatePromptStatus();
+      }
 
-  function appendStructureToPrompt() {
-    let prompt = document.getElementById('promptEditor').value;
+      function appendStructureToPrompt() {
+        let prompt = document.getElementById('promptEditor').value;
 
-    // 移除已有的 Output Structure 部分
-    const marker = '\n\n# Output Structure';
-    const idx = prompt.indexOf(marker);
-    if (idx !== -1) {
-      prompt = prompt.substring(0, idx);
-    }
+        // 移除已有的 Output Structure 部分
+        const marker = '\n\n# Output Structure';
+        const idx = prompt.indexOf(marker);
+        if (idx !== -1) {
+          prompt = prompt.substring(0, idx);
+        }
 
-    if (currentStructure !== 'free') {
-      const structure = structures[currentStructure];
-      prompt += `${marker}\n请严格按照以下结构生成内容：\n${structure.chapters.map(c => c.title).join('\n')}`;
-    }
+        if (currentStructure !== 'free') {
+          const structure = structures[currentStructure];
+          prompt += `${marker}\n请严格按照以下结构生成内容：\n${structure.chapters.map((c) => c.title).join('\n')}`;
+        }
 
-    document.getElementById('promptEditor').value = prompt;
-    onPromptEdit();
-  }
+        document.getElementById('promptEditor').value = prompt;
+        onPromptEdit();
+      }
 
-  function updatePromptStatus() {
-    const status = document.getElementById('promptStatus');
-    if (currentStructure === 'free') {
-      status.className = 'prompt-preview-status free';
-      status.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> 自由结构';
-    } else {
-      status.className = 'prompt-preview-status linked';
-      status.innerHTML = '<i class="fa-solid fa-link"></i> 已关联「' + structures[currentStructure].name + '」';
-    }
-  }
+      function updatePromptStatus() {
+        const status = document.getElementById('promptStatus');
+        if (currentStructure === 'free') {
+          status.className = 'prompt-preview-status free';
+          status.innerHTML =
+            '<i class="fa-solid fa-wand-magic-sparkles"></i> 自由结构';
+        } else {
+          status.className = 'prompt-preview-status linked';
+          status.innerHTML =
+            '<i class="fa-solid fa-link"></i> 已关联「' +
+            structures[currentStructure].name +
+            '」';
+        }
+      }
 
-  function renderPromptPreview() {
-    const render = document.getElementById('promptRender');
-    let html = escapeHtml(promptText)
-      .replace(/(# .+)/g, '<span class="prompt-section-title">$1</span>')
-      .replace(/\{([^}]+)\}/g, '<span class="prompt-var">{$1}</span>');
-    render.innerHTML = html;
-  }
+      function renderPromptPreview() {
+        const render = document.getElementById('promptRender');
+        let html = escapeHtml(promptText)
+          .replace(/(# .+)/g, '<span class="prompt-section-title">$1</span>')
+          .replace(/\{([^}]+)\}/g, '<span class="prompt-var">{$1}</span>');
+        render.innerHTML = html;
+      }
 
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
 
-  function switchPreviewTab(el, type) {
-    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.querySelectorAll('.preview-pane').forEach(p => p.classList.remove('active'));
-    document.getElementById('preview' + (type === 'prompt' ? 'Prompt' : 'Form')).classList.add('active');
-  }
+      function switchPreviewTab(el, type) {
+        document
+          .querySelectorAll('.preview-tab')
+          .forEach((t) => t.classList.remove('active'));
+        el.classList.add('active');
+        document
+          .querySelectorAll('.preview-pane')
+          .forEach((p) => p.classList.remove('active'));
+        document
+          .getElementById('preview' + (type === 'prompt' ? 'Prompt' : 'Form'))
+          .classList.add('active');
+      }
 
-  function updateFormPreview() {
-    document.getElementById('formPreviewTag').textContent = typeLabels[currentType] + ' · ' + formatLabels[currentFormat];
-    document.getElementById('formPreviewTitle').textContent = templateName;
+      function updateFormPreview() {
+        document.getElementById('formPreviewTag').textContent =
+          typeLabels[currentType] + ' · ' + formatLabels[currentFormat];
+        document.getElementById('formPreviewTitle').textContent = templateName;
 
-    const body = document.getElementById('formPreviewBody');
-    body.innerHTML = fields.map(f => `
+        const body = document.getElementById('formPreviewBody');
+        body.innerHTML =
+          fields
+            .map(
+              (f) => `
       <div class="form-preview-field">
         <div class="form-preview-label">${f.name} ${f.required ? '<span class="form-preview-required">*</span>' : ''}</div>
-        ${f.type === 'long'
-          ? `<div class="form-preview-textarea">${f.placeholder}</div>`
-          : `<div class="form-preview-input">${f.placeholder}</div>`
+        ${
+          f.type === 'long'
+            ? `<div class="form-preview-textarea">${f.placeholder}</div>`
+            : `<div class="form-preview-input">${f.placeholder}</div>`
         }
       </div>
-    `).join('') + `
+    `
+            )
+            .join('') +
+          `
       <button class="form-preview-generate">
         <i class="fa-solid fa-wand-magic-sparkles"></i> 生成内容
       </button>
     `;
-  }
+      }
 
-  function simulateGenerate() {
-    const result = document.getElementById('generateResult');
-    result.innerHTML = `
+      function simulateGenerate() {
+        const result = document.getElementById('generateResult');
+        result.innerHTML = `
       <div class="generate-result-title"><i class="fa-solid fa-sparkles"></i> 模拟生成结果</div>
       <div style="color:#6b7280;margin-bottom:12px;">（这是基于当前提示词和测试值的模拟输出）</div>
       <div style="font-weight:700;color:#111827;margin-bottom:8px;">${templateName}</div>
@@ -1549,20 +1864,19 @@
       <div style="font-weight:700;margin-bottom:6px;">二、整体解决方案</div>
       <div style="padding-left:12px;border-left:2px solid #667eea;">本方案通过引入智能制造平台，实现生产全流程数字化、设备互联互通、数据实时分析...</div>
     `;
-  }
+      }
 
-  function copyPrompt() {
-    navigator.clipboard.writeText(promptText);
-    alert('提示词已复制到剪贴板');
-  }
+      function copyPrompt() {
+        navigator.clipboard.writeText(promptText);
+        alert('提示词已复制到剪贴板');
+      }
 
-  function resetPrompt() {
-    autoGeneratePrompt();
-  }
+      function resetPrompt() {
+        autoGeneratePrompt();
+      }
 
-  // 初始化
-  init();
-</script>
-
-</body>
+      // 初始化
+      init();
+    </script>
+  </body>
 </html>

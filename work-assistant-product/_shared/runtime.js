@@ -19,13 +19,40 @@
 (function () {
   'use strict';
 
-  const ANIMS = ['fade-up','fade-down','fade-left','fade-right','rise-in','drop-in',
-    'zoom-pop','blur-in','glitch-in','typewriter','neon-glow','shimmer-sweep',
-    'gradient-flow','stagger-list','counter-up','path-draw','parallax-tilt',
-    'card-flip-3d','cube-rotate-3d','page-turn-3d','perspective-zoom',
-    'marquee-scroll','kenburns','confetti-burst','spotlight','morph-shape','ripple-reveal'];
+  const ANIMS = [
+    'fade-up',
+    'fade-down',
+    'fade-left',
+    'fade-right',
+    'rise-in',
+    'drop-in',
+    'zoom-pop',
+    'blur-in',
+    'glitch-in',
+    'typewriter',
+    'neon-glow',
+    'shimmer-sweep',
+    'gradient-flow',
+    'stagger-list',
+    'counter-up',
+    'path-draw',
+    'parallax-tilt',
+    'card-flip-3d',
+    'cube-rotate-3d',
+    'page-turn-3d',
+    'perspective-zoom',
+    'marquee-scroll',
+    'kenburns',
+    'confetti-burst',
+    'spotlight',
+    'morph-shape',
+    'ripple-reveal',
+  ];
 
-  function ready(fn){ if(document.readyState!='loading')fn(); else document.addEventListener('DOMContentLoaded',fn);}
+  function ready(fn) {
+    if (document.readyState != 'loading') fn();
+    else document.addEventListener('DOMContentLoaded', fn);
+  }
 
   /* ========== Parse URL for preview-only mode ==========
    * When loaded as iframe.src = "index.html?preview=3", runtime enters a
@@ -52,7 +79,7 @@
     if (isPreviewMode) {
       function showSlide(i) {
         slides.forEach((s, j) => {
-          const active = (j === i);
+          const active = j === i;
           s.classList.toggle('is-active', active);
           s.style.display = active ? '' : 'none';
           if (active) {
@@ -64,8 +91,11 @@
       }
       showSlide(previewOnlyIdx);
       /* Hide chrome that the presenter shouldn't see in preview */
-      const hideSel = '.progress-bar, .notes-overlay, .overview, .notes, aside.notes, .speaker-notes';
-      document.querySelectorAll(hideSel).forEach(el => { el.style.display = 'none'; });
+      const hideSel =
+        '.progress-bar, .notes-overlay, .overview, .notes, aside.notes, .speaker-notes';
+      document.querySelectorAll(hideSel).forEach((el) => {
+        el.style.display = 'none';
+      });
       document.documentElement.setAttribute('data-preview', '1');
       document.body.setAttribute('data-preview', '1');
       /* Auto-detect theme base path for theme switching in preview mode */
@@ -85,7 +115,7 @@
       /* Listen for postMessage from parent presenter window:
        *  - preview-goto: switch visible slide WITHOUT reloading
        *  - preview-theme: switch theme CSS link to match audience window */
-      window.addEventListener('message', function(e) {
+      window.addEventListener('message', function (e) {
         if (!e.data) return;
         if (e.data.type === 'preview-goto') {
           const n = parseInt(e.data.idx, 10);
@@ -103,7 +133,10 @@
         }
       });
       /* Signal to parent that preview iframe is ready */
-      try { window.parent && window.parent.postMessage({ type: 'preview-ready' }, '*'); } catch(e) {}
+      try {
+        window.parent &&
+          window.parent.postMessage({ type: 'preview-ready' }, '*');
+      } catch (e) {}
       return;
     }
 
@@ -119,12 +152,17 @@
     let scrollModeResizeHandler = null;
     let scrollModeScrollHandler = null;
     let wasScrollModeBeforeFullscreen = false;
-    const EDITABLE_SELECTOR = 'h1,h2,h3,h4,p,li,.lede,.kicker,.eyebrow,td,th,blockquote';
+    const EDITABLE_SELECTOR =
+      'h1,h2,h3,h4,p,li,.lede,.kicker,.eyebrow,td,th,blockquote';
 
     /* ===== BroadcastChannel for presenter sync ===== */
     const CHANNEL_NAME = 'html-ppt-presenter-' + location.pathname;
     let bc;
-    try { bc = new BroadcastChannel(CHANNEL_NAME); } catch(e) { bc = null; }
+    try {
+      bc = new BroadcastChannel(CHANNEL_NAME);
+    } catch (e) {
+      bc = null;
+    }
 
     // Are we running inside the presenter popup? (legacy flag, now unused)
     const isPresenterWindow = false;
@@ -161,8 +199,10 @@
         t.style.position = 'relative';
         t.style.overflow = 'hidden';
 
-        const title = s.getAttribute('data-title') ||
-          (s.querySelector('h1,h2,h3')||{}).textContent || ('Slide '+(i+1));
+        const title =
+          s.getAttribute('data-title') ||
+          (s.querySelector('h1,h2,h3') || {}).textContent ||
+          'Slide ' + (i + 1);
 
         // Create a container for the mini-slide
         const mini = document.createElement('div');
@@ -192,7 +232,8 @@
         const overlay = document.createElement('div');
         overlay.style.position = 'absolute';
         overlay.style.inset = '0';
-        overlay.style.background = 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.8) 100%)';
+        overlay.style.background =
+          'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.8) 100%)';
         overlay.style.color = '#fff';
         overlay.style.zIndex = '10';
         overlay.style.pointerEvents = 'none';
@@ -210,7 +251,7 @@
 
         const text = document.createElement('div');
         text.className = 't';
-        text.textContent = title.trim().slice(0,80);
+        text.textContent = title.trim().slice(0, 80);
         text.style.position = 'absolute';
         text.style.bottom = '12px';
         text.style.left = '16px';
@@ -224,60 +265,68 @@
         overlay.appendChild(text);
         t.appendChild(overlay);
 
-        t.addEventListener('click', () => { go(i); toggleOverview(false); });
+        t.addEventListener('click', () => {
+          go(i);
+          toggleOverview(false);
+        });
         overview.appendChild(t);
       });
       document.body.appendChild(overview);
     }
 
     /* ===== navigation ===== */
-    function go(n, fromRemote){
-      n = Math.max(0, Math.min(total-1, n));
+    function go(n, fromRemote) {
+      n = Math.max(0, Math.min(total - 1, n));
       if (!scrollMode) {
-        slides.forEach((s,i) => {
-          s.classList.toggle('is-active', i===n);
-          s.classList.toggle('is-prev', i<n);
+        slides.forEach((s, i) => {
+          s.classList.toggle('is-active', i === n);
+          s.classList.toggle('is-prev', i < n);
         });
       } else {
         scrollToSlide(n);
         updateScrollHighlight(n);
       }
       idx = n;
-      barFill.style.width = ((n+1)/total*100)+'%';
+      barFill.style.width = ((n + 1) / total) * 100 + '%';
       const numEl = document.querySelector('.slide-number');
-      if (numEl) { numEl.setAttribute('data-current', n+1); numEl.setAttribute('data-total', total); }
+      if (numEl) {
+        numEl.setAttribute('data-current', n + 1);
+        numEl.setAttribute('data-total', total);
+      }
 
       // notes (bottom overlay)
-      const note = slides[n].querySelector('.notes, aside.notes, .speaker-notes');
+      const note = slides[n].querySelector(
+        '.notes, aside.notes, .speaker-notes'
+      );
       notes.innerHTML = note ? note.innerHTML : '';
 
       // hash
-      const hashTarget = '#/'+(n+1);
+      const hashTarget = '#/' + (n + 1);
       if (location.hash !== hashTarget && !isPresenterWindow) {
-        history.replaceState(null,'', hashTarget);
+        history.replaceState(null, '', hashTarget);
       }
 
       // re-trigger entry animations (only in single-page mode)
       if (!scrollMode) {
-        slides[n].querySelectorAll('[data-anim]').forEach(el => {
+        slides[n].querySelectorAll('[data-anim]').forEach((el) => {
           const a = el.getAttribute('data-anim');
-          el.classList.remove('anim-'+a);
+          el.classList.remove('anim-' + a);
           void el.offsetWidth;
-          el.classList.add('anim-'+a);
+          el.classList.add('anim-' + a);
         });
       }
 
       // counter-up
-      slides[n].querySelectorAll('.counter').forEach(el => {
-        const target = parseFloat(el.getAttribute('data-to')||el.textContent);
-        const dur = parseInt(el.getAttribute('data-dur')||'1200',10);
+      slides[n].querySelectorAll('.counter').forEach((el) => {
+        const target = parseFloat(el.getAttribute('data-to') || el.textContent);
+        const dur = parseInt(el.getAttribute('data-dur') || '1200', 10);
         const start = performance.now();
         const from = 0;
-        function tick(now){
-          const t = Math.min(1,(now-start)/dur);
-          const v = from + (target-from)*(1-Math.pow(1-t,3));
-          el.textContent = (target % 1 === 0) ? Math.round(v) : v.toFixed(1);
-          if (t<1) requestAnimationFrame(tick);
+        function tick(now) {
+          const t = Math.min(1, (now - start) / dur);
+          const v = from + (target - from) * (1 - Math.pow(1 - t, 3));
+          el.textContent = target % 1 === 0 ? Math.round(v) : v.toFixed(1);
+          if (t < 1) requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
       });
@@ -290,7 +339,7 @@
 
     /* ===== listen for remote navigation / theme changes ===== */
     if (bc) {
-      bc.onmessage = function(e) {
+      bc.onmessage = function (e) {
         if (!e.data) return;
         if (e.data.type === 'go' && typeof e.data.idx === 'number') {
           go(e.data.idx, true);
@@ -303,16 +352,22 @@
       };
     }
 
-    function toggleNotes(force){ notes.classList.toggle('open', force!==undefined?force:!notes.classList.contains('open')); }
-    function toggleOverview(force){
-      const isOpen = force!==undefined ? force : !overview.classList.contains('open');
+    function toggleNotes(force) {
+      notes.classList.toggle(
+        'open',
+        force !== undefined ? force : !notes.classList.contains('open')
+      );
+    }
+    function toggleOverview(force) {
+      const isOpen =
+        force !== undefined ? force : !overview.classList.contains('open');
       overview.classList.toggle('open', isOpen);
       if (isOpen) {
         requestAnimationFrame(() => {
           const thumbs = overview.querySelectorAll('.thumb');
           if (thumbs.length) {
             const scale = thumbs[0].clientWidth / 1920;
-            overview.querySelectorAll('.mini-slide').forEach(m => {
+            overview.querySelectorAll('.mini-slide').forEach((m) => {
               m.style.transform = 'scale(' + scale + ')';
             });
           }
@@ -322,11 +377,11 @@
 
     /* ===== edit mode ===== */
     function toggleEditMode(force) {
-      editMode = (force !== undefined) ? force : !editMode;
+      editMode = force !== undefined ? force : !editMode;
       document.body.classList.toggle('deck-editing', editMode);
 
-      document.querySelectorAll('.slide').forEach(function(slide) {
-        slide.querySelectorAll(EDITABLE_SELECTOR).forEach(function(el) {
+      document.querySelectorAll('.slide').forEach(function (slide) {
+        slide.querySelectorAll(EDITABLE_SELECTOR).forEach(function (el) {
           if (editMode) el.setAttribute('contenteditable', 'true');
           else el.removeAttribute('contenteditable');
         });
@@ -353,11 +408,11 @@
       const vw = window.innerWidth;
       const ratio = vw / 1920;
       const slideHeight = Math.round(1080 * ratio);
-      slideWrappers.forEach(function(wrapper) {
+      slideWrappers.forEach(function (wrapper) {
         wrapper.style.width = '100%';
         wrapper.style.height = slideHeight + 'px';
       });
-      slides.forEach(function(s) {
+      slides.forEach(function (s) {
         s.style.position = 'absolute';
         s.style.top = '0';
         s.style.left = '0';
@@ -377,7 +432,9 @@
     }
 
     function updateScrollHighlight(n) {
-      slideWrappers.forEach(function(w, i) { w.classList.toggle('scroll-active', i === n); });
+      slideWrappers.forEach(function (w, i) {
+        w.classList.toggle('scroll-active', i === n);
+      });
     }
 
     function enterScrollMode() {
@@ -386,10 +443,10 @@
       document.documentElement.classList.add('scroll-mode');
       document.body.classList.add('scroll-mode');
 
-      slides.forEach(function(slide) {
+      slides.forEach(function (slide) {
         slide.classList.remove('is-active', 'is-prev');
         // 清除已附加的入场动画 class（go() 可能已经加上了）
-        slide.querySelectorAll('[data-anim]').forEach(function(el) {
+        slide.querySelectorAll('[data-anim]').forEach(function (el) {
           el.classList.remove('anim-' + el.getAttribute('data-anim'));
         });
         if (slide.hasAttribute('data-anim')) {
@@ -405,24 +462,35 @@
       applyScrollModeScale();
       updateScrollHighlight(idx);
 
-      scrollModeResizeHandler = function() { applyScrollModeScale(); };
+      scrollModeResizeHandler = function () {
+        applyScrollModeScale();
+      };
       window.addEventListener('resize', scrollModeResizeHandler);
 
-      scrollModeScrollHandler = function() {
+      scrollModeScrollHandler = function () {
         const centerY = window.scrollY + window.innerHeight * 0.4;
-        let closest = 0, minDist = Infinity;
-        slideWrappers.forEach(function(w, i) {
+        let closest = 0,
+          minDist = Infinity;
+        slideWrappers.forEach(function (w, i) {
           const top = w.getBoundingClientRect().top + window.scrollY;
           const mid = top + w.offsetHeight / 2;
           const dist = Math.abs(centerY - mid);
-          if (dist < minDist) { minDist = dist; closest = i; }
+          if (dist < minDist) {
+            minDist = dist;
+            closest = i;
+          }
         });
         if (closest !== idx) {
           idx = closest;
-          barFill.style.width = ((idx + 1) / total * 100) + '%';
+          barFill.style.width = ((idx + 1) / total) * 100 + '%';
           const numEl = document.querySelector('.slide-number');
-          if (numEl) { numEl.setAttribute('data-current', idx + 1); numEl.setAttribute('data-total', total); }
-          const note = slides[idx].querySelector('.notes, aside.notes, .speaker-notes');
+          if (numEl) {
+            numEl.setAttribute('data-current', idx + 1);
+            numEl.setAttribute('data-total', total);
+          }
+          const note = slides[idx].querySelector(
+            '.notes, aside.notes, .speaker-notes'
+          );
           notes.innerHTML = note ? note.innerHTML : '';
           history.replaceState(null, '', '#/' + (idx + 1));
           updateScrollHighlight(idx);
@@ -430,7 +498,9 @@
       };
       window.addEventListener('scroll', scrollModeScrollHandler);
 
-      requestAnimationFrame(function() { scrollToSlide(idx); });
+      requestAnimationFrame(function () {
+        scrollToSlide(idx);
+      });
     }
 
     function exitScrollMode() {
@@ -438,10 +508,16 @@
       scrollMode = false;
       document.documentElement.classList.remove('scroll-mode');
       document.body.classList.remove('scroll-mode');
-      if (scrollModeResizeHandler) { window.removeEventListener('resize', scrollModeResizeHandler); scrollModeResizeHandler = null; }
-      if (scrollModeScrollHandler) { window.removeEventListener('scroll', scrollModeScrollHandler); scrollModeScrollHandler = null; }
+      if (scrollModeResizeHandler) {
+        window.removeEventListener('resize', scrollModeResizeHandler);
+        scrollModeResizeHandler = null;
+      }
+      if (scrollModeScrollHandler) {
+        window.removeEventListener('scroll', scrollModeScrollHandler);
+        scrollModeScrollHandler = null;
+      }
 
-      slides.forEach(function(slide, i) {
+      slides.forEach(function (slide, i) {
         const wrapper = slideWrappers[i];
         if (wrapper && wrapper.parentNode) {
           wrapper.parentNode.insertBefore(slide, wrapper);
@@ -471,23 +547,38 @@
       }
 
       // Build absolute URL of THIS deck file (without hash/query)
-      const deckUrl = location.protocol + '//' + location.host + location.pathname;
+      const deckUrl =
+        location.protocol + '//' + location.host + location.pathname;
 
       // Collect slide titles + notes (HTML strings)
       const slideMeta = slides.map((s, i) => {
         const note = s.querySelector('.notes, aside.notes, .speaker-notes');
         return {
-          title: s.getAttribute('data-title') ||
-            (s.querySelector('h1,h2,h3')||{}).textContent || ('Slide '+(i+1)),
-          notes: note ? note.innerHTML : ''
+          title:
+            s.getAttribute('data-title') ||
+            (s.querySelector('h1,h2,h3') || {}).textContent ||
+            'Slide ' + (i + 1),
+          notes: note ? note.innerHTML : '',
         };
       });
 
       /* Capture current theme so presenter previews match the audience */
-      const currentTheme = root.getAttribute('data-theme') || (themes[themeIdx] || '');
-      const presenterHTML = buildPresenterHTML(deckUrl, slideMeta, total, idx, CHANNEL_NAME, currentTheme);
+      const currentTheme =
+        root.getAttribute('data-theme') || themes[themeIdx] || '';
+      const presenterHTML = buildPresenterHTML(
+        deckUrl,
+        slideMeta,
+        total,
+        idx,
+        CHANNEL_NAME,
+        currentTheme
+      );
 
-      presenterWin = window.open('', 'html-ppt-presenter', 'width=1280,height=820,menubar=no,toolbar=no');
+      presenterWin = window.open(
+        '',
+        'html-ppt-presenter',
+        'width=1280,height=820,menubar=no,toolbar=no'
+      );
       if (!presenterWin) {
         alert('请允许弹出窗口以使用演讲者视图');
         return;
@@ -497,7 +588,14 @@
       presenterWin.document.close();
     }
 
-    function buildPresenterHTML(deckUrl, slideMeta, total, startIdx, channelName, currentTheme) {
+    function buildPresenterHTML(
+      deckUrl,
+      slideMeta,
+      total,
+      startIdx,
+      channelName,
+      currentTheme
+    ) {
       const metaJSON = JSON.stringify(slideMeta);
       const deckUrlJSON = JSON.stringify(deckUrl);
       const channelJSON = JSON.stringify(channelName);
@@ -505,7 +603,8 @@
       const storageKey = 'html-ppt-presenter:' + location.pathname;
 
       // Build the document as a single template string for clarity
-      return `<!DOCTYPE html>
+      return (
+        `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -1019,20 +1118,23 @@
   nxtMeta.textContent = (idx + 2) + '/' + total;
   timerCount.textContent = (idx + 1) + ' / ' + total;
 })();
-</` + `script>
-</body></html>`;
+</` +
+        `script>
+</body></html>`
+      );
     }
 
-    function fullscreen(){
+    function fullscreen() {
       if (!document.fullscreenElement) {
         wasScrollModeBeforeFullscreen = scrollMode;
         if (scrollMode) exitScrollMode();
-        document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+        document.documentElement.requestFullscreen &&
+          document.documentElement.requestFullscreen();
       } else {
         document.exitFullscreen && document.exitFullscreen();
       }
     }
-    document.addEventListener('fullscreenchange', function() {
+    document.addEventListener('fullscreenchange', function () {
       if (!document.fullscreenElement && wasScrollModeBeforeFullscreen) {
         wasScrollModeBeforeFullscreen = false;
         enterScrollMode();
@@ -1041,8 +1143,15 @@
 
     // theme cycling
     const root = document.documentElement;
-    const themesAttr = root.getAttribute('data-themes') || document.body.getAttribute('data-themes');
-    const themes = themesAttr ? themesAttr.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    const themesAttr =
+      root.getAttribute('data-themes') ||
+      document.body.getAttribute('data-themes');
+    const themes = themesAttr
+      ? themesAttr
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
     let themeIdx = 0;
 
     // Auto-detect theme base path from existing <link id="theme-link">
@@ -1053,7 +1162,10 @@
         // el.getAttribute('href') gives the raw relative path written in HTML
         const rawHref = existingLink.getAttribute('href') || '';
         const lastSlash = rawHref.lastIndexOf('/');
-        themeBase = lastSlash >= 0 ? rawHref.substring(0, lastSlash + 1) : 'assets/themes/';
+        themeBase =
+          lastSlash >= 0
+            ? rawHref.substring(0, lastSlash + 1)
+            : 'assets/themes/';
       } else {
         themeBase = 'assets/themes/';
       }
@@ -1072,9 +1184,9 @@
       const ind = document.querySelector('.theme-indicator');
       if (ind) ind.textContent = name;
     }
-    function cycleTheme(fromRemote){
+    function cycleTheme(fromRemote) {
       if (!themes.length) return;
-      themeIdx = (themeIdx+1) % themes.length;
+      themeIdx = (themeIdx + 1) % themes.length;
       const name = themes[themeIdx];
       applyTheme(name);
       /* Broadcast to other window (audience ↔ presenter) */
@@ -1083,47 +1195,97 @@
 
     // animation cycling on current slide
     let animIdx = 0;
-    function cycleAnim(){
-      animIdx = (animIdx+1) % ANIMS.length;
+    function cycleAnim() {
+      animIdx = (animIdx + 1) % ANIMS.length;
       const a = ANIMS[animIdx];
-      const target = slides[idx].querySelector('[data-anim-target]') || slides[idx];
-      ANIMS.forEach(x => target.classList.remove('anim-'+x));
+      const target =
+        slides[idx].querySelector('[data-anim-target]') || slides[idx];
+      ANIMS.forEach((x) => target.classList.remove('anim-' + x));
       void target.offsetWidth;
-      target.classList.add('anim-'+a);
+      target.classList.add('anim-' + a);
       target.setAttribute('data-anim', a);
       const ind = document.querySelector('.anim-indicator');
       if (ind) ind.textContent = a;
     }
 
     document.addEventListener('keydown', function (e) {
-      if (e.metaKey||e.ctrlKey||e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       // 编辑模式下，只响应 Escape 退出，其余交给浏览器
       if (editMode) {
-        if (e.key === 'Escape') { toggleEditMode(false); e.preventDefault(); }
+        if (e.key === 'Escape') {
+          toggleEditMode(false);
+          e.preventDefault();
+        }
         return;
       }
       switch (e.key) {
-        case 'ArrowRight': case ' ': case '.': case 'PageDown': case 'Enter': go(idx+1); e.preventDefault(); break;
-        case 'ArrowLeft': case 'PageUp': case 'Backspace': go(idx-1); e.preventDefault(); break;
-        case 'ArrowDown': go(idx+1); e.preventDefault(); break;
-        case 'ArrowUp': go(idx-1); e.preventDefault(); break;
-        case 'Home': go(0); break;
-        case 'End': go(total-1); break;
-        case 'f': case 'F': fullscreen(); break;
-        case 's': case 'S': openPresenterWindow(); break;
-        case 'n': case 'N': toggleNotes(); break;
-        case 'o': case 'O': toggleOverview(); break;
-        case 't': case 'T': cycleTheme(); break;
-        case 'a': case 'A': cycleAnim(); break;
-        case 'e': case 'E': toggleEditMode(); break;
-        case 'Escape': toggleOverview(false); toggleNotes(false); break;
+        case 'ArrowRight':
+        case ' ':
+        case '.':
+        case 'PageDown':
+        case 'Enter':
+          go(idx + 1);
+          e.preventDefault();
+          break;
+        case 'ArrowLeft':
+        case 'PageUp':
+        case 'Backspace':
+          go(idx - 1);
+          e.preventDefault();
+          break;
+        case 'ArrowDown':
+          go(idx + 1);
+          e.preventDefault();
+          break;
+        case 'ArrowUp':
+          go(idx - 1);
+          e.preventDefault();
+          break;
+        case 'Home':
+          go(0);
+          break;
+        case 'End':
+          go(total - 1);
+          break;
+        case 'f':
+        case 'F':
+          fullscreen();
+          break;
+        case 's':
+        case 'S':
+          openPresenterWindow();
+          break;
+        case 'n':
+        case 'N':
+          toggleNotes();
+          break;
+        case 'o':
+        case 'O':
+          toggleOverview();
+          break;
+        case 't':
+        case 'T':
+          cycleTheme();
+          break;
+        case 'a':
+        case 'A':
+          cycleAnim();
+          break;
+        case 'e':
+        case 'E':
+          toggleEditMode();
+          break;
+        case 'Escape':
+          toggleOverview(false);
+          toggleNotes(false);
+          break;
       }
     });
 
     // hash deep-link
-    function fromHash(){
-      const m = /^#\/(\d+)/.exec(location.hash||'');
-      if (m) go(Math.max(0, parseInt(m[1],10)-1));
+    function fromHash() {
+      const m = /^#\/(\d+)/.exec(location.hash || '');
+      if (m) go(Math.max(0, parseInt(m[1], 10) - 1));
     }
     window.addEventListener('hashchange', fromHash);
     fromHash();

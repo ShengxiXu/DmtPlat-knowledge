@@ -35,7 +35,7 @@ Each tool requires a name, description, and JSON Schema for its inputs:
 **Best practices for tool definitions:**
 
 - Use clear, descriptive names (e.g., `get_weather`, `search_database`, `send_email`)
-- Write detailed descriptions — Claude uses these to decide when to use the tool. Be **prescriptive about *when* to call it**, not just what it does (e.g. "Call this when the user asks about current prices or recent events"). On recent Opus models, which reach for tools more conservatively, trigger conditions in the description give measurable lift in should-call rate.
+- Write detailed descriptions — Claude uses these to decide when to use the tool. Be **prescriptive about _when_ to call it**, not just what it does (e.g. "Call this when the user asks about current prices or recent events"). On recent Opus models, which reach for tools more conservatively, trigger conditions in the description give measurable lift in should-call rate.
 - Include descriptions for each property
 - Use `enum` for parameters with a fixed set of values
 - Mark truly required parameters in `required`; make others optional with defaults
@@ -313,10 +313,10 @@ The advisor tool pairs a faster, lower-cost **executor** model (the top-level `m
 
 **The advisor model must be at least as capable as the executor.** An invalid pairing returns `400 invalid_request_error`. Valid pairs:
 
-| Executor (request `model`) | Valid advisor (tool `model`) |
-|---|---|
+| Executor (request `model`)                                                                           | Valid advisor (tool `model`)           |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | `claude-haiku-4-5` / `claude-sonnet-4-6` / `claude-sonnet-5` / `claude-opus-4-6` / `claude-opus-4-7` | `claude-opus-4-8` or `claude-opus-4-7` |
-| `claude-opus-4-8` | `claude-opus-4-8` only |
+| `claude-opus-4-8`                                                                                    | `claude-opus-4-8` only                 |
 
 Call via `client.beta.messages.create(...)` with `betas=["advisor-tool-2026-03-01"]` (or the `anthropic-beta: advisor-tool-2026-03-01` header). In multi-turn conversations, append the full `response.content` — including any `advisor_tool_result` blocks — back to `messages` on the next turn. If you remove the advisor tool from `tools` on a later turn while the history still contains `advisor_tool_result` blocks, the API returns a 400.
 
@@ -350,16 +350,16 @@ Both are **client-executed**: Claude returns a `tool_use` block, your code perfo
 ### Bash tool declaration
 
 ```json
-{"type": "bash_20250124", "name": "bash"}
+{ "type": "bash_20250124", "name": "bash" }
 ```
 
-| Language | Declaration |
-|---|---|
-| Python / TypeScript / Ruby / cURL | plain object `{"type": "bash_20250124", "name": "bash"}` |
-| Go | `anthropic.ToolUnionParam{OfBashTool20250124: &anthropic.ToolBash20250124Param{}}` |
-| Java | `.addTool(ToolBash20250124.builder().build())` from `com.anthropic.models.messages` |
-| C# | `Tools = [new ToolBash20250124()]` from `Anthropic.Models.Messages` |
-| PHP | `tools: [new \Anthropic\Messages\ToolBash20250124()]` |
+| Language                          | Declaration                                                                         |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| Python / TypeScript / Ruby / cURL | plain object `{"type": "bash_20250124", "name": "bash"}`                            |
+| Go                                | `anthropic.ToolUnionParam{OfBashTool20250124: &anthropic.ToolBash20250124Param{}}`  |
+| Java                              | `.addTool(ToolBash20250124.builder().build())` from `com.anthropic.models.messages` |
+| C#                                | `Tools = [new ToolBash20250124()]` from `Anthropic.Models.Messages`                 |
+| PHP                               | `tools: [new \Anthropic\Messages\ToolBash20250124()]`                               |
 
 Claude's `tool_use.input` contains either `{"command": "<string>"}` or `{"restart": true}`. Check for `restart` first (reset the session, return a confirmation string); otherwise run `command` and return combined stdout + stderr.
 
@@ -368,7 +368,7 @@ Claude's `tool_use.input` contains either `{"command": "<string>"}` or `{"restar
 ### Text editor tool declaration
 
 ```json
-{"type": "text_editor_20250728", "name": "str_replace_based_edit_tool"}
+{ "type": "text_editor_20250728", "name": "str_replace_based_edit_tool" }
 ```
 
 Optional field: `max_characters` to cap `view` output. Java exposes a typed `ToolTextEditor20250728` builder (`com.anthropic.models.messages`); other statically-typed SDKs follow the same naming pattern — see the Anthropic-Defined Tools section in `{lang}/claude-api/tool-use.md` for the exact class.
@@ -377,12 +377,12 @@ Optional field: `max_characters` to cap `view` output. Java exposes a typed `Too
 
 `tool_use.input.command` is one of:
 
-| `command` | Other inputs | Action |
-|---|---|---|
-| `view` | `path`, optional `view_range` | Return file contents or directory listing |
-| `create` | `path`, `file_text` | Create/overwrite file with `file_text`. Create a backup if the file already exists. |
-| `str_replace` | `path`, `old_str`, `new_str` | Replace exactly one occurrence; error if 0 or >1 matches |
-| `insert` | `path`, `insert_line`, `insert_text` | Insert `insert_text` after line `insert_line` (0 = beginning of file) |
+| `command`     | Other inputs                         | Action                                                                              |
+| ------------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `view`        | `path`, optional `view_range`        | Return file contents or directory listing                                           |
+| `create`      | `path`, `file_text`                  | Create/overwrite file with `file_text`. Create a backup if the file already exists. |
+| `str_replace` | `path`, `old_str`, `new_str`         | Replace exactly one occurrence; error if 0 or >1 matches                            |
+| `insert`      | `path`, `insert_line`, `insert_text` | Insert `insert_text` after line `insert_line` (0 = beginning of file)               |
 
 For both tools, on error return `{"type": "tool_result", "tool_use_id": "…", "content": "<error text>", "is_error": true}` so Claude can recover.
 

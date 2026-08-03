@@ -28,14 +28,14 @@
 
 ### 2. 新增与修改文件
 
-| 类型 | 文件 | 说明 |
-|------|------|------|
-| 新建 | `src/views/DocumentManager.js` | 统一文档管理视图 |
-| 修改 | `src/components/Sidebar.js` | 新增导航项 |
-| 修改 | `src/main.js` | 注册路由并处理打开回调 |
+| 类型 | 文件                                  | 说明                                                |
+| ---- | ------------------------------------- | --------------------------------------------------- |
+| 新建 | `src/views/DocumentManager.js`        | 统一文档管理视图                                    |
+| 修改 | `src/components/Sidebar.js`           | 新增导航项                                          |
+| 修改 | `src/main.js`                         | 注册路由并处理打开回调                              |
 | 修改 | `src/views/ContentTemplateManager.js` | 支持通过 `initialDocumentId` 加载已有文档进入编辑器 |
-| 修改 | `src/views/WorkAssistant.js` | 支持通过 `initialRecordId` 恢复历史记录并展示结果 |
-| 修改 | `src/style.css` | 追加少量 DocumentManager 专用样式 |
+| 修改 | `src/views/WorkAssistant.js`          | 支持通过 `initialRecordId` 恢复历史记录并展示结果   |
+| 修改 | `src/style.css`                       | 追加少量 DocumentManager 专用样式                   |
 
 ### 3. 统一文档展示模型
 
@@ -66,6 +66,7 @@
 ### 4. DocumentManager.js 组件设计
 
 #### 状态字段
+
 - `searchQuery: string`
 - `sourceFilter: 'all' | 'content' | 'scene'`
 - `outputTypeFilter: string`
@@ -75,6 +76,7 @@
 - `pageSize: number`（建议 8）
 
 #### 核心方法
+
 - `loadDocuments()`：调用 `getMyDocuments()` 与 `getWorkHistory()`，归一化合并。
 - `getFilteredDocuments()`：应用搜索、来源筛选、输出类型筛选、排序。
 - `getPaginatedDocuments()`：分页。
@@ -85,12 +87,14 @@
 - `handleDelete(doc)`：二次确认后，content 调用 `deleteMyDocument`，scene 从 history 过滤后 `saveWorkHistory`。
 
 #### 回调接口
+
 - `setOnOpenContentDoc(callback)`
 - `setOnOpenSceneRecord(callback)`
 
 ### 5. ContentTemplateManager.js 修改点
 
 构造函数接收 `options.initialDocumentId`：
+
 - `init()` 中在 `loadTemplates()` 后判断，若存在则查找 `getMyDocuments()` 并命中进入编辑器。
 - 现有 `render()` 已优先判断 `this.contentDoc`，`saveContentDocument()` 会按 `id` 覆盖更新。
 - 关闭编辑器回到模板列表时清空 `this.contentDoc`（已有 `closeContentEditor()`）。
@@ -98,6 +102,7 @@
 ### 6. WorkAssistant.js 修改点
 
 构造函数接收 `options.initialRecordId` 和 `options.returnToView`：
+
 - 新增 `restoreInitialRecord()`：从 `getWorkHistory()` 查找记录，恢复 `selectedTemplate`、`activeRole`、`currentFormData`、`currentMode`、`currentKBs`、`currentResult`。
 - `renderEditor()` 中表单/模式/知识库初始值优先使用恢复值。
 - 渲染后若 `currentResult` 存在，直接调用结果展示逻辑（非 PPT 调用 `renderResult`，PPT 调用 PPT 结果展示）。
@@ -106,9 +111,11 @@
 ### 7. main.js 与 Sidebar.js 修改点
 
 Sidebar.js：
+
 - 在 `workItems` 追加 `{ id: 'myDocuments', label: '我的文档', icon: 'folder-open' }`。
 
 main.js：
+
 - 引入 `DocumentManager`。
 - `handleInitialRoute()` 白名单加入 `'myDocuments'`。
 - `renderView()` switch 新增 `case 'myDocuments'`。
@@ -120,6 +127,7 @@ main.js：
 ### 8. CSS 方案
 
 优先复用现有类：
+
 - 页面结构：`.header`、`.header-title`、`.header-actions`、`.content`
 - 搜索框：`.search-box`、`.input`
 - 筛选标签：`.filter-tag`、`.filter-tags`
@@ -142,11 +150,11 @@ main.js：
 
 ## 风险与应对
 
-| 风险 | 应对 |
-|------|------|
+| 风险                                     | 应对                                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
 | WorkAssistant 恢复历史记录时状态依赖复杂 | 仅恢复必要的 `selectedTemplate` / `formData` / `mode` / `KBs` / `result`，其余状态使用默认值 |
-| 两类产物数据模型差异大 | 通过统一展示模型屏蔽差异，打开时再按原始结构处理 |
-| localStorage 数据量大 | 保留分页，每次从 localStorage 读取；后续如需性能优化可再引入内存缓存 |
+| 两类产物数据模型差异大                   | 通过统一展示模型屏蔽差异，打开时再按原始结构处理                                             |
+| localStorage 数据量大                    | 保留分页，每次从 localStorage 读取；后续如需性能优化可再引入内存缓存                         |
 
 ## 下一步
 

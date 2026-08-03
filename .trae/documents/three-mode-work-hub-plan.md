@@ -31,10 +31,12 @@
 **文件**: `src/data/workAssistantData.js` + `src/services/contentGenerator.js`
 
 在 `workAssistantData.js` 新增 `mockChatResponse(userMessage, selectedKBs)` 函数：
+
 - 返回 `{ content: string, citations: [] }`
 - 基于用户消息生成结构化回复（理解 → 要点 → 建议），约 30-50 行
 
 在 `contentGenerator.js` 新增 `generateChat(userMessage, selectedKBs, options)` 异步生成器：
+
 - 复用 thinking/chunk/done 事件结构
 - 内部调用 `mockChatResponse` 而非 `mockGenerateContent`
 - 与现有 `generate()` 并列导出
@@ -44,9 +46,9 @@
 **文件**: `src/views/WorkAssistant.js` 构造函数 (line ~56)
 
 ```javascript
-this.chatKBs = [];              // Mode 1 选中的知识库
+this.chatKBs = []; // Mode 1 选中的知识库
 this.sceneListCategory = 'all'; // Mode 2 分类
-this.sceneListSearch = '';      // Mode 2 搜索
+this.sceneListSearch = ''; // Mode 2 搜索
 this.contentListCategory = 'all'; // Mode 3 分类
 // chatMessages / chatStreaming 已存在，复用
 ```
@@ -56,10 +58,20 @@ this.contentListCategory = 'all'; // Mode 3 分类
 **文件**: `src/views/WorkAssistant.js` render() (line ~292)
 
 在现有 4 个分支后新增 3 个：
+
 ```javascript
-if (this.activeTab === 'chat') { this.renderChatMode(); return; }
-if (this.activeTab === 'sceneTemplates') { this.renderSceneTemplates(); return; }
-if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); return; }
+if (this.activeTab === 'chat') {
+  this.renderChatMode();
+  return;
+}
+if (this.activeTab === 'sceneTemplates') {
+  this.renderSceneTemplates();
+  return;
+}
+if (this.activeTab === 'contentTemplates') {
+  this.renderContentTemplates();
+  return;
+}
 ```
 
 ### Step 4: 重写 renderHome() 为 Hub 首页
@@ -77,6 +89,7 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 - **最近创作**: 复用 `.wa-hub-recents` + `getRecentHistory()` + `renderRecentItem()`
 
 新增 `bindHubEvents()`:
+
 - 三张 `.wa-hub-portal` 点击 → `this.activeTab = mode; this.render();`
 - 顶部按钮（文档/历史/主题）复用现有逻辑
 - Hero 输入框回车 → 进 Mode 1 并发送首条消息
@@ -86,11 +99,13 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 **文件**: `src/views/WorkAssistant.js`
 
 复用 `.wa-chat-*` CSS，纯聊天界面（无模板卡片）：
+
 - 顶部栏: 返回 Hub 按钮 + "AI 对话"标题 + KB 选择器 + 新对话 + 主题切换
 - 主区域: `chatMessages` 为空时显示欢迎提示，有消息时渲染消息流
 - 底部: composer 输入框
 
 新增方法:
+
 - `renderChatMode()` — 渲染聊天界面
 - `bindChatModeEvents()` — 绑定发送/返回/KB选择/主题
 - `async startFreeChat(userMessage)` — 仿 `startChatGeneration()` (line 662)，但调用 `generateChat()`，userMsg 类型为 `'free-text'`，aiMsg 无 template
@@ -102,11 +117,13 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 **文件**: `src/views/WorkAssistant.js`
 
 复用 `.wa-market-*` CSS 卡片样式：
+
 - 顶部栏: 返回 Hub + "场景模板"标题 + "模板市场"按钮 + "创建模板"按钮
 - 分类 Tab + 搜索框
 - 模板卡片网格: 用 `getAllTemplates()` 按分类/搜索过滤
 
 新增方法:
+
 - `renderSceneTemplates()` — 渲染列表页
 - `renderSceneListCard(template)` — 单个模板卡片（简化版 `renderMarketCard`）
 - `bindSceneTemplatesEvents()` — 绑定事件:
@@ -121,11 +138,13 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 **文件**: `src/views/WorkAssistant.js`
 
 结构同 Mode 2，但渲染 `getAllContentTemplates()`：
+
 - 顶部栏: 返回 Hub + "内容模板"标题
 - 分类 Tab（按 format: 全部/文档/表格/邮件/...）
 - 模板卡片网格
 
 新增方法:
+
 - `renderContentTemplates()` — 渲染列表页
 - `renderContentListCard(template)` — 卡片用 `getContentIcon()` + `formatLabels[]`
 - `bindContentTemplatesEvents()` — 卡片点击 → `this.onNavigate('contentTemplates', { initialContentTemplateId: template.id })`
@@ -135,6 +154,7 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 **文件**: `src/style.css` 末尾
 
 最小新增:
+
 - `.wa-hub-portal-icon.mode-chat` — 紫色渐变
 - `.wa-hub-portal-icon.mode-scene` — 蓝色渐变
 - `.wa-hub-portal-icon.mode-content` — 绿色渐变
@@ -153,12 +173,12 @@ if (this.activeTab === 'contentTemplates') { this.renderContentTemplates(); retu
 
 ## 关键文件
 
-| 文件 | 改动类型 |
-|------|----------|
-| `src/views/WorkAssistant.js` | 重写 renderHome + 新增 3 个 mode 渲染方法 + 调整 render() |
-| `src/services/contentGenerator.js` | 新增 `generateChat()` |
-| `src/data/workAssistantData.js` | 新增 `mockChatResponse()` |
-| `src/style.css` | 追加 mode 渐变 + 少量新类 |
+| 文件                               | 改动类型                                                  |
+| ---------------------------------- | --------------------------------------------------------- |
+| `src/views/WorkAssistant.js`       | 重写 renderHome + 新增 3 个 mode 渲染方法 + 调整 render() |
+| `src/services/contentGenerator.js` | 新增 `generateChat()`                                     |
+| `src/data/workAssistantData.js`    | 新增 `mockChatResponse()`                                 |
+| `src/style.css`                    | 追加 mode 渐变 + 少量新类                                 |
 
 ## 复用清单（不改动）
 

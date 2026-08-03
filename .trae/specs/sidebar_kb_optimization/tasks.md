@@ -1,9 +1,10 @@
 # 侧边栏知识库展示优化 - 实现计划
 
 ## [ ] Task 1: 侧边栏添加搜索功能
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在侧边栏顶部添加搜索框
   - 支持实时筛选知识库
   - 支持键盘快捷键 Ctrl+K 聚焦搜索框
@@ -15,9 +16,10 @@
 - **Notes**: 使用模糊匹配实现搜索
 
 ## [ ] Task 2: 知识库分组展示
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 将知识库按类型分组（文档/问答/网页）
   - 支持展开/折叠分组
   - 显示每个分组的知识库数量
@@ -29,9 +31,10 @@
 - **Notes**: 类型包括：文档、问答、网页
 
 ## [ ] Task 3: 添加收藏功能
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在每个知识库项添加收藏按钮
   - 收藏的知识库显示在"我的收藏"分组
   - 支持取消收藏
@@ -43,9 +46,10 @@
 - **Notes**: 使用 localStorage 保存收藏状态
 
 ## [ ] Task 4: 添加最近使用列表
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在侧边栏顶部显示最近使用的知识库
   - 限制显示数量（最多5个）
   - 记录点击知识库的时间
@@ -57,9 +61,10 @@
 - **Notes**: 使用 localStorage 保存最近使用记录
 
 ## [ ] Task 5: 添加"查看全部"按钮
+
 - **Priority**: P2
 - **Depends On**: Task 2
-- **Description**: 
+- **Description**:
   - 当知识库数量超过限制（默认5个）时显示"查看全部"
   - 点击跳转到知识库列表页面
 - **Acceptance Criteria Addressed**: AC-5
@@ -69,9 +74,10 @@
 - **Notes**: 默认限制每个分组显示5个
 
 ## [ ] Task 6: 优化侧边栏样式
+
 - **Priority**: P2
 - **Depends On**: All
-- **Description**: 
+- **Description**:
   - 添加分组折叠/展开动画
   - 优化选中状态样式
   - 添加空状态提示

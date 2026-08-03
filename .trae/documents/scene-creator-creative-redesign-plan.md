@@ -67,7 +67,6 @@
 
 1. **全局背景层**
    - `.wa-creator-form-new`：修改背景色、添加径向渐变高光。
-   
 2. **主画布**
    - `.wa-creator-panel--seamless`：保留去卡片化，但增加 grounding 阴影和圆角。
    - `.wa-creator-panel--seamless .wa-creator-panel-header`：增强标题排版、进度点改为进度线。

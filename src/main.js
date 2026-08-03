@@ -211,8 +211,28 @@ class App {
       onNavigate: (view, params = {}) => {
         this.currentView = view;
         this.sidebar.setActive(view);
+
+        // 同步更新 URL（不刷新页面）
+        const url = new URL(window.location.href);
+        url.searchParams.set('view', view);
+        Object.entries(params).forEach(([key, value]) => {
+          if (value === undefined || value === null) {
+            url.searchParams.delete(key);
+          } else {
+            url.searchParams.set(key, String(value));
+          }
+        });
+        window.history.pushState({}, '', url);
+
         if (view === 'contentTemplates') {
-          this.renderContentTemplates(document.getElementById('main-content'), params);
+          this.renderContentTemplates(document.getElementById('main-content'), {
+            ...params,
+            onBack: () => {
+              this.currentView = 'workAssistant';
+              this.sidebar.setActive('workAssistant');
+              this.renderWorkAssistant(document.getElementById('main-content'));
+            },
+          });
         } else if (view === 'myDocuments') {
           this.renderDocumentManager(document.getElementById('main-content'));
         }
@@ -238,6 +258,7 @@ class App {
             this.renderDocumentManager(document.getElementById('main-content'));
           }
         : undefined,
+      onBack: options.onBack || undefined,
     });
   }
 
@@ -269,7 +290,13 @@ class App {
     dm.setOnGotoContent(() => {
       this.currentView = 'contentTemplates';
       this.sidebar.setActive('contentTemplates');
-      this.renderContentTemplates(document.getElementById('main-content'));
+      this.renderContentTemplates(document.getElementById('main-content'), {
+        onBack: () => {
+          this.currentView = 'myDocuments';
+          this.sidebar.setActive('myDocuments');
+          this.renderDocumentManager(document.getElementById('main-content'));
+        },
+      });
     });
   }
 

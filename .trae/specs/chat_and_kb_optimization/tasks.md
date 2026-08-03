@@ -1,9 +1,10 @@
 # 聊天页面与知识库展示优化 - 实现计划
 
 ## [ ] Task 1: 添加聊天历史记录
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在聊天页面显示预设的历史对话记录
   - 消息支持发送时间显示
   - 添加消息复制功能
@@ -15,9 +16,10 @@
 - **Notes**: 使用 mockData 中的 chatMessages 数据
 
 ## [ ] Task 2: 添加快捷提问模板
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在聊天输入框上方添加快捷提问区域
   - 提供常用问题模板列表
   - 点击模板快速填入输入框或直接发送
@@ -28,9 +30,10 @@
 - **Notes**: 预设常见问题作为快捷模板
 
 ## [ ] Task 3: 添加热门问题推荐
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在聊天页面侧边显示热门问题推荐
   - 点击热门问题直接发送
 - **Acceptance Criteria Addressed**: AC-6
@@ -40,9 +43,10 @@
 - **Notes**: 热门问题数据从 mockData 中获取
 
 ## [ ] Task 4: 知识库列表搜索功能
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 在知识库列表页面添加搜索框
   - 支持按名称、类型搜索
   - 实时筛选结果
@@ -53,9 +57,10 @@
 - **Notes**: 使用模糊匹配实现搜索
 
 ## [ ] Task 5: 知识库列表分页功能
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 实现知识库列表分页显示
   - 每页显示固定数量的知识库卡片
   - 添加页码导航
@@ -66,9 +71,10 @@
 - **Notes**: 每页显示 6 个知识库卡片
 
 ## [ ] Task 6: 添加聊天清空功能
+
 - **Priority**: P2
 - **Depends On**: Task 1
-- **Description**: 
+- **Description**:
   - 添加清空聊天记录按钮
   - 弹出确认对话框
   - 清空所有消息
@@ -79,9 +85,10 @@
 - **Notes**: 清空操作需要二次确认
 
 ## [ ] Task 7: 添加知识库分类筛选
+
 - **Priority**: P1
 - **Depends On**: Task 4
-- **Description**: 
+- **Description**:
   - 添加知识库类型筛选标签
   - 支持按类型（文档、问答、网页）筛选
 - **Test Requirements**:
@@ -90,9 +97,10 @@
 - **Notes**: 类型包括：文档、问答、网页
 
 ## [ ] Task 8: 样式优化
+
 - **Priority**: P2
 - **Depends On**: All
-- **Description**: 
+- **Description**:
   - 优化聊天消息样式
   - 添加消息时间显示
   - 优化知识库卡片布局

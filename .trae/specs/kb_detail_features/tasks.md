@@ -1,9 +1,10 @@
 # 知识库详情页功能完善 - 实现计划
 
 ## [/] Task 1: 完善文档管理功能
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 添加文件拖拽上传功能
   - 添加文件预览弹窗
   - 添加删除确认模态框
@@ -15,9 +16,10 @@
 - **Notes**: 使用 HTML5 Drag and Drop API
 
 ## [ ] Task 2: 完善训练配置功能
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 实现训练按钮点击事件（模拟训练过程）
   - 添加配置保存功能
   - 更新训练日志展示
@@ -29,9 +31,10 @@
 - **Notes**: 模拟训练过程，使用 setTimeout 模拟异步操作
 
 ## [ ] Task 3: 完善问答测试功能
+
 - **Priority**: P0
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 完善聊天消息样式
   - 添加消息发送动画
   - 实现模拟 AI 回答延迟效果
@@ -43,9 +46,10 @@
 - **Notes**: 使用 setTimeout 模拟 AI 思考延迟
 
 ## [ ] Task 4: 完善效果评估功能
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 实现评分筛选功能
   - 添加查看详情弹窗
   - 优化统计卡片展示
@@ -57,9 +61,10 @@
 - **Notes**: 筛选逻辑基于评分字段
 
 ## [ ] Task 5: 完善应用绑定功能
+
 - **Priority**: P1
 - **Depends On**: None
-- **Description**: 
+- **Description**:
   - 实现复制密钥功能（Clipboard API）
   - 添加新建密钥模态框
   - 实现密钥启用/禁用切换
@@ -71,9 +76,10 @@
 - **Notes**: Clipboard API 需要 HTTPS 或 localhost 环境
 
 ## [ ] Task 6: 样式优化
+
 - **Priority**: P2
 - **Depends On**: Tasks 1-5
-- **Description**: 
+- **Description**:
   - 统一标签页图标风格
   - 优化深色模式适配
   - 添加动画效果

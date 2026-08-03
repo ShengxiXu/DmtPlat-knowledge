@@ -6,13 +6,13 @@
 
 Send events to a session via `POST /v1/sessions/{id}/events`.
 
-| Event Type                | When to Send                                        |
-| ------------------------- | --------------------------------------------------- |
-| `user.message`            | Send a user message |
-| `user.interrupt`          | Interrupt the agent while it's running |
-| `user.tool_confirmation`  | Approve/deny a tool call (when `always_ask` policy) |
-| `user.custom_tool_result` | Provide result for a custom tool call |
-| `user.define_outcome`     | Start a rubric-graded iterate loop — see `shared/managed-agents-outcomes.md` |
+| Event Type                | When to Send                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `user.message`            | Send a user message                                                                                                     |
+| `user.interrupt`          | Interrupt the agent while it's running                                                                                  |
+| `user.tool_confirmation`  | Approve/deny a tool call (when `always_ask` policy)                                                                     |
+| `user.custom_tool_result` | Provide result for a custom tool call                                                                                   |
+| `user.define_outcome`     | Start a rubric-graded iterate loop — see `shared/managed-agents-outcomes.md`                                            |
 | `system.message`          | Update the agent's system prompt between turns — **Claude Opus 4.8 only**; see § Updating the system prompt mid-session |
 
 #### Updating the system prompt mid-session (`system.message`)
@@ -57,27 +57,27 @@ All **persisted** events carry `id`, `type`, and `processed_at` (ISO 8601; `null
 
 Event types use dot notation, grouped by namespace:
 
-| Event Type | Description |
-| --- | --- |
-| `agent.message` | Agent text output |
-| `agent.thinking` | Extended thinking blocks |
-| `agent.tool_use` | Agent used a built-in tool (`agent_toolset_20260401`) |
-| `agent.tool_result` | Result from a built-in tool |
-| `agent.mcp_tool_use` | Agent used an MCP tool |
-| `agent.mcp_tool_result` | Result from an MCP tool |
-| `agent.custom_tool_use` | Agent invoked a custom tool — session goes idle, you respond with `user.custom_tool_result` |
-| `agent.thread_context_compacted` | Conversation context was compacted |
-| `session.status_idle` | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message` or blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`. The `stop_reason` attached contains more information about why the Agent has stopped working. |
-| `session.status_running` | Session has starting running, and the Agent is actively doing work. |
-| `session.status_rescheduled` | Session is (re)scheduling after a retryable error has occurred, ready to be picked up by the orchestration system. |
-| `session.status_terminated` | Session has terminated, entering an irreversible and unusable state.  |
-| `session.error` | Error occurred during processing |
-| `span.model_request_start` | Model inference started |
-| `span.model_request_end` | Model inference completed |
-| `span.outcome_evaluation_start` / `_ongoing` / `_end` | Grader progress for outcome-oriented sessions — see `shared/managed-agents-outcomes.md` |
-| `session.thread_created` | Subagent thread spawned (multiagent) — see `shared/managed-agents-multiagent.md` |
-| `session.thread_status_running` / `_idle` / `_rescheduled` / `_terminated` | Subagent thread status transitions (multiagent). `_idle` carries `stop_reason`. |
-| `agent.thread_message_sent` / `_received` | Cross-thread message, carries `to_session_thread_id` / `from_session_thread_id` (multiagent) |
+| Event Type                                                                 | Description                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent.message`                                                            | Agent text output                                                                                                                                                                                                                                                                                             |
+| `agent.thinking`                                                           | Extended thinking blocks                                                                                                                                                                                                                                                                                      |
+| `agent.tool_use`                                                           | Agent used a built-in tool (`agent_toolset_20260401`)                                                                                                                                                                                                                                                         |
+| `agent.tool_result`                                                        | Result from a built-in tool                                                                                                                                                                                                                                                                                   |
+| `agent.mcp_tool_use`                                                       | Agent used an MCP tool                                                                                                                                                                                                                                                                                        |
+| `agent.mcp_tool_result`                                                    | Result from an MCP tool                                                                                                                                                                                                                                                                                       |
+| `agent.custom_tool_use`                                                    | Agent invoked a custom tool — session goes idle, you respond with `user.custom_tool_result`                                                                                                                                                                                                                   |
+| `agent.thread_context_compacted`                                           | Conversation context was compacted                                                                                                                                                                                                                                                                            |
+| `session.status_idle`                                                      | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message` or blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`. The `stop_reason` attached contains more information about why the Agent has stopped working. |
+| `session.status_running`                                                   | Session has starting running, and the Agent is actively doing work.                                                                                                                                                                                                                                           |
+| `session.status_rescheduled`                                               | Session is (re)scheduling after a retryable error has occurred, ready to be picked up by the orchestration system.                                                                                                                                                                                            |
+| `session.status_terminated`                                                | Session has terminated, entering an irreversible and unusable state.                                                                                                                                                                                                                                          |
+| `session.error`                                                            | Error occurred during processing                                                                                                                                                                                                                                                                              |
+| `span.model_request_start`                                                 | Model inference started                                                                                                                                                                                                                                                                                       |
+| `span.model_request_end`                                                   | Model inference completed                                                                                                                                                                                                                                                                                     |
+| `span.outcome_evaluation_start` / `_ongoing` / `_end`                      | Grader progress for outcome-oriented sessions — see `shared/managed-agents-outcomes.md`                                                                                                                                                                                                                       |
+| `session.thread_created`                                                   | Subagent thread spawned (multiagent) — see `shared/managed-agents-multiagent.md`                                                                                                                                                                                                                              |
+| `session.thread_status_running` / `_idle` / `_rescheduled` / `_terminated` | Subagent thread status transitions (multiagent). `_idle` carries `stop_reason`.                                                                                                                                                                                                                               |
+| `agent.thread_message_sent` / `_received`                                  | Cross-thread message, carries `to_session_thread_id` / `from_session_thread_id` (multiagent)                                                                                                                                                                                                                  |
 
 The stream also echoes back user-sent events (`user.message`, `user.interrupt`, `user.tool_confirmation`, `user.custom_tool_result`, `user.define_outcome`).
 
@@ -107,9 +107,10 @@ When a previewed event begins, the stream emits an `event_start` carrying the up
 
 `event_start` and `event_delta` have no `id` or `processed_at` of their own — the only identifier they carry is the `id` of the event they preview. For `agent.thinking`, **only** the `event_start` is emitted (a "thinking has started" signal) — no deltas follow; read content from the buffered `agent.thinking` event.
 
-**Accumulate-and-reconcile pattern.** Treat the preview as a scratch buffer keyed by `(event_id, index)`. On `event_start`, create an empty entry for the announced `id`. On each `event_delta`, append `delta.content.text` to `(event_id, delta.index)` and render the running text. When the buffered `agent.message` arrives, match it by `id`, **discard the accumulated preview**, and render the message's content instead. The identifiers always line up: `event_start.event.id`, every `event_delta.event_id`, and the buffered event's `id` are the same value. On a normal turn the order is fixed: `session.status_running` → `span.model_request_start` → `event_start` → `event_delta`* → buffered `agent.message` → `span.model_request_end`. If the turn errors or is interrupted the buffered event may never arrive, but `span.model_request_end` still does — close any unreconciled preview when you see it. Python/TypeScript/Go SDKs ship an accumulator helper that implements this; in other SDKs apply the manual pattern to the generated event types.
+**Accumulate-and-reconcile pattern.** Treat the preview as a scratch buffer keyed by `(event_id, index)`. On `event_start`, create an empty entry for the announced `id`. On each `event_delta`, append `delta.content.text` to `(event_id, delta.index)` and render the running text. When the buffered `agent.message` arrives, match it by `id`, **discard the accumulated preview**, and render the message's content instead. The identifiers always line up: `event_start.event.id`, every `event_delta.event_id`, and the buffered event's `id` are the same value. On a normal turn the order is fixed: `session.status_running` → `span.model_request_start` → `event_start` → `event_delta`\* → buffered `agent.message` → `span.model_request_end`. If the turn errors or is interrupted the buffered event may never arrive, but `span.model_request_end` still does — close any unreconciled preview when you see it. Python/TypeScript/Go SDKs ship an accumulator helper that implements this; in other SDKs apply the manual pattern to the generated event types.
 
 **Limitations:**
+
 - **Best effort** — under load the server may shed deltas for an event; you receive a contiguous prefix and then no further deltas for that event. The buffered `agent.message` still arrives complete. Never treat an accumulated preview as final.
 - **No replay on reconnect** — deltas are delivered only to the connection that opted in, while it's open. After a drop, follow the consolidation pattern in § Reconnecting after a dropped stream — the history fetch returns any buffered events emitted during the gap; missed deltas cannot be re-requested.
 - **Primary thread, text only** — tool use, tool results, MCP results, and subagent-thread activity are never previewed.
@@ -123,12 +124,12 @@ Practical patterns for driving a session via the events surface.
 
 ### Stream-first ordering
 
-**Open the stream before sending events.** The stream only delivers events that occur *after* it's opened — it does not replay current state or historical events. If you send a message first and open the stream second, early events (including fast status transitions) arrive buffered in a single batch and you lose the ability to react to them in real time.
+**Open the stream before sending events.** The stream only delivers events that occur _after_ it's opened — it does not replay current state or historical events. If you send a message first and open the stream second, early events (including fast status transitions) arrive buffered in a single batch and you lose the ability to react to them in real time.
 
 ```ts
 // ✅ Correct — stream and send concurrently
 const [response] = await Promise.all([
-  streamEvents(sessionId),   // opens SSE connection
+  streamEvents(sessionId), // opens SSE connection
   sendMessage(sessionId, text),
 ]);
 
@@ -141,7 +142,7 @@ const response = await streamEvents(sessionId);
 
 ### Reconnecting after a dropped stream
 
-**The SSE stream has no replay.** If your connection drops (httpx read timeout, network blip) and you reconnect, you only get events emitted *after* reconnection. Any events emitted during the gap are lost from the stream.
+**The SSE stream has no replay.** If your connection drops (httpx read timeout, network blip) and you reconnect, you only get events emitted _after_ reconnection. Any events emitted during the gap are lost from the stream.
 
 **The consolidation pattern:** on every (re)connect, overlap the stream with a history fetch and dedupe by event ID:
 
@@ -172,9 +173,9 @@ def connect_with_consolidation(client, session_id):
 
 ```ts
 // All three go into one session; agent processes them in order
-await sendMessage(sessionId, "Summarize the README");
-await sendMessage(sessionId, "Actually also check the CONTRIBUTING guide");
-await sendMessage(sessionId, "And compare the two");
+await sendMessage(sessionId, 'Summarize the README');
+await sendMessage(sessionId, 'Actually also check the CONTRIBUTING guide');
+await sendMessage(sessionId, 'And compare the two');
 // Stream once — agent responds to all three as a coherent turn
 ```
 
@@ -199,14 +200,13 @@ The agent stops mid-task. It does not see the interrupt as a message — it just
 some events carry useful metadata beyond the status change itself:
 
 `session.status_idle` — includes a `stop_reason` field which elaborates on why the session stopped and what type of further action is required by the user.
+
 ```json
 {
   "id": "sevt_456",
   "processed_at": "2026-04-07T04:27:43.197Z",
   "stop_reason": {
-    "event_ids": [
-      "sevt_123"
-    ],
+    "event_ids": ["sevt_123"],
     "type": "requires_action"
   },
   "type": "status_idle"
@@ -250,5 +250,3 @@ await client.beta.sessions.archive(sessionId);
 ```
 
 > Archiving a **session** is routine cleanup — sessions are per-run and disposable. **Do not generalize this to agents or environments**: those are persistent, reusable resources, and archiving them is permanent (no unarchive; new sessions cannot reference them). See `shared/managed-agents-overview.md` → Common Pitfalls.
-
-
