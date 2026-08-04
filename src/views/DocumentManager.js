@@ -1,5 +1,5 @@
 import { getMyDocuments, deleteMyDocument, formatLabels } from '../data/contentTemplates.js';
-import { getWorkHistory, saveWorkHistory } from '../data/workAssistantData.js';
+import { getWorkHistory, saveWorkHistory, addDocumentToKB } from '../data/workAssistantData.js';
 
 const SOURCE_LABELS = {
   content: '文档模板',
@@ -438,6 +438,9 @@ export class DocumentManager {
           <div class="doc-manager-dropdown-item doc-manager-dropdown-open" data-id="${doc.id}" data-source="${doc.sourceType}">
             <i class="fa-solid fa-eye"></i> 打开
           </div>
+          <div class="doc-manager-dropdown-item doc-manager-dropdown-kb" data-id="${doc.id}" data-source="${doc.sourceType}" data-title="${this.escapeHtml(doc.title)}">
+            <i class="fa-solid fa-book-bookmark"></i> 添加到知识库
+          </div>
           <div class="doc-manager-dropdown-item doc-manager-dropdown-delete" data-id="${doc.id}" data-source="${doc.sourceType}" data-title="${this.escapeHtml(doc.title)}">
             <i class="fa-solid fa-trash"></i> 删除
           </div>
@@ -565,6 +568,12 @@ export class DocumentManager {
         this.handleOpen(id, source);
       });
 
+      menuOverlay.querySelector('.doc-manager-dropdown-kb')?.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.id;
+        this.closeMenu();
+        this.handleAddToKB(id);
+      });
+
       menuOverlay.querySelector('.doc-manager-dropdown-delete')?.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.id;
         const source = e.currentTarget.dataset.source;
@@ -674,6 +683,218 @@ export class DocumentManager {
     this.render();
     this.bindEvents();
     this.showToast('文档已删除');
+  }
+
+  handleAddToKB(id) {
+    const doc = this.documents.find((d) => d.id === id);
+    if (!doc) return;
+    this.openAddToKBModal(doc);
+  }
+
+  docToMarkdown(doc) {
+    const title = doc.title || '未命名内容';
+    const raw = doc.raw || {};
+
+    // 场景生成记录：raw.result 包含生成结果
+    if (doc.sourceType === 'scene' && raw.result) {
+      const result = raw.result;
+      let md = `# ${result.title || title}\n\n`;
+      if (result.content) {
+        md += result.content;
+        if (result.citations && result.citations.length) {
+          md += '\n\n---\n\n## 参考来源\n\n';
+          result.citations.forEach((c, i) => {
+            md += `${i + 1}. [${c.title || c.name || '来源'}](${c.url || '#'})\n`;
+          });
+        }
+      } else if (result.pages) {
+        result.pages.forEach((page, index) => {
+          md += `## 第 ${index + 1} 页 · ${page.title}\n\n`;
+          if (page.subtitle) md += `**${page.subtitle}**\n\n`;
+          (page.bullets || []).forEach((b) => { md += `- ${b}\n`; });
+          if (page.note) md += `\n**演讲备注**：${page.note}\n`;
+          md += '\n---\n\n';
+        });
+      } else if (result.columns && result.rows) {
+        md += `| ${result.columns.join(' | ')} |\n`;
+        md += `| ${result.columns.map(() => '---').join(' | ')} |\n`;
+        result.rows.forEach((row) => { md += `| ${row.join(' | ')} |\n`; });
+      } else if (result.items) {
+        result.items.forEach((item) => { md += `- ${typeof item === 'string' ? item : (item.text || item.title || '')}\n`; });
+      } else if (result.steps) {
+        result.steps.forEach((step, i) => { md += `${i + 1}. ${typeof step === 'string' ? step : (step.title || step.text || '')}\n`; });
+      } else if (result.subject || result.body) {
+        if (result.subject) md += `**主题**：${result.subject}\n\n`;
+        if (Array.isArray(result.body)) {
+          md += result.body.join('\n\n');
+        } else {
+          md += result.body || '';
+        }
+      }
+      return md;
+    }
+
+    // 内容模板文档：raw.data 包含结构化数据
+    if (doc.sourceType === 'content') {
+      const data = raw.data || {};
+      let md = `# ${title}\n\n`;
+      // 元信息
+      if (data.meta) {
+        const metaEntries = Object.entries(data.meta).filter(([, v]) => v);
+        if (metaEntries.length) {
+          metaEntries.forEach(([k, v]) => { md += `- **${k}**：${v}\n`; });
+          md += '\n';
+        }
+      }
+      // word 格式：sections
+      if (data.sections && data.sections.length) {
+        data.sections.forEach((s) => {
+          md += `## ${s.title || ''}\n\n`;
+          if (s.guide) md += `> ${s.guide}\n\n`;
+          if (s.text) md += `${s.text}\n\n`;
+        });
+      }
+      // table 格式：columns + rows
+      if (data.columns && data.rows) {
+        md += `| ${data.columns.join(' | ')} |\n`;
+        md += `| ${data.columns.map(() => '---').join(' | ')} |\n`;
+        data.rows.forEach((row) => {
+          md += `| ${data.columns.map((c) => (Array.isArray(row) ? row[data.columns.indexOf(c)] : row[c]) || '').join(' | ')} |\n`;
+        });
+      }
+      // email 格式
+      if (data.subject || data.body) {
+        if (data.subject) md += `**主题**：${data.subject}\n\n`;
+        if (Array.isArray(data.body)) {
+          md += data.body.join('\n\n');
+        } else if (data.body) {
+          md += data.body;
+        }
+      }
+      return md;
+    }
+
+    return `# ${title}\n\n（无内容）`;
+  }
+
+  getAvailableKnowledgeBases() {
+    try {
+      const raw = localStorage.getItem('knowledgeBases');
+      const kbs = raw ? JSON.parse(raw) : [];
+      return Array.isArray(kbs) ? kbs.filter((kb) => kb.status !== 'disabled' && kb.status !== 'inactive') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  openAddToKBModal(doc) {
+    document.getElementById('wa-kb-modal')?.remove();
+
+    const kbs = this.getAvailableKnowledgeBases();
+    if (!kbs.length) {
+      this.showToast('暂无可用知识库，请先创建知识库');
+      return;
+    }
+
+    const content = this.docToMarkdown(doc);
+    const previewShort = content.length > 200 ? content.substring(0, 200) + '...' : content;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wa-kb-modal';
+    overlay.className = 'wa-modal-overlay';
+    overlay.innerHTML = `
+      <div class="wa-modal wa-kb-modal-box" onclick="event.stopPropagation()">
+        <div class="wa-modal-header">
+          <h3><i class="fa-solid fa-book-bookmark"></i> 添加到知识库</h3>
+          <button class="wa-modal-close" id="wa-kb-modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wa-modal-body">
+          <div class="wa-kb-modal-preview">
+            <div class="wa-kb-modal-preview-label">即将添加的内容</div>
+            <div class="wa-kb-modal-preview-name">${this.escapeHtml(doc.title)}</div>
+            <div class="wa-kb-modal-preview-meta">
+              <span><i class="fa-solid fa-tag"></i> ${doc.outputTypeLabel}</span>
+              <span><i class="fa-solid fa-align-left"></i> ${content.length} 字</span>
+              <span><i class="fa-solid fa-${SOURCE_ICONS[doc.sourceType]}"></i> ${SOURCE_LABELS[doc.sourceType]}</span>
+            </div>
+            <div class="wa-kb-modal-preview-text">${this.escapeHtml(previewShort)}</div>
+          </div>
+          <div class="wa-kb-modal-section">
+            <div class="wa-kb-modal-section-label">选择目标知识库</div>
+            <div class="wa-kb-modal-list">
+              ${kbs.map((kb) => `
+                <label class="wa-kb-modal-item" data-kb-id="${kb.id}">
+                  <input type="radio" name="wa-kb-target" value="${kb.id}" ${kbs.length === 1 ? 'checked' : ''}>
+                  <div class="wa-kb-modal-item-icon"><i class="fa-solid fa-${kb.type === '问答' ? 'message' : kb.type === '网页' ? 'globe' : 'folder-open'}"></i></div>
+                  <div class="wa-kb-modal-item-info">
+                    <div class="wa-kb-modal-item-name">${this.escapeHtml(kb.name)}</div>
+                    <div class="wa-kb-modal-item-desc">${this.escapeHtml(kb.description || '')}</div>
+                    <div class="wa-kb-modal-item-meta">${kb.type} · ${kb.documentCount || 0} 篇文档 · 更新于 ${kb.lastUpdate || '-'}</div>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div class="wa-kb-modal-section">
+            <label class="wa-kb-modal-checkbox">
+              <input type="checkbox" id="wa-kb-include-meta" checked>
+              <span>包含生成元信息（来源、模板名称、创建时间等）</span>
+            </label>
+          </div>
+        </div>
+        <div class="wa-modal-footer">
+          <button class="btn btn-ghost" id="wa-kb-modal-cancel">取消</button>
+          <button class="btn btn-primary" id="wa-kb-modal-confirm"><i class="fa-solid fa-check"></i> 确认添加</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-close').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-confirm').addEventListener('click', () => {
+      const selected = overlay.querySelector('input[name="wa-kb-target"]:checked');
+      if (!selected) {
+        this.showToast('请选择一个知识库');
+        return;
+      }
+      const kbId = selected.value;
+      const kb = kbs.find((k) => k.id === kbId);
+      const includeMeta = overlay.querySelector('#wa-kb-include-meta').checked;
+      overlay.remove();
+      this.confirmAddToKB(doc, kb, includeMeta);
+    });
+  }
+
+  confirmAddToKB(doc, kb, includeMeta) {
+    if (!doc || !kb) return;
+
+    let content = this.docToMarkdown(doc);
+    if (includeMeta) {
+      const now = new Date().toLocaleString('zh-CN');
+      const meta = `> 本文来自我的文档\n> - 标题：${doc.title}\n> - 来源：${SOURCE_LABELS[doc.sourceType]}\n> - 模板：${doc.templateName || '自定义'}\n> - 类型：${doc.outputTypeLabel}\n> - 时间：${now}\n> - 知识库：${kb.name}\n\n`;
+      content = meta + content;
+    }
+
+    const sizeKb = Math.max(1, Math.round(content.length / 1024));
+    const document = {
+      id: 'doc_dm_' + Date.now(),
+      name: `${doc.title || '未命名内容'}.md`,
+      type: 'Markdown',
+      size: `${sizeKb} KB`,
+      uploadTime: '刚刚',
+      status: '已索引',
+      progress: 100,
+      content,
+      source: 'workAssistant',
+      sourceTemplate: doc.templateName || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    addDocumentToKB(kb.id, document);
+    this.showToast(`已添加到知识库「${kb.name}」`);
   }
 
   showToast(message) {
