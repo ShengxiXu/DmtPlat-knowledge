@@ -1026,6 +1026,15 @@
   color: #059669;
 }
 
+.ctm-hover-btn-promote {
+  color: #10b981;
+}
+
+.ctm-hover-btn-promote:hover {
+  background: rgba(16, 185, 129, 0.9);
+  color: #fff;
+}
+
 .ctm-create-option:hover {
   border-color: #10b981;
   background: #f0fdf4;
@@ -1622,6 +1631,28 @@
 .ctm-preview-toolbtn-danger:hover {
   background: rgba(239, 68, 68, 0.9);
   border-color: rgba(239, 68, 68, 0.6);
+}
+
+.ctm-preview-toolbtn-promote {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.ctm-preview-toolbtn-promote:hover {
+  background: rgba(16, 185, 129, 0.9);
+  border-color: rgba(16, 185, 129, 0.6);
+  color: #fff;
+}
+
+.ctm-preview-promote-btn {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}
+
+.ctm-preview-promote-btn:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
 }
 
 .ctm-preview-left-inner {

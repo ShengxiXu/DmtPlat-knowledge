@@ -582,6 +582,7 @@ export class ContentTemplateManager {
               <i class="fa-regular fa-eye"></i>
             </button>
             ${isPersonal ? `<button class="ctm-hover-btn" data-action="edit" title="编辑"><i class="fa-regular fa-pen-to-square"></i></button>` : ''}
+            ${isPersonal ? `<button class="ctm-hover-btn ctm-hover-btn-promote" data-action="promote" title="设为官方"><i class="fa-solid fa-shield-halved"></i></button>` : ''}
             <button class="btn btn-primary btn-sm ctm-hover-use-btn" data-action="use">
               <i class="fa-solid fa-play"></i> 使用
             </button>
@@ -882,6 +883,7 @@ export class ContentTemplateManager {
                 <i class="fa-regular fa-copy"></i>
               </button>
               ${isPersonal ? `<button class="ctm-preview-toolbtn" data-action="edit-preview" title="编辑模板"><i class="fa-regular fa-pen-to-square"></i></button>` : ''}
+              ${isPersonal ? `<button class="ctm-preview-toolbtn ctm-preview-toolbtn-promote" data-action="promote-preview" title="设为官方模板"><i class="fa-solid fa-shield-halved"></i></button>` : ''}
               ${isPersonal ? `<button class="ctm-preview-toolbtn ctm-preview-toolbtn-danger" data-action="delete-preview" title="删除模板"><i class="fa-regular fa-trash-can"></i></button>` : ''}
             </div>
             <div class="ctm-preview-left-inner">
@@ -913,6 +915,7 @@ export class ContentTemplateManager {
                   <i class="fa-solid fa-play"></i> 使用此模板
                 </button>
                 ${isPersonal ? `<button class="btn btn-secondary btn-lg" data-action="edit-preview"><i class="fa-regular fa-pen-to-square"></i> 编辑模板</button>` : ''}
+                ${isPersonal ? `<button class="btn btn-outline btn-lg ctm-preview-promote-btn" data-action="promote-preview"><i class="fa-solid fa-shield-halved"></i> 设为官方</button>` : ''}
                 <button class="btn btn-outline btn-lg" data-action="export-preview">
                   <i class="fa-solid fa-file-export"></i> 导出 Word
                 </button>
@@ -1871,7 +1874,7 @@ export class ContentTemplateManager {
 
     container
       .querySelectorAll(
-        '[data-action="use-preview"], [data-action="edit-preview"], [data-action="export-preview"], [data-action="clone-preview"], [data-action="delete-preview"]'
+        '[data-action="use-preview"], [data-action="edit-preview"], [data-action="export-preview"], [data-action="clone-preview"], [data-action="delete-preview"], [data-action="promote-preview"]'
       )
       .forEach((el) => {
         el.addEventListener('click', () => {
@@ -2623,7 +2626,26 @@ export class ContentTemplateManager {
       case 'delete':
         this.deleteTemplate(id);
         break;
+      case 'promote':
+        this.promoteToOfficial(id);
+        break;
     }
+  }
+
+  promoteToOfficial(id) {
+    const template = this.templates.find((t) => t.id === id);
+    if (!template || template.level === 'official') return;
+
+    if (!confirm(`确定要将「${template.name}」设为官方模板吗？设为官方后将对所有用户可见。`)) return;
+
+    template.level = 'official';
+    template.updatedAt = Date.now();
+
+    this.saveTemplates();
+    this.previewTemplate = null;
+    this.refreshList();
+
+    this.showToast?.({ type: 'success', message: '已设为官方模板' });
   }
 
   /**
@@ -2933,9 +2955,14 @@ export class ContentTemplateManager {
   }
 
   saveTemplates() {
-    // 持久化个人模板到 localStorage（仅保存 level 为 personal 的模板）
-    const personal = this.templates.filter((t) => t.level === 'personal');
-    localStorage.setItem('dmtplat_content_templates', JSON.stringify(personal));
+    // 获取默认官方模板的 ID 列表
+    const defaultOfficialIds = new Set(defaultContentTemplates.map((t) => t.id));
+    
+    // 保存所有非默认模板（个人模板 + 用户提升为官方的模板）
+    const userTemplates = this.templates.filter(
+      (t) => t.level === 'personal' || (t.level === 'official' && !defaultOfficialIds.has(t.id))
+    );
+    localStorage.setItem('dmtplat_content_templates', JSON.stringify(userTemplates));
   }
 
   exportTemplate(template) {
