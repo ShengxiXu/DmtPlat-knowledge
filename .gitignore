@@ -31,31 +31,3 @@ coverage/
 
 # Server uploads
 server/uploads/
-
-# IDE workspace (Trae)
-.trae/
-
-# Design drafts / prototypes
-prototype-*.html
-kb_module_avocado.html
-work-assistant-product/
-
-# Docs / reports / office files
-docs/
-weekly-report-*.md
-*PRD*.md
-eslint-report.txt
-*.docx
-*.pptx
-*.pdf
-*.doc
-
-# Dev process artifacts (screenshots & temp scripts)
-*.png
-verify-*.py
-test-*.py
-debug-*.py
-check-*.py
-screenshot-*.py
-fix-*.mjs
-gen-ppt.cjs
