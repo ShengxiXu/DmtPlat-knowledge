@@ -188,19 +188,17 @@
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: #059669;
-  color: #fff;
+  background: transparent;
+  color: #059669;
   border: none;
   font-size: 16px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.35);
   transition: all 0.2s ease;
 }
 
 .ctm-lib-new-btn:hover {
-  background: #047857;
+  background: rgba(5, 150, 105, 0.1);
   transform: translateY(-50%) scale(1.05);
-  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
 }
 
 .ctm-lib-body {
