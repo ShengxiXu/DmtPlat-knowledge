@@ -19676,12 +19676,12 @@ html:not(.dark) .wa-chat-composer--hero .wa-chat-tool-btn { border-color: #e8e8e
   color: var(--wa-fm-accent, #59A674);
 }
 .wa-chat-tool-btn.active {
-  background: var(--wa-fm-accent-soft);
+  background: transparent;
   border-color: var(--wa-fm-accent);
-  color: var(--wa-fm-accent-bright);
+  color: var(--wa-fm-accent);
 }
 html:not(.dark) .wa-chat-tool-btn.active {
-  background: var(--wa-fm-accent-soft);
+  background: transparent;
   color: var(--wa-fm-accent);
 }
 
@@ -19702,8 +19702,8 @@ html:not(.dark) .wa-chat-composer--hero .wa-chat-plus-btn { border-color: #e8e8e
 }
 .wa-chat-composer--hero .wa-chat-plus-btn.active {
   border-color: var(--wa-fm-accent, #59A674);
-  background: var(--wa-fm-accent-soft);
-  color: var(--wa-fm-accent-bright);
+  background: transparent;
+  color: var(--wa-fm-accent, #59A674);
 }
 .wa-chat-composer--hero .wa-chat-plus-btn.open {
   border-color: var(--wa-fm-accent, #59A674);
