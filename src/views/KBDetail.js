@@ -15,7 +15,8 @@ export class KBDetail {
       lastUpdate: '2小时前',
     };
     this.activeTab = 'tab-docs';
-    this.documents = mockData.documents || [];
+    // 加载用户通过工作助手添加的文档，与默认文档合并
+    this.documents = this.loadDocuments();
     this.trainingLogs = mockData.trainingLogs || [];
     this.evaluationRecords = mockData.evaluationRecords || [];
     this.apiKeys = mockData.apiKeys || [];
@@ -218,10 +219,10 @@ export class KBDetail {
               .map(
                 (doc) => `
               <div class="doc-item">
-                <i class="fa-solid fa-file-lines doc-icon"></i>
+                <i class="fa-solid ${doc.source === 'workAssistant' ? 'fa-wand-magic-sparkles' : 'fa-file-lines'} doc-icon" ${doc.source === 'workAssistant' ? 'style="color:var(--kb-primary)"' : ''}></i>
                 <div class="doc-info">
-                  <div class="doc-name">${doc.name}</div>
-                  <div class="doc-meta">${doc.size} · ${doc.type} · 上传于 ${doc.uploadTime}</div>
+                  <div class="doc-name">${doc.name}${doc.source === 'workAssistant' ? ' <span class="doc-source-badge">工作助手</span>' : ''}</div>
+                  <div class="doc-meta">${doc.size} · ${doc.type} · 上传于 ${doc.uploadTime}${doc.sourceTemplate ? ` · 模板：${doc.sourceTemplate}` : ''}</div>
                 </div>
                 <div class="doc-status tag ${doc.status === '已索引' ? 'tag-primary' : ''}">${doc.status}</div>
                 <div class="doc-progress">
@@ -237,6 +238,19 @@ export class KBDetail {
         </div>
       </div>
     `;
+  }
+
+  loadDocuments() {
+    const defaultDocs = mockData.documents || [];
+    const kbId = this.kbData?.id;
+    if (!kbId) return defaultDocs;
+    try {
+      const userDocs = JSON.parse(localStorage.getItem('kb_documents_' + kbId) || '[]');
+      // 用户添加的文档排在前面
+      return [...userDocs, ...defaultDocs];
+    } catch {
+      return defaultDocs;
+    }
   }
 
   renderCrawlTab() {
@@ -1183,7 +1197,7 @@ export class KBDetail {
     previewBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const docId = btn.dataset.id;
-        const doc = documents.find((d) => d.id === docId);
+        const doc = this.documents.find((d) => d.id === docId);
         if (doc) {
           this.showDocPreview(doc);
         }
@@ -1194,7 +1208,7 @@ export class KBDetail {
     deleteBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const docId = btn.dataset.id;
-        const doc = documents.find((d) => d.id === docId);
+        const doc = this.documents.find((d) => d.id === docId);
         if (doc) {
           this.confirmDelete(doc);
         }
@@ -1396,6 +1410,16 @@ export class KBDetail {
     }, 3000);
   }
 
+  escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   showAdvancedSearchModal() {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay active';
@@ -1491,14 +1515,15 @@ export class KBDetail {
         <div class="modal-body">
           <div style="padding:16px;background:var(--kb-hover-bg);border-radius:8px;">
             <div style="font-size:14px;color:var(--kb-text-muted);margin-bottom:12px;">文件信息</div>
-            <div style="display:flex;gap:24px;margin-bottom:16px;">
+            <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap;">
               <div><strong>类型:</strong> ${doc.type}</div>
               <div><strong>大小:</strong> ${doc.size}</div>
               <div><strong>状态:</strong> ${doc.status}</div>
+              ${doc.sourceTemplate ? `<div><strong>来源模板:</strong> ${doc.sourceTemplate}</div>` : ''}
             </div>
-            <div style="font-size:14px;color:var(--kb-text-muted);margin-bottom:8px;">内容预览（模拟）</div>
-            <div style="font-size:13px;color:var(--kb-text);line-height:1.6;padding:12px;background:var(--kb-card-bg);border-radius:6px;border:1px solid var(--kb-border);">
-              这是 "${doc.name}" 的内容预览。由于这是一个模拟系统，实际内容会从文件中读取并显示在这里。支持 PDF、Word、TXT 和 Markdown 等格式的预览。
+            <div style="font-size:14px;color:var(--kb-text-muted);margin-bottom:8px;">内容预览${doc.source === 'workAssistant' ? '' : '（模拟）'}</div>
+            <div style="font-size:13px;color:var(--kb-text);line-height:1.6;padding:12px;background:var(--kb-card-bg);border-radius:6px;border:1px solid var(--kb-border);max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;">
+              ${doc.content ? this.escapeHtml(doc.content) : `这是 "${doc.name}" 的内容预览。由于这是一个模拟系统，实际内容会从文件中读取并显示在这里。支持 PDF、Word、TXT 和 Markdown 等格式的预览。`}
             </div>
           </div>
         </div>
@@ -1517,7 +1542,7 @@ export class KBDetail {
       <div class="modal">
         <div class="modal-header">
           <h3 style="font-size:18px;font-weight:600;"><i class="fa-solid fa-trash-can"></i> 删除确认</h3>
-          <button class="btn btn-circle btn-ghost" onclick="this.closest('.modal-overlay').remove()"><i class="fa-solid fa-xmark"></i></button>
+          <button class="btn btn-circle btn-ghost" id="confirm-delete-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
           <div style="padding:16px;">
@@ -1526,12 +1551,35 @@ export class KBDetail {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-          <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove(); document.querySelector('.toast')?.remove(); document.body.insertAdjacentHTML('beforeend', '<div class=\"toast toast-success show\">文件已删除</div>'); setTimeout(() => document.querySelector('.toast')?.remove(), 3000);">确认删除</button>
+          <button class="btn btn-secondary" id="confirm-delete-cancel">取消</button>
+          <button class="btn btn-primary" id="confirm-delete-ok">确认删除</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#confirm-delete-close').addEventListener('click', closeModal);
+    modal.querySelector('#confirm-delete-cancel').addEventListener('click', closeModal);
+    modal.querySelector('#confirm-delete-ok').addEventListener('click', () => {
+      // 从 localStorage 中删除用户添加的文档
+      if (doc.source === 'workAssistant' && this.kbData?.id) {
+        try {
+          const key = 'kb_documents_' + this.kbData.id;
+          const docs = JSON.parse(localStorage.getItem(key) || '[]').filter((d) => d.id !== doc.id);
+          localStorage.setItem(key, JSON.stringify(docs));
+        } catch {
+          /* ignore */
+        }
+      }
+      // 从内存列表中移除
+      const idx = this.documents.findIndex((d) => d.id === doc.id);
+      if (idx >= 0) this.documents.splice(idx, 1);
+      closeModal();
+      this.renderTabContent();
+      this.bindEvents();
+      this.showToast('文件已删除', 'success');
+    });
   }
 
   startTraining() {

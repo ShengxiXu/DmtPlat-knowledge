@@ -34,6 +34,8 @@ import {
   setQuickSceneTemplateIds,
   getQuickContentTemplateIds,
   setQuickContentTemplateIds,
+  getKBDocuments,
+  addDocumentToKB,
   mockGenerateContent,
   generatePPTContentFromOutline,
 } from '../data/workAssistantData.js';
@@ -3526,6 +3528,7 @@ export class WorkAssistant {
     const isDocument = ['text', 'markdown', 'email', 'steps', 'report'].includes(template.outputType);
 
     container.style.display = 'flex';
+    const kbBtn = `<button class="btn btn-sm btn-ghost" id="wa-result-to-kb" title="将此内容添加到知识库"><i class="fa-solid fa-book-bookmark"></i> 添加到知识库</button>`;
     container.innerHTML = `
       <div class="wa-result-header">
         <div class="wa-result-title">${result.title}${isPPTOutline ? ' <span style="font-size:13px;font-weight:500;color:var(--kb-primary)">(大纲预览)</span>' : ''}</div>
@@ -3538,14 +3541,18 @@ export class WorkAssistant {
             <button class="btn btn-sm btn-ghost" id="wa-ppt-export-pptx"><i class="fa-solid fa-file-powerpoint"></i> 导出PPTX</button>
             <button class="btn btn-sm btn-ghost" id="wa-result-regen"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
             <button class="btn btn-sm btn-ghost" id="wa-result-save"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
+            ${kbBtn}
           ` : isTable ? `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
             <button class="btn btn-sm btn-ghost" id="wa-export-xlsx"><i class="fa-solid fa-file-excel"></i> 导出XLSX</button>
+            ${kbBtn}
           ` : isDocument ? `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
             <button class="btn btn-sm btn-ghost" id="wa-export-docx"><i class="fa-solid fa-file-word"></i> 导出DOCX</button>
+            ${kbBtn}
           ` : `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
+            ${kbBtn}
           `}
         </div>
       </div>
@@ -4887,6 +4894,10 @@ export class WorkAssistant {
       this.saveCurrentResult(result);
     });
 
+    document.getElementById('wa-result-to-kb')?.addEventListener('click', () => {
+      this.openAddToKBModal(result, template);
+    });
+
     document.getElementById('wa-ppt-export-md')?.addEventListener('click', () => {
       this.exportPPTToMarkdown(result);
     });
@@ -5372,6 +5383,137 @@ export class WorkAssistant {
     this.showToast('已保存到我的内容');
   }
 
+  openAddToKBModal(result, template) {
+    // 移除已有弹窗
+    document.getElementById('wa-kb-modal')?.remove();
+
+    const kbs = this.getAvailableKnowledgeBases();
+    if (!kbs.length) {
+      this.showToast('暂无可用知识库，请先创建知识库');
+      return;
+    }
+
+    const typeLabel = template?.outputType === outputTypes.PPT ? 'PPT'
+      : template?.outputType === outputTypes.TABLE ? '表格'
+      : '文档';
+    const preview = this.resultToMarkdown(result);
+    const previewShort = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wa-kb-modal';
+    overlay.className = 'wa-modal-overlay';
+    overlay.innerHTML = `
+      <div class="wa-modal wa-kb-modal-box" onclick="event.stopPropagation()">
+        <div class="wa-modal-header">
+          <h3><i class="fa-solid fa-book-bookmark"></i> 添加到知识库</h3>
+          <button class="wa-modal-close" id="wa-kb-modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="wa-modal-body">
+          <div class="wa-kb-modal-preview">
+            <div class="wa-kb-modal-preview-label">即将添加的内容</div>
+            <div class="wa-kb-modal-preview-name">${this.escapeHtml(result.title || '未命名内容')}</div>
+            <div class="wa-kb-modal-preview-meta">
+              <span><i class="fa-solid fa-tag"></i> ${typeLabel}</span>
+              <span><i class="fa-solid fa-align-left"></i> ${preview.length} 字</span>
+              ${template?.name ? `<span><i class="fa-solid fa-wand-magic-sparkles"></i> ${this.escapeHtml(template.name)}</span>` : ''}
+            </div>
+            <div class="wa-kb-modal-preview-text">${this.escapeHtml(previewShort)}</div>
+          </div>
+          <div class="wa-kb-modal-section">
+            <div class="wa-kb-modal-section-label">选择目标知识库</div>
+            <div class="wa-kb-modal-list">
+              ${kbs.map((kb) => `
+                <label class="wa-kb-modal-item" data-kb-id="${kb.id}">
+                  <input type="radio" name="wa-kb-target" value="${kb.id}" ${kbs.length === 1 ? 'checked' : ''}>
+                  <div class="wa-kb-modal-item-icon"><i class="fa-solid fa-${kb.type === '问答' ? 'message' : kb.type === '网页' ? 'globe' : 'folder-open'}"></i></div>
+                  <div class="wa-kb-modal-item-info">
+                    <div class="wa-kb-modal-item-name">${this.escapeHtml(kb.name)}</div>
+                    <div class="wa-kb-modal-item-desc">${this.escapeHtml(kb.description || '')}</div>
+                    <div class="wa-kb-modal-item-meta">${kb.type} · ${kb.documentCount || 0} 篇文档 · 更新于 ${kb.lastUpdate || '-'}</div>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div class="wa-kb-modal-section">
+            <label class="wa-kb-modal-checkbox">
+              <input type="checkbox" id="wa-kb-include-meta" checked>
+              <span>包含生成元信息（模板名称、创建时间等）</span>
+            </label>
+          </div>
+        </div>
+        <div class="wa-modal-footer">
+          <button class="btn btn-ghost" id="wa-kb-modal-cancel">取消</button>
+          <button class="btn btn-primary" id="wa-kb-modal-confirm"><i class="fa-solid fa-check"></i> 确认添加</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // 绑定事件
+    overlay.addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-close').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-cancel').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#wa-kb-modal-confirm').addEventListener('click', () => {
+      const selected = overlay.querySelector('input[name="wa-kb-target"]:checked');
+      if (!selected) {
+        this.showToast('请选择一个知识库');
+        return;
+      }
+      const kbId = selected.value;
+      const kb = kbs.find((k) => k.id === kbId);
+      const includeMeta = overlay.querySelector('#wa-kb-include-meta').checked;
+      overlay.remove();
+      this.addResultToKnowledgeBase(result, template, kb, includeMeta);
+    });
+  }
+
+  getAvailableKnowledgeBases() {
+    try {
+      const raw = localStorage.getItem('knowledgeBases');
+      const kbs = raw ? JSON.parse(raw) : [];
+      return Array.isArray(kbs) ? kbs.filter((kb) => kb.status !== 'disabled' && kb.status !== 'inactive') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  addResultToKnowledgeBase(result, template, kb, includeMeta = true) {
+    if (!result || !kb) return;
+
+    let content = this.resultToMarkdown(result);
+    if (includeMeta) {
+      const now = new Date().toLocaleString('zh-CN');
+      const meta = `> 本文由智能工作助手生成\n> - 模板：${template?.name || '自定义'}\n> - 类型：${template?.outputType || '文档'}\n> - 时间：${now}\n> - 知识库：${kb.name}\n\n`;
+      content = meta + content;
+    }
+
+    const typeMap = {
+      [outputTypes.PPT]: 'Markdown',
+      [outputTypes.TABLE]: 'Markdown',
+    };
+    const docType = typeMap[template?.outputType] || 'Markdown';
+    const sizeKb = Math.max(1, Math.round(content.length / 1024));
+
+    const document = {
+      id: 'doc_wa_' + Date.now(),
+      name: `${result.title || '未命名内容'}.md`,
+      type: docType,
+      size: `${sizeKb} KB`,
+      uploadTime: '刚刚',
+      status: '已索引',
+      progress: 100,
+      content,
+      source: 'workAssistant',
+      sourceTemplate: template?.name || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    addDocumentToKB(kb.id, document);
+    this.showToast(`已添加到知识库「${kb.name}」`);
+  }
+
   autoSaveDraft(template) {
     const formData = this.getFormData();
     const hasValue = Object.values(formData).some((v) => v && v.trim && v.trim());
@@ -5395,6 +5537,48 @@ export class WorkAssistant {
   pptToText(result) {
     if (!result.pages) return '';
     return result.pages.map((p, i) => `${i + 1}. ${p.title}\n${p.bullets ? p.bullets.join('\n') : p.content}\n备注：${p.note || ''}`).join('\n\n');
+  }
+
+  resultToMarkdown(result) {
+    if (!result) return '';
+    const title = result.title || '未命名内容';
+    // 文档类（markdown / text / email / steps / report）
+    if (result.content) {
+      let md = `# ${title}\n\n`;
+      if (result.citations && result.citations.length) {
+        md += result.content + '\n\n---\n\n## 参考来源\n\n';
+        result.citations.forEach((c, i) => {
+          md += `${i + 1}. [${c.title || c.name || '来源'}](${c.url || '#'})\n`;
+        });
+      } else {
+        md += result.content;
+      }
+      return md;
+    }
+    // PPT 类
+    if (result.pages) {
+      let md = `# ${title}\n\n`;
+      md += `> 风格：${result.style || '标准'} | 配色：${result.color || '默认'} | 页数：${result.pages.length}\n\n---\n\n`;
+      result.pages.forEach((page, index) => {
+        md += `## 第 ${index + 1} 页 · ${page.title}\n\n`;
+        if (page.subtitle) md += `**${page.subtitle}**\n\n`;
+        (page.bullets || []).forEach((b) => { md += `- ${b}\n`; });
+        if (page.note) md += `\n**演讲备注**：${page.note}\n`;
+        md += '\n---\n\n';
+      });
+      return md;
+    }
+    // 表格类
+    if (result.columns && result.rows) {
+      let md = `# ${title}\n\n`;
+      md += `| ${result.columns.join(' | ')} |\n`;
+      md += `| ${result.columns.map(() => '---').join(' | ')} |\n`;
+      result.rows.forEach((row) => {
+        md += `| ${row.join(' | ')} |\n`;
+      });
+      return md;
+    }
+    return `# ${title}\n\n（无内容）`;
   }
 
   exportPPTToMarkdown(result) {

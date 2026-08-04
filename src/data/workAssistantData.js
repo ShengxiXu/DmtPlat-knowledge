@@ -2203,6 +2203,45 @@ export function setQuickSceneTemplateIds(ids) { writeQuickIds(STORAGE_QUICK_SCEN
 export function getQuickContentTemplateIds() { return readQuickIds(STORAGE_QUICK_CONTENT_KEY); }
 export function setQuickContentTemplateIds(ids) { writeQuickIds(STORAGE_QUICK_CONTENT_KEY, ids); }
 
+// 知识库文档存储（按知识库 ID 隔离）
+const KB_DOCUMENTS_PREFIX = 'kb_documents_';
+
+export function getKBDocuments(kbId) {
+  if (!kbId) return [];
+  try {
+    const data = localStorage.getItem(KB_DOCUMENTS_PREFIX + kbId);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addDocumentToKB(kbId, document) {
+  if (!kbId || !document) return null;
+  const docs = getKBDocuments(kbId);
+  docs.unshift(document);
+  localStorage.setItem(KB_DOCUMENTS_PREFIX + kbId, JSON.stringify(docs));
+  // 同步更新知识库列表中的文档数量
+  try {
+    const kbs = JSON.parse(localStorage.getItem('knowledgeBases') || '[]');
+    const kb = kbs.find((k) => k.id === kbId);
+    if (kb) {
+      kb.documentCount = (kb.documentCount || 0) + 1;
+      kb.lastUpdate = '刚刚';
+      localStorage.setItem('knowledgeBases', JSON.stringify(kbs));
+    }
+  } catch {
+    /* ignore */
+  }
+  return document;
+}
+
+export function deleteKBDocument(kbId, docId) {
+  if (!kbId || !docId) return;
+  const docs = getKBDocuments(kbId).filter((d) => d.id !== docId);
+  localStorage.setItem(KB_DOCUMENTS_PREFIX + kbId, JSON.stringify(docs));
+}
+
 export function createWorkRecord(template, formData, mode, selectedKBs, result) {
   const kbs = Array.isArray(selectedKBs) ? selectedKBs : [];
   return {
