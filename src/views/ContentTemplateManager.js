@@ -2768,7 +2768,7 @@ export class ContentTemplateManager {
     this.syncContentDocFromDOM();
     const saved = saveMyDocument({ ...this.contentDoc });
     this.contentDoc.id = saved.id;
-    this.showToast('文档已保存到我的文档');
+    this.showToast('文档已保存到创作记录');
   }
 
   showToast(message) {

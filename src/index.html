@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./ctm-styles.css" />
     <link rel="stylesheet" href="./ppt-skeleton.css" />
+    <link rel="stylesheet" href="./ppt-chat-card.css" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
@@ -60,6 +61,73 @@
       window.dropHandler = dropHandler;
       window.dragOverHandler = dragOverHandler;
       window.dragLeaveHandler = dragLeaveHandler;
+    </script>
+
+    <!-- 悬浮聊天挂件 -->
+    <script>
+      window.chat_iframe_src = '/zsgz-proxy/#/chat/js-0e68dcb7b3e491f8141b7e9a8c01620cg9ME';
+      window.chat_iframe_width = '375px';
+      window.chat_iframe_height = '667px';
+      window.chat_icon_bg = '#247a60';
+      window.chat_icon_color = '#fff';
+      window.addEventListener('load', function () {
+        if (window.__dmtKbChatEmbedLoaded) return;
+        window.__dmtKbChatEmbedLoaded = true;
+        var src = window.chat_iframe_src;
+        if (!src) return;
+        var panelWidth = window.chat_iframe_width || '375px';
+        var panelHeight = window.chat_iframe_height || '667px';
+        var iconBg = window.chat_icon_bg || '#247a60';
+        var iconColor = window.chat_icon_color || '#fff';
+        var zIndex = 99999;
+        var style = document.createElement('style');
+        style.textContent = [
+          '.dmt-kb-chat-fab{position:fixed!important;right:24px!important;bottom:24px!important;width:56px!important;height:56px!important;border-radius:50%!important;border:none!important;',
+          'cursor:pointer!important;box-shadow:0 8px 24px rgba(15,23,42,.18)!important;display:flex!important;align-items:center!important;justify-content:center!important;',
+          'z-index:' + (zIndex + 1) + '!important;transition:transform .18s ease,box-shadow .18s ease!important}',
+          '.dmt-kb-chat-fab:hover{transform:translateY(-2px)!important;box-shadow:0 12px 28px rgba(15,23,42,.22)!important}',
+          '.dmt-kb-chat-panel{position:fixed!important;right:24px!important;bottom:92px!important;width:' + panelWidth + '!important;height:' + panelHeight + '!important;',
+          'max-width:calc(100vw - 48px)!important;max-height:calc(100vh - 120px)!important;border-radius:16px!important;overflow:hidden!important;',
+          'box-shadow:0 16px 48px rgba(15,23,42,.2)!important;background:#fff!important;z-index:' + zIndex + '!important;display:none!important;flex-direction:column!important}',
+          '.dmt-kb-chat-panel.is-open{display:flex!important}',
+          '.dmt-kb-chat-panel__head{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 12px!important;',
+          'background:#f8fafc!important;border-bottom:1px solid #e8eef4!important;font:600 14px/1.4 system-ui,sans-serif!important;color:#334155!important}',
+          '.dmt-kb-chat-panel__close{border:none!important;background:transparent!important;cursor:pointer!important;font-size:20px!important;line-height:1!important;color:#64748b!important;padding:4px!important}',
+          '.dmt-kb-chat-panel__iframe{flex:1!important;border:none!important;width:100%!important;background:#fff!important}'
+        ].join('');
+        document.head.appendChild(style);
+        var panel = document.createElement('div');
+        panel.className = 'dmt-kb-chat-panel';
+        panel.innerHTML =
+          '<div class="dmt-kb-chat-panel__head"><span>智能对话</span>' +
+          '<button type="button" class="dmt-kb-chat-panel__close" aria-label="关闭">&times;</button></div>' +
+          '<iframe class="dmt-kb-chat-panel__iframe" src="' + src.replace(/"/g, '&quot;') + '" allow="clipboard-write"></iframe>';
+        var fab = document.createElement('button');
+        fab.type = 'button';
+        fab.className = 'dmt-kb-chat-fab';
+        fab.setAttribute('aria-label', '打开智能对话');
+        fab.style.background = iconBg;
+        fab.style.color = iconColor;
+        fab.innerHTML =
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>';
+        function toggle(open) {
+          var next = typeof open === 'boolean' ? open : !panel.classList.contains('is-open');
+          panel.classList.toggle('is-open', next);
+        }
+        fab.addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          toggle();
+        });
+        panel.querySelector('.dmt-kb-chat-panel__close').addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          toggle(false);
+        });
+        document.body.appendChild(panel);
+        document.body.appendChild(fab);
+      });
     </script>
   </body>
 </html>

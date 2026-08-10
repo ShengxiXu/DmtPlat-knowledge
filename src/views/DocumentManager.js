@@ -1,19 +1,30 @@
-import { getMyDocuments, deleteMyDocument, formatLabels } from '../data/contentTemplates.js';
-import { getWorkHistory, saveWorkHistory, addDocumentToKB } from '../data/workAssistantData.js';
+import {
+  getMyDocuments,
+  deleteMyDocument,
+  formatLabels,
+} from '../data/contentTemplates.js';
+import {
+  getWorkHistory,
+  saveWorkHistory,
+  addDocumentToKB,
+} from '../data/workAssistantData.js';
 
 const SOURCE_LABELS = {
   content: '文档模板',
   scene: '场景生成',
+  chat: '对话生成',
 };
 
 const SOURCE_ICONS = {
   content: 'fa-file-lines',
   scene: 'fa-wand-magic-sparkles',
+  chat: 'fa-comments',
 };
 
 const SOURCE_COLORS = {
   content: '#2563eb',
   scene: '#10b981',
+  chat: '#8b5cf6',
 };
 
 const SCENE_OUTPUT_LABELS = {
@@ -26,6 +37,8 @@ const SCENE_OUTPUT_LABELS = {
   steps: '流程',
   report: '报告',
   qa: '问答',
+  video: '视频',
+  music: '音乐',
 };
 
 const SCENE_OUTPUT_ICONS = {
@@ -38,6 +51,8 @@ const SCENE_OUTPUT_ICONS = {
   steps: 'fa-list-ol',
   report: 'fa-file-contract',
   qa: 'fa-circle-question',
+  video: 'fa-film',
+  music: 'fa-music',
 };
 
 function inferSceneOutputType(record) {
@@ -45,6 +60,9 @@ function inferSceneOutputType(record) {
   if (!result) return record.template?.outputType || 'text';
   if (result.pages || result.slides) return 'ppt';
   if (result.columns && result.rows) return 'table';
+  if (Array.isArray(result.scenes)) return 'video';
+  // 音乐：有 lyrics/tempo/genre 等特征字段（避免与 report 的 sections 混淆）
+  if (result.lyrics || result.tempo || result.genre) return 'music';
   if (Array.isArray(result.items)) return 'list';
   if (Array.isArray(result.steps)) return 'steps';
   if (result.subject || result.greeting) return 'email';
@@ -91,7 +109,11 @@ export class DocumentManager {
   normalizeDocuments() {
     const contentDocs = getMyDocuments().map((doc) => {
       const format = doc.format || 'word';
-      const labelInfo = formatLabels[format] || { label: format, icon: 'fa-file', color: '#6b7280' };
+      const labelInfo = formatLabels[format] || {
+        label: format,
+        icon: 'fa-file',
+        color: '#6b7280',
+      };
       return {
         id: doc.id,
         sourceType: 'content',
@@ -113,9 +135,15 @@ export class DocumentManager {
 
     const sceneRecords = getWorkHistory().map((record) => {
       const outputType = inferSceneOutputType(record);
+      // 区分首页对话生成（freeChat / chat_type_xxx / free-chat）与场景模板生成
+      const isFreeChat =
+        record.isFreeChat ||
+        record.source === 'freeChat' ||
+        (record.templateId && record.templateId.startsWith('chat_type_')) ||
+        record.templateId === 'free-chat';
       return {
         id: record.id,
-        sourceType: 'scene',
+        sourceType: isFreeChat ? 'chat' : 'scene',
         title: this.getSceneRecordTitle(record),
         templateId: record.templateId || '',
         templateName: record.templateName || '未知模板',
@@ -162,12 +190,25 @@ export class DocumentManager {
 
     if (this.searchQuery.trim()) {
       const kw = this.searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (d) =>
+      list = list.filter((d) => {
+        const result = d.raw?.result || {};
+        return (
           d.title.toLowerCase().includes(kw) ||
           d.templateName.toLowerCase().includes(kw) ||
-          d.outputTypeLabel.toLowerCase().includes(kw)
-      );
+          d.outputTypeLabel.toLowerCase().includes(kw) ||
+          (d.roleName || '').toLowerCase().includes(kw) ||
+          (d.abilityName || '').toLowerCase().includes(kw) ||
+          (result.content || '').toLowerCase().includes(kw) ||
+          (result.lyrics || '').toLowerCase().includes(kw) ||
+          (Array.isArray(result.scenes) &&
+            result.scenes.some(
+              (s) =>
+                (s.shot || '').toLowerCase().includes(kw) ||
+                (s.desc || '').toLowerCase().includes(kw) ||
+                (s.audio || '').toLowerCase().includes(kw)
+            ))
+        );
+      });
     }
 
     list.sort((a, b) => {
@@ -224,14 +265,10 @@ export class DocumentManager {
     this.container.innerHTML = `
       <header class="header doc-manager-header">
         <div class="doc-manager-header-left">
-          <h1 class="header-title">我的文档</h1>
-          <span class="doc-manager-count">${total} 个文档</span>
+          <h1 class="header-title">创作记录</h1>
+          <span class="doc-manager-count">${total} 条记录</span>
         </div>
         <div class="header-actions">
-          <div class="search-box doc-manager-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="doc-search-input" class="input" placeholder="搜索文档标题、模板名称..." value="${this.escapeHtml(this.searchQuery)}">
-          </div>
           ${this.renderNewButton()}
         </div>
       </header>
@@ -249,6 +286,19 @@ export class DocumentManager {
               <button class="doc-manager-tab ${this.sourceFilter === 'scene' ? 'active' : ''}" data-source="scene">
                 场景生成
               </button>
+              <button class="doc-manager-tab ${this.sourceFilter === 'chat' ? 'active' : ''}" data-source="chat">
+                对话生成
+              </button>
+            </div>
+
+            <div class="doc-manager-search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="doc-search-input" class="doc-manager-search-input" placeholder="搜索标题、模板、角色、内容..." value="${this.escapeHtml(this.searchQuery)}">
+              ${
+                this.searchQuery
+                  ? '<button type="button" class="doc-manager-search-clear" id="doc-search-clear" title="清除搜索"><span>×</span></button>'
+                  : ''
+              }
             </div>
 
             <div class="doc-manager-controls">
@@ -299,7 +349,9 @@ export class DocumentManager {
           <span>新建</span>
           <i class="fa-solid ${this.newDropdownOpen ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
         </button>
-        ${this.newDropdownOpen ? `
+        ${
+          this.newDropdownOpen
+            ? `
           <div class="doc-manager-new-dropdown">
             <div class="doc-manager-new-dropdown-item" data-action="goto-content">
               <div class="doc-manager-new-dropdown-icon" style="background:#2563eb15;color:#2563eb">
@@ -320,7 +372,9 @@ export class DocumentManager {
               </div>
             </div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -479,11 +533,37 @@ export class DocumentManager {
   bindEvents() {
     const searchInput = document.getElementById('doc-search-input');
     if (searchInput) {
-      searchInput.addEventListener('input', (e) => {
+      // 中文输入法组合期间不触发搜索与重新渲染，避免打断输入
+      let isComposing = false;
+      searchInput.addEventListener('compositionstart', () => {
+        isComposing = true;
+      });
+      searchInput.addEventListener('compositionend', (e) => {
+        isComposing = false;
         this.searchQuery = e.target.value;
         this.currentPage = 1;
         this.render();
         this.bindEvents();
+        this.focusSearchInput();
+      });
+      searchInput.addEventListener('input', (e) => {
+        if (isComposing) return;
+        this.searchQuery = e.target.value;
+        this.currentPage = 1;
+        this.render();
+        this.bindEvents();
+        this.focusSearchInput();
+      });
+    }
+
+    const clearBtn = document.getElementById('doc-search-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        this.searchQuery = '';
+        this.currentPage = 1;
+        this.render();
+        this.bindEvents();
+        this.focusSearchInput();
       });
     }
 
@@ -530,14 +610,16 @@ export class DocumentManager {
       });
     }
 
-    this.container.querySelectorAll('.doc-manager-list-row, .doc-manager-card').forEach((row) => {
-      row.addEventListener('click', (e) => {
-        if (e.target.closest('.doc-manager-menu-btn')) return;
-        const id = row.dataset.id;
-        const source = row.dataset.source;
-        this.handleOpen(id, source);
+    this.container
+      .querySelectorAll('.doc-manager-list-row, .doc-manager-card')
+      .forEach((row) => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.doc-manager-menu-btn')) return;
+          const id = row.dataset.id;
+          const source = row.dataset.source;
+          this.handleOpen(id, source);
+        });
       });
-    });
 
     this.container.querySelectorAll('.doc-manager-menu-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -561,26 +643,32 @@ export class DocumentManager {
         }
       });
 
-      menuOverlay.querySelector('.doc-manager-dropdown-open')?.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
-        const source = e.currentTarget.dataset.source;
-        this.closeMenu();
-        this.handleOpen(id, source);
-      });
+      menuOverlay
+        .querySelector('.doc-manager-dropdown-open')
+        ?.addEventListener('click', (e) => {
+          const id = e.currentTarget.dataset.id;
+          const source = e.currentTarget.dataset.source;
+          this.closeMenu();
+          this.handleOpen(id, source);
+        });
 
-      menuOverlay.querySelector('.doc-manager-dropdown-kb')?.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
-        this.closeMenu();
-        this.handleAddToKB(id);
-      });
+      menuOverlay
+        .querySelector('.doc-manager-dropdown-kb')
+        ?.addEventListener('click', (e) => {
+          const id = e.currentTarget.dataset.id;
+          this.closeMenu();
+          this.handleAddToKB(id);
+        });
 
-      menuOverlay.querySelector('.doc-manager-dropdown-delete')?.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
-        const source = e.currentTarget.dataset.source;
-        const title = e.currentTarget.dataset.title;
-        this.closeMenu();
-        this.handleDelete(id, source, title);
-      });
+      menuOverlay
+        .querySelector('.doc-manager-dropdown-delete')
+        ?.addEventListener('click', (e) => {
+          const id = e.currentTarget.dataset.id;
+          const source = e.currentTarget.dataset.source;
+          const title = e.currentTarget.dataset.title;
+          this.closeMenu();
+          this.handleDelete(id, source, title);
+        });
     }
 
     const pagination = document.getElementById('doc-pagination');
@@ -613,25 +701,35 @@ export class DocumentManager {
       });
     }
 
-    this.container.querySelectorAll('.doc-manager-new-dropdown-item[data-action="goto-content"]').forEach((el) => {
-      el.addEventListener('click', () => {
-        this.newDropdownOpen = false;
-        if (this.onGotoContent) this.onGotoContent();
+    this.container
+      .querySelectorAll(
+        '.doc-manager-new-dropdown-item[data-action="goto-content"]'
+      )
+      .forEach((el) => {
+        el.addEventListener('click', () => {
+          this.newDropdownOpen = false;
+          if (this.onGotoContent) this.onGotoContent();
+        });
       });
-    });
 
-    this.container.querySelectorAll('.doc-manager-new-dropdown-item[data-action="goto-work"]').forEach((el) => {
-      el.addEventListener('click', () => {
-        this.newDropdownOpen = false;
-        if (this.onGotoWork) this.onGotoWork();
+    this.container
+      .querySelectorAll(
+        '.doc-manager-new-dropdown-item[data-action="goto-work"]'
+      )
+      .forEach((el) => {
+        el.addEventListener('click', () => {
+          this.newDropdownOpen = false;
+          if (this.onGotoWork) this.onGotoWork();
+        });
       });
-    });
 
-    this.container.querySelectorAll('.doc-manager-goto-content').forEach((el) => {
-      el.addEventListener('click', () => {
-        if (this.onGotoContent) this.onGotoContent();
+    this.container
+      .querySelectorAll('.doc-manager-goto-content')
+      .forEach((el) => {
+        el.addEventListener('click', () => {
+          if (this.onGotoContent) this.onGotoContent();
+        });
       });
-    });
 
     this.container.querySelectorAll('.doc-manager-goto-work').forEach((el) => {
       el.addEventListener('click', () => {
@@ -663,7 +761,8 @@ export class DocumentManager {
   handleOpen(id, source) {
     if (source === 'content') {
       this.onOpenContentDoc(id);
-    } else if (source === 'scene') {
+    } else {
+      // scene / chat 均来自工作历史，走场景记录恢复（WorkAssistant 内按渠道分流到对应编辑点）
       this.onOpenSceneRecord(id);
     }
   }
@@ -673,7 +772,8 @@ export class DocumentManager {
 
     if (source === 'content') {
       deleteMyDocument(id);
-    } else if (source === 'scene') {
+    } else {
+      // scene / chat 均来自工作历史
       const history = getWorkHistory().filter((r) => r.id !== id);
       saveWorkHistory(history);
     }
@@ -695,8 +795,11 @@ export class DocumentManager {
     const title = doc.title || '未命名内容';
     const raw = doc.raw || {};
 
-    // 场景生成记录：raw.result 包含生成结果
-    if (doc.sourceType === 'scene' && raw.result) {
+    // 场景生成 / 对话生成记录：raw.result 包含生成结果
+    if (
+      (doc.sourceType === 'scene' || doc.sourceType === 'chat') &&
+      raw.result
+    ) {
       const result = raw.result;
       let md = `# ${result.title || title}\n\n`;
       if (result.content) {
@@ -711,24 +814,58 @@ export class DocumentManager {
         result.pages.forEach((page, index) => {
           md += `## 第 ${index + 1} 页 · ${page.title}\n\n`;
           if (page.subtitle) md += `**${page.subtitle}**\n\n`;
-          (page.bullets || []).forEach((b) => { md += `- ${b}\n`; });
+          (page.bullets || []).forEach((b) => {
+            md += `- ${b}\n`;
+          });
           if (page.note) md += `\n**演讲备注**：${page.note}\n`;
           md += '\n---\n\n';
         });
       } else if (result.columns && result.rows) {
         md += `| ${result.columns.join(' | ')} |\n`;
         md += `| ${result.columns.map(() => '---').join(' | ')} |\n`;
-        result.rows.forEach((row) => { md += `| ${row.join(' | ')} |\n`; });
+        result.rows.forEach((row) => {
+          md += `| ${row.join(' | ')} |\n`;
+        });
       } else if (result.items) {
-        result.items.forEach((item) => { md += `- ${typeof item === 'string' ? item : (item.text || item.title || '')}\n`; });
+        result.items.forEach((item) => {
+          md += `- ${typeof item === 'string' ? item : item.text || item.title || ''}\n`;
+        });
       } else if (result.steps) {
-        result.steps.forEach((step, i) => { md += `${i + 1}. ${typeof step === 'string' ? step : (step.title || step.text || '')}\n`; });
+        result.steps.forEach((step, i) => {
+          md += `${i + 1}. ${typeof step === 'string' ? step : step.title || step.text || ''}\n`;
+        });
       } else if (result.subject || result.body) {
         if (result.subject) md += `**主题**：${result.subject}\n\n`;
         if (Array.isArray(result.body)) {
           md += result.body.join('\n\n');
         } else {
           md += result.body || '';
+        }
+      } else if (Array.isArray(result.scenes)) {
+        // 视频脚本：分镜文本
+        md += `> 视频脚本（共 ${result.scenes.length} 个分镜）\n\n`;
+        result.scenes.forEach((s, i) => {
+          md += `## 分镜 ${i + 1}：${s.shot || ''}\n\n`;
+          if (s.time) md += `**时间**：${s.time}\n\n`;
+          if (s.desc) md += `${s.desc}\n\n`;
+          if (s.audio) md += `> 旁白/音效：${s.audio}\n\n`;
+        });
+      } else if (result.lyrics || result.tempo || result.genre) {
+        // 音乐：曲风信息 + 段落 + 歌词
+        const meta = [];
+        if (result.genre) meta.push(`**曲风**：${result.genre}`);
+        if (result.tempo) meta.push(`**节拍**：${result.tempo}`);
+        if (result.mood) meta.push(`**情绪**：${result.mood}`);
+        if (meta.length) md += meta.join('　') + '\n\n';
+        if (Array.isArray(result.sections)) {
+          result.sections.forEach((s) => {
+            md += `## ${s.label || '段落'}\n\n`;
+            if (s.time) md += `**时间**：${s.time}\n\n`;
+            if (s.desc) md += `${s.desc}\n\n`;
+          });
+        }
+        if (result.lyrics) {
+          md += `## 歌词\n\n${result.lyrics}\n`;
         }
       }
       return md;
@@ -742,7 +879,9 @@ export class DocumentManager {
       if (data.meta) {
         const metaEntries = Object.entries(data.meta).filter(([, v]) => v);
         if (metaEntries.length) {
-          metaEntries.forEach(([k, v]) => { md += `- **${k}**：${v}\n`; });
+          metaEntries.forEach(([k, v]) => {
+            md += `- **${k}**：${v}\n`;
+          });
           md += '\n';
         }
       }
@@ -781,7 +920,11 @@ export class DocumentManager {
     try {
       const raw = localStorage.getItem('knowledgeBases');
       const kbs = raw ? JSON.parse(raw) : [];
-      return Array.isArray(kbs) ? kbs.filter((kb) => kb.status !== 'disabled' && kb.status !== 'inactive') : [];
+      return Array.isArray(kbs)
+        ? kbs.filter(
+            (kb) => kb.status !== 'disabled' && kb.status !== 'inactive'
+          )
+        : [];
     } catch {
       return [];
     }
@@ -797,7 +940,17 @@ export class DocumentManager {
     }
 
     const content = this.docToMarkdown(doc);
-    const previewShort = content.length > 200 ? content.substring(0, 200) + '...' : content;
+    const previewShort =
+      content.length > 200 ? content.substring(0, 200) + '...' : content;
+
+    // 识别视频/音乐等知识库不直接支持的媒体类型
+    const isMedia =
+      doc.outputType === 'video' || doc.outputType === 'music';
+    const mediaHint = isMedia
+      ? `<div class="wa-kb-modal-media-hint"><i class="fa-solid fa-circle-info"></i> 该创作为${doc.outputTypeLabel}内容，知识库暂不支持音视频文件，将以文本形式（${
+          doc.outputType === 'music' ? '歌词与段落说明' : '分镜脚本'
+        }）添加</div>`
+      : '';
 
     const overlay = document.createElement('div');
     overlay.id = 'wa-kb-modal';
@@ -810,6 +963,7 @@ export class DocumentManager {
         </div>
         <div class="wa-modal-body">
           <div class="wa-kb-modal-preview">
+            ${mediaHint}
             <div class="wa-kb-modal-preview-label">即将添加的内容</div>
             <div class="wa-kb-modal-preview-name">${this.escapeHtml(doc.title)}</div>
             <div class="wa-kb-modal-preview-meta">
@@ -822,7 +976,9 @@ export class DocumentManager {
           <div class="wa-kb-modal-section">
             <div class="wa-kb-modal-section-label">选择目标知识库</div>
             <div class="wa-kb-modal-list">
-              ${kbs.map((kb) => `
+              ${kbs
+                .map(
+                  (kb) => `
                 <label class="wa-kb-modal-item" data-kb-id="${kb.id}">
                   <input type="radio" name="wa-kb-target" value="${kb.id}" ${kbs.length === 1 ? 'checked' : ''}>
                   <div class="wa-kb-modal-item-icon"><i class="fa-solid fa-${kb.type === '问答' ? 'message' : kb.type === '网页' ? 'globe' : 'folder-open'}"></i></div>
@@ -832,7 +988,9 @@ export class DocumentManager {
                     <div class="wa-kb-modal-item-meta">${kb.type} · ${kb.documentCount || 0} 篇文档 · 更新于 ${kb.lastUpdate || '-'}</div>
                   </div>
                 </label>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
           <div class="wa-kb-modal-section">
@@ -852,20 +1010,30 @@ export class DocumentManager {
     document.body.appendChild(overlay);
 
     overlay.addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-close').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-cancel').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-confirm').addEventListener('click', () => {
-      const selected = overlay.querySelector('input[name="wa-kb-target"]:checked');
-      if (!selected) {
-        this.showToast('请选择一个知识库');
-        return;
-      }
-      const kbId = selected.value;
-      const kb = kbs.find((k) => k.id === kbId);
-      const includeMeta = overlay.querySelector('#wa-kb-include-meta').checked;
-      overlay.remove();
-      this.confirmAddToKB(doc, kb, includeMeta);
-    });
+    overlay
+      .querySelector('#wa-kb-modal-close')
+      .addEventListener('click', () => overlay.remove());
+    overlay
+      .querySelector('#wa-kb-modal-cancel')
+      .addEventListener('click', () => overlay.remove());
+    overlay
+      .querySelector('#wa-kb-modal-confirm')
+      .addEventListener('click', () => {
+        const selected = overlay.querySelector(
+          'input[name="wa-kb-target"]:checked'
+        );
+        if (!selected) {
+          this.showToast('请选择一个知识库');
+          return;
+        }
+        const kbId = selected.value;
+        const kb = kbs.find((k) => k.id === kbId);
+        const includeMeta = overlay.querySelector(
+          '#wa-kb-include-meta'
+        ).checked;
+        overlay.remove();
+        this.confirmAddToKB(doc, kb, includeMeta);
+      });
   }
 
   confirmAddToKB(doc, kb, includeMeta) {
@@ -874,7 +1042,7 @@ export class DocumentManager {
     let content = this.docToMarkdown(doc);
     if (includeMeta) {
       const now = new Date().toLocaleString('zh-CN');
-      const meta = `> 本文来自我的文档\n> - 标题：${doc.title}\n> - 来源：${SOURCE_LABELS[doc.sourceType]}\n> - 模板：${doc.templateName || '自定义'}\n> - 类型：${doc.outputTypeLabel}\n> - 时间：${now}\n> - 知识库：${kb.name}\n\n`;
+      const meta = `> 本文来自创作记录\n> - 标题：${doc.title}\n> - 来源：${SOURCE_LABELS[doc.sourceType]}\n> - 模板：${doc.templateName || '自定义'}\n> - 类型：${doc.outputTypeLabel}\n> - 时间：${now}\n> - 知识库：${kb.name}\n\n`;
       content = meta + content;
     }
 
@@ -917,6 +1085,17 @@ export class DocumentManager {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  focusSearchInput() {
+    const restored = document.getElementById('doc-search-input');
+    if (restored) {
+      restored.focus();
+      restored.setSelectionRange(
+        this.searchQuery.length,
+        this.searchQuery.length
+      );
+    }
   }
 
   setOnOpenContentDoc(callback) {

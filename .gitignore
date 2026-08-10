@@ -17,6 +17,7 @@ build/
 # IDE
 .vscode/
 .idea/
+.trae/
 *.swp
 *.swo
 *~
@@ -31,3 +32,27 @@ coverage/
 
 # Server uploads
 server/uploads/
+
+# HTML design drafts
+prototype-*.html
+kb_module_avocado.html
+work-assistant-product/
+
+# Documents / reports / PPTs
+docs/
+weekly-report-*.md
+*PRD*.md
+eslint-report.txt
+*.docx
+*.pptx
+*.pdf
+
+# Development artifacts (root)
+/*.png
+test-*.py
+debug-*.py
+check-*.py
+screenshot-*.py
+verify-*.py
+fix-*.mjs
+gen-ppt.cjs

@@ -1,0 +1,1395 @@
+/* ========================================
+   工作助手 - 聊天框 PPT 卡片 & 预览模态框
+   ======================================== */
+
+/* ---------- 聊天框内 PPT 卡片 ---------- */
+.wa-chat-ppt-card {
+  display: flex;
+  gap: 16px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  max-width: 560px;
+}
+
+.wa-chat-ppt-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+.wa-chat-ppt-thumb {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 150px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wa-chat-ppt-thumb-inner {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.wa-chat-ppt-thumb-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wa-chat-ppt-thumb-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wa-chat-ppt-thumb-footer {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wa-chat-ppt-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-chat-ppt-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wa-chat-ppt-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.wa-chat-ppt-style {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wa-chat-ppt-kb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.wa-chat-ppt-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: auto;
+}
+
+.wa-chat-ppt-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wa-chat-ppt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.wa-chat-ppt-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.wa-chat-ppt-btn.primary {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.wa-chat-ppt-btn.primary:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+.wa-chat-ppt-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .wa-chat-ppt-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .wa-chat-ppt-thumb {
+    flex: none;
+    width: 100%;
+    height: 120px;
+  }
+}
+
+/* ---------- 预览模态框 ---------- */
+.wa-ppt-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: wa-ppt-fade-in 0.2s ease;
+}
+
+@keyframes wa-ppt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.wa-ppt-preview-modal {
+  width: 1100px;
+  max-width: calc(100vw - 48px);
+  height: calc(100vh - 80px);
+  max-height: 760px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: wa-ppt-scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes wa-ppt-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.wa-ppt-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.wa-ppt-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  min-width: 0;
+}
+
+.wa-ppt-modal-title i {
+  font-size: 22px;
+}
+
+.wa-ppt-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.wa-ppt-modal-style {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wa-ppt-modal-kb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+}
+
+.wa-ppt-modal-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-ppt-modal-view-tabs {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.wa-ppt-modal-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.wa-ppt-modal-view-tab.active {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.wa-ppt-modal-tool {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.wa-ppt-modal-tool:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.wa-ppt-modal-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.wa-ppt-modal-sidebar {
+  flex: 0 0 220px;
+  width: 220px;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.wa-ppt-modal-thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-ppt-modal-thumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.wa-ppt-modal-thumb:hover {
+  background: #f1f5f9;
+}
+
+.wa-ppt-modal-thumb.active {
+  background: #fff;
+  border-color: currentColor;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.wa-ppt-modal-thumb-num {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wa-ppt-modal-thumb.active .wa-ppt-modal-thumb-num {
+  background: currentColor;
+  color: #fff;
+}
+
+.wa-ppt-modal-thumb-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wa-ppt-modal-stage {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+  overflow-y: auto;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 幻灯片视图 */
+.wa-ppt-modal-slide {
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 16 / 9;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.wa-ppt-modal-slide-header {
+  padding: 36px 44px 24px;
+  flex: 0 0 auto;
+}
+
+.wa-ppt-modal-slide-type {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.wa-ppt-modal-slide-title {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0f172a;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s ease;
+}
+
+.wa-ppt-modal-slide-title:hover,
+.wa-ppt-modal-slide-title:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+.wa-ppt-modal-slide-subtitle {
+  font-size: 16px;
+  color: #475569;
+  margin-top: 10px;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.wa-ppt-modal-slide-subtitle:hover,
+.wa-ppt-modal-slide-subtitle:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+.wa-ppt-modal-slide-body {
+  flex: 1;
+  padding: 0 44px 36px;
+  overflow-y: auto;
+}
+
+.wa-ppt-modal-slide-bullets {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wa-ppt-modal-slide-bullets li {
+  font-size: 16px;
+  line-height: 1.55;
+  color: #334155;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s ease;
+  padding: 2px 0;
+}
+
+.wa-ppt-modal-slide-bullets li:hover,
+.wa-ppt-modal-slide-bullets li:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+.wa-ppt-modal-slide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 44px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+}
+
+/* 幻灯片导航 */
+.wa-ppt-modal-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.wa-ppt-modal-slide:hover .wa-ppt-modal-nav {
+  opacity: 1;
+}
+
+.wa-ppt-modal-nav:hover {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.wa-ppt-modal-nav.prev { left: 12px; }
+.wa-ppt-modal-nav.next { right: 12px; }
+
+.wa-ppt-modal-nav:disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed;
+}
+
+/* 大纲视图 */
+.wa-ppt-modal-outline {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wa-ppt-modal-outline-item {
+  display: flex;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.wa-ppt-modal-outline-item:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+
+.wa-ppt-modal-outline-item.active {
+  background: #fff;
+  border-color: currentColor;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+.wa-ppt-modal-outline-num {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wa-ppt-modal-outline-item.active .wa-ppt-modal-outline-num {
+  background: currentColor;
+  color: #fff;
+}
+
+.wa-ppt-modal-outline-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wa-ppt-modal-outline-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.wa-ppt-modal-outline-title:hover,
+.wa-ppt-modal-outline-title:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+.wa-ppt-modal-outline-subtitle {
+  font-size: 13px;
+  color: #475569;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.wa-ppt-modal-outline-subtitle:hover,
+.wa-ppt-modal-outline-subtitle:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+.wa-ppt-modal-outline-note {
+  font-size: 12px;
+  color: #94a3b8;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+.wa-ppt-modal-outline-note:hover,
+.wa-ppt-modal-outline-note:focus {
+  border-bottom-color: #cbd5e1;
+}
+
+@media (max-width: 860px) {
+  .wa-ppt-preview-modal {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+
+  .wa-ppt-modal-header {
+    flex-wrap: wrap;
+  }
+
+  .wa-ppt-modal-sidebar {
+    flex: 0 0 180px;
+    width: 180px;
+  }
+
+  .wa-ppt-modal-slide-title {
+    font-size: 22px;
+  }
+}
+
+/* ========================================
+   统一摘要卡片（所有 outputType 共用）
+   ======================================== */
+.wa-chat-summary-card {
+  display: flex;
+  gap: 16px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  max-width: 560px;
+}
+.wa-chat-summary-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+.wa-chat-summary-thumb {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 150px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.wa-chat-summary-thumb-inner {
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.wa-chat-summary-thumb-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wa-chat-summary-thumb-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wa-chat-summary-thumb-footer {
+  font-size: 12px;
+  font-weight: 600;
+}
+.wa-chat-summary-thumb-bigicon {
+  font-size: 26px;
+  margin-bottom: 4px;
+}
+.wa-chat-summary-thumb-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.wa-chat-summary-thumb-row {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  color: #475569;
+}
+.wa-chat-summary-thumb-row > div {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-chat-summary-thumb-row.head {
+  font-weight: 700;
+  color: #0f172a;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 4px;
+}
+
+.wa-chat-summary-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wa-chat-summary-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wa-chat-summary-title i {
+  margin-right: 6px;
+  opacity: 0.8;
+}
+.wa-chat-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+.wa-chat-summary-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+}
+.wa-chat-summary-kb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.wa-chat-summary-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: auto;
+}
+.wa-chat-summary-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.wa-chat-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.wa-chat-summary-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.wa-chat-summary-btn.primary {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+.wa-chat-summary-btn.primary:hover {
+  background: #1e293b;
+}
+.wa-chat-summary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .wa-chat-summary-card {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .wa-chat-summary-thumb {
+    flex: none;
+    width: 100%;
+    height: 120px;
+  }
+}
+
+/* ========================================
+   PPT 模态框编辑控件补全
+   ======================================== */
+.wa-ppt-modal-select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+.wa-ppt-modal-select:hover {
+  border-color: #cbd5e1;
+}
+.wa-ppt-modal-select:focus {
+  border-color: #0f172a;
+}
+
+.wa-ppt-modal-thumb {
+  position: relative;
+}
+.wa-ppt-modal-thumb-handle {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #cbd5e1;
+  cursor: grab;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wa-ppt-modal-thumb:hover .wa-ppt-modal-thumb-handle {
+  opacity: 1;
+}
+.wa-ppt-modal-thumb-ops {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wa-ppt-modal-thumb:hover .wa-ppt-modal-thumb-ops {
+  opacity: 1;
+}
+.wa-ppt-modal-thumb-op {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.7);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.wa-ppt-modal-thumb-op:hover {
+  background: rgba(15, 23, 42, 0.9);
+}
+.wa-ppt-modal-thumb-op:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.wa-ppt-modal-thumb.dragging {
+  opacity: 0.4;
+}
+.wa-ppt-modal-thumb.drag-over {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15);
+}
+
+.wa-ppt-modal-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.wa-ppt-modal-bullet-text {
+  flex: 1;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s ease;
+}
+.wa-ppt-modal-bullet-text:hover,
+.wa-ppt-modal-bullet-text:focus {
+  border-bottom-color: #cbd5e1;
+}
+.wa-ppt-modal-bullet-del {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.wa-ppt-modal-bullet-item:hover .wa-ppt-modal-bullet-del {
+  opacity: 1;
+}
+.wa-ppt-modal-bullet-del:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+.wa-ppt-modal-add-bullet {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.wa-ppt-modal-add-bullet:hover {
+  border-color: #0f172a;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.wa-ppt-modal-add-page {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.wa-ppt-modal-add-page:hover {
+  border-color: #0f172a;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.wa-ppt-modal-outline-item {
+  position: relative;
+}
+.wa-ppt-modal-outline-ops {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.wa-ppt-modal-outline-item:hover .wa-ppt-modal-outline-ops {
+  opacity: 1;
+}
+
+/* ========================================
+   通用模态框舞台（覆盖默认居中，支持多类型布局）
+   ======================================== */
+.wa-result-modal-stage {
+  display: block;
+  padding: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* ========================================
+   表格预览/编辑模态框
+   ======================================== */
+.wa-table-modal-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.wa-table-modal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.wa-table-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wa-table-modal-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.wa-table-modal-info {
+  margin-left: auto;
+  font-size: 12px;
+  color: #64748b;
+}
+.wa-table-modal-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.wa-table-modal-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.wa-table-modal-table th,
+.wa-table-modal-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0;
+}
+.wa-table-modal-row-head {
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  width: 72px;
+  min-width: 72px;
+  position: relative;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.wa-table-modal-drag,
+.wa-table-modal-col-drag {
+  color: #cbd5e1;
+  cursor: grab;
+  font-size: 12px;
+  display: inline-block;
+}
+.wa-table-modal-col-drag {
+  padding: 0 2px;
+}
+.wa-table-modal-col-drag:active {
+  cursor: grabbing;
+}
+.wa-table-modal-row-num {
+  display: inline-block;
+  margin: 0 2px;
+}
+.wa-table-modal-more {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  vertical-align: middle;
+}
+.wa-table-modal-row-head:hover .wa-table-modal-more,
+.wa-table-modal-col-head:hover .wa-table-modal-more {
+  opacity: 1;
+}
+.wa-table-modal-more:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+.wa-table-modal-col-head {
+  background: #f8fafc;
+  position: relative;
+  min-width: 100px;
+}
+.wa-table-modal-col-text {
+  display: inline-block;
+  padding: 8px 4px 8px 2px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  min-width: 60px;
+}
+.wa-table-modal-cell {
+  padding: 8px 10px;
+  color: #334155;
+  outline: none;
+  min-width: 100px;
+}
+.wa-table-modal-cell:focus,
+.wa-table-modal-col-text:focus {
+  background: #f0f9ff;
+  box-shadow: inset 0 0 0 2px #38bdf8;
+}
+.wa-table-modal-table tr.dragging {
+  opacity: 0.4;
+}
+.wa-table-modal-table tr.drag-over td {
+  border-top: 2px solid #0f172a;
+}
+.wa-table-modal-col-head.dragging {
+  opacity: 0.4;
+}
+.wa-table-modal-col-head.drag-over {
+  border-left: 2px solid #0f172a;
+}
+
+/* 行/列操作下拉菜单 */
+.wa-table-modal-menu {
+  position: fixed;
+  z-index: 10001;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: wa-table-menu-in 0.12s ease;
+}
+@keyframes wa-table-menu-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.wa-table-modal-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  text-align: left;
+}
+.wa-table-modal-menu-item i {
+  width: 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+.wa-table-modal-menu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.wa-table-modal-menu-item:hover i {
+  color: #475569;
+}
+.wa-table-modal-menu-item.danger {
+  color: #ef4444;
+}
+.wa-table-modal-menu-item.danger i {
+  color: #fca5a5;
+}
+.wa-table-modal-menu-item.danger:hover {
+  background: #fef2f2;
+}
+.wa-table-modal-menu-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.wa-table-modal-menu-item:disabled:hover {
+  background: transparent;
+}
+
+/* ========================================
+   文档预览/编辑模态框（Tiptap）
+   ======================================== */
+.wa-doc-modal-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.wa-doc-modal-toolbar {
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.wa-doc-modal-editor {
+  flex: 1;
+  overflow: auto;
+  padding: 32px 48px;
+  background: #fff;
+}
+.wa-doc-modal-editor .ProseMirror {
+  min-height: 400px;
+  outline: none;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1f2937;
+}
+.wa-doc-modal-editor .ProseMirror:focus {
+  outline: none;
+}
+.wa-doc-modal-fallback textarea {
+  width: 100%;
+  height: 60vh;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+}
+
+/* ========================================
+   视频/音乐预览/编辑模态框
+   ======================================== */
+.wa-media-modal-layout {
+  display: flex;
+  height: 100%;
+}
+.wa-media-modal-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wa-media-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.wa-media-modal-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+.wa-media-modal-meta-item > span {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wa-media-modal-meta-item > div {
+  min-width: 60px;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  font-weight: 600;
+}
+.wa-media-modal-meta-item > div:focus {
+  border-color: #0f172a;
+}
+.wa-media-modal-stage {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+.wa-media-modal-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 680px;
+}
+.wa-media-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wa-media-modal-field > label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wa-media-modal-input {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  line-height: 1.6;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.wa-media-modal-input.area {
+  min-height: 80px;
+}
+.wa-media-modal-input.lyrics {
+  min-height: 160px;
+  white-space: pre-wrap;
+}
+.wa-media-modal-input:focus {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+/* 媒体模态框复用 PPT 侧边栏布局，确保侧边栏正确显示 */
+.wa-media-modal-layout .wa-ppt-modal-sidebar {
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  overflow-y: auto;
+  padding: 12px;
+  flex: 0 0 220px;
+  width: 220px;
+}
+.wa-media-modal-layout .wa-ppt-modal-thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .wa-media-modal-layout {
+    flex-direction: column;
+  }
+  .wa-media-modal-layout .wa-ppt-modal-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 200px;
+  }
+}

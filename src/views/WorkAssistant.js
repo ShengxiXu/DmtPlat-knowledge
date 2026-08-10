@@ -49,10 +49,28 @@ import {
   formatLabels,
 } from '../data/contentTemplates.js';
 import { knowledgeBases } from '../data/mockData.js';
-import { formatDate, generateId, showToast as helpersShowToast } from '../utils/helpers.js';
+import {
+  formatDate,
+  generateId,
+  showToast as helpersShowToast,
+} from '../utils/helpers.js';
 import { FieldModal } from '../components/FieldModal.js';
 import { generate as generateContent } from '../services/contentGenerator.js';
-import { toggleTheme, onThemeChange, getThemeIcon, getEffectiveTheme } from '../utils/theme.js';
+import {
+  toggleTheme,
+  onThemeChange,
+  getThemeIcon,
+  getEffectiveTheme,
+} from '../utils/theme.js';
+import { createRichEditor } from '../editor/RichEditor.js';
+import { createRichToolbar } from '../editor/RichToolbar.js';
+import { SpreadsheetEditor } from '../editor/SpreadsheetEditor.js';
+import { MediaPlayer } from '../editor/MediaPlayer.js';
+import {
+  normalizeTableResult,
+  syncLegacyMirror,
+  buildXlsxStyle,
+} from '../utils/spreadsheetHelpers.js';
 
 const ROLE_TO_SCENES = {
   sales: ['sales', 'office', 'personal'],
@@ -133,7 +151,9 @@ export class WorkAssistant {
     if (this.initialContentTemplateId) {
       const ct = getContentTemplateById(this.initialContentTemplateId);
       if (ct) {
-        const { outputType, abilityId } = this.mapContentTemplateFormat(ct.format);
+        const { outputType, abilityId } = this.mapContentTemplateFormat(
+          ct.format
+        );
         this.selectedTemplate = this.createTempTemplateFromContentTemplate(
           ct,
           outputType,
@@ -145,7 +165,13 @@ export class WorkAssistant {
 
     this.restoreInitialRecord();
 
-    this.extractForm = { name: '', roleId: 'sales', abilityId: 'writing', outputType: outputTypes.TEXT, exampleText: '' };
+    this.extractForm = {
+      name: '',
+      roleId: 'sales',
+      abilityId: 'writing',
+      outputType: outputTypes.TEXT,
+      exampleText: '',
+    };
     this.extractPreview = null;
     this.extractFile = null;
     this.extractParsing = false;
@@ -192,7 +218,12 @@ export class WorkAssistant {
   }
 
   displayCurrentResultIfNeeded() {
-    if (!this.selectedTemplate || !this.currentResult || this.activeTab !== 'editor') return;
+    if (
+      !this.selectedTemplate ||
+      !this.currentResult ||
+      this.activeTab !== 'editor'
+    )
+      return;
     if (this.selectedTemplate.outputType === outputTypes.PPT) {
       this.showPPTResult(this.currentResult, this.selectedTemplate);
     } else {
@@ -248,30 +279,37 @@ export class WorkAssistant {
     });
 
     // 兜底：内容模板弹窗按钮在 document capture 阶段处理，避免某些情况下点击事件未正常传播到按钮
-    document.addEventListener('click', (e) => {
-      if (!this.ctModalOpen) return;
-      if (e.target.closest('#wa-ct-modal-cancel') || e.target.closest('#wa-ct-modal-close')) {
-        e.stopPropagation();
-        this.ctModalOpen = false;
-        this.render();
-        return;
-      }
-      if (e.target.closest('#wa-ct-modal-confirm')) {
-        e.stopPropagation();
-        this.ctModalOpen = false;
-        if (this.ctModalForCreator) {
-          this.updateCreatorPreview();
-        } else if (this.ctModalForReview) {
-          this.creatorReviewState.structureType = 'free';
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (!this.ctModalOpen) return;
+        if (
+          e.target.closest('#wa-ct-modal-cancel') ||
+          e.target.closest('#wa-ct-modal-close')
+        ) {
+          e.stopPropagation();
+          this.ctModalOpen = false;
+          this.render();
+          return;
         }
-        this.render();
-        return;
-      }
-      if (e.target.id === 'wa-ct-modal-overlay') {
-        this.ctModalOpen = false;
-        this.render();
-      }
-    }, true);
+        if (e.target.closest('#wa-ct-modal-confirm')) {
+          e.stopPropagation();
+          this.ctModalOpen = false;
+          if (this.ctModalForCreator) {
+            this.updateCreatorPreview();
+          } else if (this.ctModalForReview) {
+            this.creatorReviewState.structureType = 'free';
+          }
+          this.render();
+          return;
+        }
+        if (e.target.id === 'wa-ct-modal-overlay') {
+          this.ctModalOpen = false;
+          this.render();
+        }
+      },
+      true
+    );
   }
 
   restoreInitialRecord() {
@@ -283,12 +321,89 @@ export class WorkAssistant {
       return;
     }
 
-    const allTemplates = [...getAllTemplates(), ...getCustomTemplates()];
-    const template = allTemplates.find((t) => t.id === record.templateId);
-    if (!template) {
-      this.showToast('原始模板不存在，无法恢复记录');
-      this.initialRecordId = null;
+    // 按创作渠道分流，回到各自最后的编辑点
+    const source = record.source || this.inferItemSource(record);
+    const isChatChannel =
+      source === 'freeChat' ||
+      record.isFreeChat ||
+      (record.templateId && record.templateId.startsWith('chat_type_'));
+    if (isChatChannel) {
+      // 渠道一：首页 AI 对话 → 回到首页对话流
+      this.restoreFreeChatRecord(record);
       return;
+    }
+    // 渠道二：场景模板 → 回到编辑器
+    this.restoreSceneRecord(record);
+  }
+
+  // 恢复首页 AI 对话记录：回到 home 对话流，展示该次生成的结果
+  restoreFreeChatRecord(record) {
+    // 解析对话内容类型（markdown/ppt/table/video/music/chat）
+    let chatContentType = 'chat';
+    if (record.templateId && record.templateId.startsWith('chat_type_')) {
+      chatContentType = record.templateId.replace('chat_type_', '');
+    } else if (record.templateId === 'free-chat') {
+      chatContentType = 'chat';
+    } else if (record.result) {
+      chatContentType = this.inferChatContentTypeFromResult(record.result);
+    }
+    this.chatContentType = chatContentType;
+    this.initChatContentConfig(this.chatContentType);
+
+    // 恢复知识库与模式
+    this.currentKBs = (record.kbIds || [])
+      .map((id) => knowledgeBases.find((kb) => kb.id === id))
+      .filter(Boolean);
+    this.setSelectedKBs(record.kbIds || []);
+    this.currentMode = record.mode || 'free';
+
+    // 把记录重建为对话流中的一条 AI 消息（含原始用户提问）
+    const userContent =
+      record.formData?.content || record.formData?.topic || record.title || '';
+    const aiMsg = {
+      id: generateId('chatmsg'),
+      role: 'ai',
+      thinkingSteps: [],
+      content: record.result?.content || '',
+      result: record.result,
+      template: {
+        id: record.templateId || 'free-chat',
+        name: record.templateName || 'AI 对话',
+        icon: 'comments',
+        outputType: this.inferOutputTypeFromResult(record.result),
+      },
+      formData: record.formData || {},
+      selectedKBs: this.currentKBs,
+      mode: record.mode || 'free',
+      done: true,
+      // 纯对话（free-chat）展示 content 文本；chat_type_xxx 结构化结果走结果卡片
+      isFreeChat: record.isFreeChat || record.templateId === 'free-chat',
+      title: record.title,
+      saved: true,
+      source: 'freeChat',
+    };
+    const userMsg = {
+      id: generateId('chatmsg'),
+      role: 'user',
+      type: 'text',
+      content: userContent,
+    };
+    this.chatMessages = [userMsg, aiMsg];
+    this.currentResult = record.result || null;
+    this.selectedTemplate = null;
+    this.activeTab = 'home';
+    this.initialRecordId = null;
+  }
+
+  // 恢复场景模板记录：回到编辑器，恢复场景编辑状态
+  restoreSceneRecord(record) {
+    const allTemplates = [...getAllTemplates(), ...getCustomTemplates()];
+    let template = allTemplates.find((t) => t.id === record.templateId);
+    if (!template) {
+      // 原始模板已不存在（常见于首页对话生成的临时模板，id 形如 chat_type_xxx）。
+      // 基于记录中保存的信息重建一个可用模板，使记录仍可恢复查看与编辑。
+      template = this.rebuildTemplateFromRecord(record);
+      this.showToast('原始模板已失效，已按记录信息恢复', 'info');
     }
 
     this.selectedTemplate = template;
@@ -307,6 +422,45 @@ export class WorkAssistant {
       this.pptStep = 3;
       this.pptStage = 'content';
     }
+    this.initialRecordId = null;
+  }
+
+  // 从 result 结构推断首页对话的内容类型
+  inferChatContentTypeFromResult(result) {
+    if (!result) return 'chat';
+    if (Array.isArray(result.pages)) return 'ppt';
+    if (result.columns || Array.isArray(result.sheets)) return 'table';
+    if (Array.isArray(result.scenes)) return 'video';
+    if (Array.isArray(result.sections)) return 'music';
+    return 'chat';
+  }
+
+  // 基于创作记录重建模板（原始模板已失效时的回退方案）
+  rebuildTemplateFromRecord(record) {
+    const outputType =
+      record.outputType || this.inferOutputTypeFromResult(record.result);
+    return {
+      id: record.templateId || `restored_${record.id}`,
+      name: record.templateName || record.title || '创作记录',
+      roleId: record.roleId || 'sales',
+      abilityId: record.abilityId,
+      outputType,
+      icon: this.getOutputTypeIcon(outputType),
+      defaultMode: record.mode || 'free',
+      fields: [{ id: 'topic', type: fieldTypes.TEXT, label: '主题' }],
+      isRestored: true,
+    };
+  }
+
+  // 从 result 结构推断 outputType
+  inferOutputTypeFromResult(result) {
+    if (!result) return outputTypes.TEXT;
+    if (Array.isArray(result.pages)) return outputTypes.PPT;
+    if (result.columns || Array.isArray(result.sheets)) return outputTypes.TABLE;
+    if (Array.isArray(result.scenes)) return outputTypes.VIDEO;
+    if (Array.isArray(result.sections)) return outputTypes.MUSIC;
+    if (result.content) return outputTypes.MARKDOWN;
+    return outputTypes.TEXT;
   }
 
   getDefaultPPTConfig() {
@@ -322,7 +476,9 @@ export class WorkAssistant {
       const history = getWorkHistory();
       if (!Array.isArray(history)) return [];
       // 过滤掉无效记录，避免 undefined/null 导致渲染报错
-      return history.filter((item) => item && typeof item === 'object' && item.id).slice(0, 5);
+      return history
+        .filter((item) => item && typeof item === 'object' && item.id)
+        .slice(0, 5);
     } catch (e) {
       console.warn('读取最近创作失败:', e);
       return [];
@@ -402,18 +558,27 @@ export class WorkAssistant {
       [outputTypes.LIST]: '列表',
       [outputTypes.MARKDOWN]: '文档',
       [outputTypes.TEXT]: '文本',
+      [outputTypes.VIDEO]: '视频',
+      [outputTypes.MUSIC]: '音乐',
     };
     return labelMap[outputType] || '文档';
   }
 
   renderMinimalTemplateRow(template, type) {
-    const icon = type === 'scene'
-      ? this.getSceneIcon(template.outputType)
-      : this.getContentIcon(template.format);
-    const meta = type === 'scene'
-      ? this.getOutputTypeLabel(template.outputType)
-      : ((formatLabels[template.format] || {}).label || template.format || '文档');
-    const uses = type === 'content' && template.usedCount ? `${template.usedCount} 次` : '';
+    const icon =
+      type === 'scene'
+        ? this.getSceneIcon(template.outputType)
+        : this.getContentIcon(template.format);
+    const meta =
+      type === 'scene'
+        ? this.getOutputTypeLabel(template.outputType)
+        : (formatLabels[template.format] || {}).label ||
+          template.format ||
+          '文档';
+    const uses =
+      type === 'content' && template.usedCount
+        ? `${template.usedCount} 次`
+        : '';
     return `
       <div class="minimal-template-row" data-template="${template.id}" data-type="${type}">
         <div class="minimal-template-icon"><i class="fa-regular fa-${icon}"></i></div>
@@ -447,9 +612,9 @@ export class WorkAssistant {
             <span>AI 创作中心</span>
           </div>
           <div class="wa-chat-top-actions">
-            <button class="wa-chat-top-btn" id="wa-chat-docs" title="我的文档">
+            <button class="wa-chat-top-btn" id="wa-chat-docs" title="创作记录">
               <i class="fa-regular fa-folder-open"></i>
-              <span>我的文档</span>
+              <span>创作记录</span>
               ${docCount > 0 ? `<span class="count">${docCount}</span>` : ''}
             </button>
             <button class="wa-chat-theme-toggle" id="wa-chat-theme-toggle" title="切换主题">
@@ -459,7 +624,9 @@ export class WorkAssistant {
         </header>
 
         <main class="wa-chat-main ${!hasMessages ? 'wa-chat-main--home' : ''}" id="wa-chat-main">
-          ${!hasMessages ? `
+          ${
+            !hasMessages
+              ? `
             <div class="wa-chat-welcome">
               <div class="wa-chat-badge">
                 <span class="dot"></span>
@@ -521,26 +688,34 @@ export class WorkAssistant {
                 <div class="wa-chat-recents-title">最近创作</div>
                 ${recents.length > 0 ? `<div class="wa-chat-recents-link" id="wa-chat-recents-more">查看全部 <i class="fa-solid fa-chevron-right"></i></div>` : ''}
               </div>
-              ${recents.length > 0 ? `
+              ${
+                recents.length > 0
+                  ? `
                 <div class="wa-chat-recents-list">
                   ${recents.map((item) => this.renderRecentItem(item)).join('')}
                 </div>
-              ` : `
+              `
+                  : `
                 <div class="wa-chat-recents-empty">
                   <i class="fa-regular fa-folder-open"></i>
                   <div class="wa-chat-recents-empty-title">暂无最近创作</div>
                   <div class="wa-chat-recents-empty-desc">在上方输入需求开始对话，或选择模板生成内容</div>
                 </div>
-              `}
+              `
+              }
             </div>
-          ` : `
+          `
+              : `
             <div class="wa-chat-messages" id="wa-chat-messages">
               ${this.chatMessages.map((m) => this.renderChatMessage(m)).join('')}
             </div>
-          `}
+          `
+          }
         </main>
 
-        ${hasMessages ? `
+        ${
+          hasMessages
+            ? `
           <div class="wa-chat-composer-wrap">
             <div class="wa-chat-composer wa-chat-composer--hero wa-chat-composer--floating">
               <textarea class="wa-chat-composer-input" id="wa-chat-input"
@@ -560,7 +735,9 @@ export class WorkAssistant {
               ${this.renderHomeKBPicker()}
             </div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
 
@@ -579,16 +756,18 @@ export class WorkAssistant {
           <button class="wa-chat-kb-picker-close" id="wa-chat-kb-close" type="button"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="wa-chat-kb-picker-list">
-          ${kbs.map((kb) => {
-            const checked = selected.some((s) => s.id === kb.id);
-            return `
+          ${kbs
+            .map((kb) => {
+              const checked = selected.some((s) => s.id === kb.id);
+              return `
               <label class="wa-chat-kb-item ${checked ? 'checked' : ''}">
                 <input type="checkbox" data-kb-id="${kb.id}" ${checked ? 'checked' : ''}>
                 <i class="fa-solid fa-book"></i>
                 <span>${this.escapeHtml(kb.name)}</span>
               </label>
             `;
-          }).join('')}
+            })
+            .join('')}
         </div>
       </div>
     `;
@@ -606,17 +785,26 @@ export class WorkAssistant {
 
   renderChatTemplateCard(template, type, index) {
     const role = type === 'scene' ? getRoleById(template.roleId) : null;
-    const icon = type === 'scene'
-      ? this.getSceneIcon(template.outputType)
-      : this.getContentIcon(template.format);
-    const tagLabel = type === 'scene'
-      ? this.getOutputTypeLabel(template.outputType)
-      : (formatLabels[template.format] || template.format);
+    const icon =
+      type === 'scene'
+        ? this.getSceneIcon(template.outputType)
+        : this.getContentIcon(template.format);
+    const tagLabel =
+      type === 'scene'
+        ? this.getOutputTypeLabel(template.outputType)
+        : formatLabels[template.format] || template.format;
     const fields = template.fields || [];
-    const fieldChips = fields.slice(0, 4).map((f) =>
-      `<span class="wa-chat-field-chip ${f.required ? 'req' : ''}">${this.escapeHtml(f.label)}</span>`
-    ).join('');
-    const extraCount = fields.length > 4 ? `<span class="wa-chat-field-chip">+${fields.length - 4}</span>` : '';
+    const fieldChips = fields
+      .slice(0, 4)
+      .map(
+        (f) =>
+          `<span class="wa-chat-field-chip ${f.required ? 'req' : ''}">${this.escapeHtml(f.label)}</span>`
+      )
+      .join('');
+    const extraCount =
+      fields.length > 4
+        ? `<span class="wa-chat-field-chip">+${fields.length - 4}</span>`
+        : '';
 
     return `
       <div class="wa-chat-template-card" data-template="${template.id}" data-type="${type}"
@@ -642,19 +830,22 @@ export class WorkAssistant {
       .map((id) => all.find((t) => t && t.id === id))
       .filter(Boolean);
 
-    const cards = items.length > 0
-      ? items.map((t) => {
-          const ic = isScene
-            ? this.getSceneIcon(t.outputType)
-            : this.getContentIcon(t.format);
-          return `
+    const cards =
+      items.length > 0
+        ? items
+            .map((t) => {
+              const ic = isScene
+                ? this.getSceneIcon(t.outputType)
+                : this.getContentIcon(t.format);
+              return `
             <button class="wa-quick-card" type="button" data-quick-type="${type}" data-template-id="${t.id}">
               <span class="wa-quick-card-icon"><i class="fa-solid fa-${ic}"></i></span>
               <span class="wa-quick-card-name">${this.escapeHtml(t.name)}</span>
             </button>
           `;
-        }).join('')
-      : `<div class="wa-quick-empty">点击「管理」添加常用模板</div>`;
+            })
+            .join('')
+        : `<div class="wa-quick-empty">点击「管理」添加常用模板</div>`;
 
     return `
       <div class="wa-quick-section" data-quick-type="${type}">
@@ -678,14 +869,16 @@ export class WorkAssistant {
     if (msg.type === 'template-context') {
       const { template, formData, selectedKBs } = msg;
       const role = getRoleById(template.roleId);
-      const fieldRows = (template.fields || []).map((f) => {
-        const val = formData[f.id];
-        let display = Array.isArray(val) ? val.join('、') : val;
-        return `<div class="wa-chat-field-row">
+      const fieldRows = (template.fields || [])
+        .map((f) => {
+          const val = formData[f.id];
+          let display = Array.isArray(val) ? val.join('、') : val;
+          return `<div class="wa-chat-field-row">
           <span class="wa-chat-field-label">${this.escapeHtml(f.label)}</span>
           <span class="wa-chat-field-value">${this.escapeHtml(display || '—')}</span>
         </div>`;
-      }).join('');
+        })
+        .join('');
 
       return `
         <div class="wa-chat-message user">
@@ -729,22 +922,31 @@ export class WorkAssistant {
 
   renderChatAIMessageInner(msg) {
     const steps = msg.thinkingSteps || [];
-    const stepsHtml = steps.map((s) => `
+    const stepsHtml = steps
+      .map(
+        (s) => `
       <div class="wa-chat-thinking-step ${s.status === 'done' ? 'done' : 'show'}">
-        ${s.status === 'done'
-          ? '<i class="fa-solid fa-check check"></i>'
-          : '<i class="fa-solid fa-circle-notch loader"></i>'}
+        ${
+          s.status === 'done'
+            ? '<i class="fa-solid fa-check check"></i>'
+            : '<i class="fa-solid fa-circle-notch loader"></i>'
+        }
         <span>${this.escapeHtml(s.text)}</span>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
-    const thinkingHtml = steps.length > 0 ? `
+    const thinkingHtml =
+      steps.length > 0
+        ? `
       <div class="wa-chat-thinking-header">
         <i class="fa-solid fa-circle-notch"></i>
         <span>${msg.done ? '思考完成' : '思考中...'}</span>
       </div>
       <div class="wa-chat-thinking-steps">${stepsHtml}</div>
-    ` : '';
+    `
+        : '';
 
     if (msg.done && msg.result && !msg.isFreeChat) {
       return this.renderChatResultCard(msg);
@@ -757,46 +959,1368 @@ export class WorkAssistant {
   }
 
   renderChatResultCard(msg) {
-    const { template, result, selectedKBs, content } = msg;
-    const outputLabel = this.getOutputTypeLabel(template.outputType);
-    const kbNote = selectedKBs && selectedKBs.length > 0
-      ? `<div class="wa-chat-kb-note"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
-      : '';
+    // 所有类型统一走「摘要卡片 → 点击预览编辑」路径
+    return this.renderChatSummaryCard(msg);
+  }
 
-    return `
-      <div class="wa-chat-result-card">
-        <div class="wa-chat-result-header">
-          <div class="wa-chat-result-icon"><i class="fa-solid fa-${template.icon || 'file-lines'}"></i></div>
-          <div class="wa-chat-result-title">${this.escapeHtml(template.name)}</div>
-          <span class="wa-chat-result-tag">${outputLabel}</span>
+  // 各 outputType 的图标映射
+  getOutputTypeIcon(outputType) {
+    const iconMap = {
+      [outputTypes.PPT]: 'file-powerpoint',
+      [outputTypes.TABLE]: 'table',
+      [outputTypes.EMAIL]: 'envelope',
+      [outputTypes.VIDEO]: 'film',
+      [outputTypes.MUSIC]: 'music',
+      [outputTypes.MARKDOWN]: 'file-lines',
+      [outputTypes.REPORT]: 'file-lines',
+      [outputTypes.LIST]: 'list-ul',
+      [outputTypes.QA]: 'circle-question',
+      [outputTypes.STEPS]: 'list-ol',
+      [outputTypes.TEXT]: 'file-lines',
+    };
+    return iconMap[outputType] || 'file-lines';
+  }
+
+  // 摘要卡片缩略图（按类型定制）
+  renderSummaryThumb(msg) {
+    const { template, result } = msg;
+    const ot = template.outputType;
+    const color = (result && result.colorHex) || '0E9F6E';
+
+    if (ot === outputTypes.PPT && result && result.pages) {
+      const firstPage = result.pages[0];
+      const slideText = firstPage
+        ? this.extractPlainText(firstPage.title || firstPage.subtitle || '')
+        : 'PPT 演示文稿';
+      return `
+        <div class="wa-chat-summary-thumb ppt-thumb" style="background:linear-gradient(135deg,#${color}22,#${color}08);border-color:#${color}30">
+          <div class="wa-chat-summary-thumb-inner">
+            <div class="wa-chat-summary-thumb-type" style="color:#${color}">${this.getPPTPageTypeLabel(firstPage?.type)}</div>
+            <div class="wa-chat-summary-thumb-title">${this.escapeHtml(slideText).substring(0, 24)}${slideText.length > 24 ? '...' : ''}</div>
+            <div class="wa-chat-summary-thumb-footer" style="color:#${color}">${result.pages.length} 页</div>
+          </div>
         </div>
-        <div class="wa-chat-result-body">${kbNote}${content}</div>
-        <div class="wa-chat-result-actions">
-          <button class="wa-chat-result-btn" data-action="copy" data-msg-id="${msg.id}">
-            <i class="fa-solid fa-copy"></i> 复制
-          </button>
-          <button class="wa-chat-result-btn primary" data-action="edit" data-msg-id="${msg.id}">
-            <i class="fa-solid fa-pen"></i> 编辑
-          </button>
-          <button class="wa-chat-result-btn ${msg.saved ? '' : 'primary'}" data-action="save" data-msg-id="${msg.id}" ${msg.saved ? 'disabled' : ''}>
-            <i class="fa-solid fa-${msg.saved ? 'check' : 'floppy-disk'}"></i> ${msg.saved ? '已保存' : '保存'}
-          </button>
+      `;
+    }
+
+    if (ot === outputTypes.TABLE && result && result.columns) {
+      const cols = result.columns.slice(0, 3);
+      const previewRows = (result.rows || []).slice(0, 3);
+      return `
+        <div class="wa-chat-summary-thumb table-thumb" style="background:linear-gradient(135deg,#${color}18,#${color}05);border-color:#${color}30">
+          <div class="wa-chat-summary-thumb-table">
+            <div class="wa-chat-summary-thumb-row head">
+              ${cols.map((c) => `<div>${this.escapeHtml(String(c))}</div>`).join('')}
+            </div>
+            ${previewRows
+              .map(
+                (r) => `
+              <div class="wa-chat-summary-thumb-row">
+                ${cols.map((_, i) => `<div>${this.escapeHtml(String(r[i] != null ? r[i] : '')).substring(0, 8)}</div>`).join('')}
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+          <div class="wa-chat-summary-thumb-footer" style="color:#${color}">${result.rows?.length || 0} 行 · ${result.columns.length} 列</div>
+        </div>
+      `;
+    }
+
+    if (ot === outputTypes.VIDEO && result && result.scenes) {
+      return `
+        <div class="wa-chat-summary-thumb video-thumb" style="background:linear-gradient(135deg,#${color}22,#${color}08);border-color:#${color}30">
+          <div class="wa-chat-summary-thumb-inner">
+            <i class="fa-solid fa-play-circle wa-chat-summary-thumb-bigicon" style="color:#${color}"></i>
+            <div class="wa-chat-summary-thumb-title">${this.escapeHtml(result.style || '视频脚本')}</div>
+            <div class="wa-chat-summary-thumb-footer" style="color:#${color}">${result.scenes.length} 分镜 · ${result.duration}s</div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (ot === outputTypes.MUSIC && result && result.sections) {
+      return `
+        <div class="wa-chat-summary-thumb music-thumb" style="background:linear-gradient(135deg,#${color}22,#${color}08);border-color:#${color}30">
+          <div class="wa-chat-summary-thumb-inner">
+            <i class="fa-solid fa-music wa-chat-summary-thumb-bigicon" style="color:#${color}"></i>
+            <div class="wa-chat-summary-thumb-title">${this.escapeHtml(result.genre || '音乐')}</div>
+            <div class="wa-chat-summary-thumb-footer" style="color:#${color}">${result.sections.length} 段落 · ${result.duration}s</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 文本类
+    const plain =
+      result && result.content ? this.extractPlainText(result.content) : '';
+    const preview = plain.substring(0, 80) + (plain.length > 80 ? '...' : '');
+    return `
+      <div class="wa-chat-summary-thumb doc-thumb" style="background:linear-gradient(135deg,#${color}18,#${color}05);border-color:#${color}30">
+        <div class="wa-chat-summary-thumb-inner">
+          <i class="fa-solid fa-${this.getOutputTypeIcon(ot)} wa-chat-summary-thumb-bigicon" style="color:#${color}"></i>
+          <div class="wa-chat-summary-thumb-title">${this.escapeHtml(preview) || '文档内容'}</div>
+          <div class="wa-chat-summary-thumb-footer" style="color:#${color}">${plain.length} 字</div>
         </div>
       </div>
     `;
   }
 
-  scrollToChatBottom() {
-    const main = document.getElementById('wa-chat-main');
-    if (main) requestAnimationFrame(() => { main.scrollTop = main.scrollHeight; });
+  // 各 outputType 的元信息
+  getSummaryMeta(msg) {
+    const { template, result } = msg;
+    const ot = template.outputType;
+    const label = this.getOutputTypeLabel(ot);
+    const parts = [`<span class="wa-chat-summary-tag">${label}</span>`];
+    if (!result) return parts.join('');
+    if (ot === outputTypes.PPT && result.pages) {
+      parts.push(
+        `<span><i class="fa-solid fa-file-powerpoint"></i> ${result.pages.length} 页</span>`
+      );
+      if (result.style)
+        parts.push(
+          `<span><i class="fa-solid fa-palette"></i> ${result.style}</span>`
+        );
+    } else if (ot === outputTypes.TABLE && result.columns) {
+      parts.push(
+        `<span><i class="fa-solid fa-table"></i> ${result.rows?.length || 0} 行 · ${result.columns.length} 列</span>`
+      );
+    } else if (ot === outputTypes.VIDEO && result.scenes) {
+      parts.push(
+        `<span><i class="fa-solid fa-film"></i> ${result.scenes.length} 分镜</span>`
+      );
+      if (result.duration)
+        parts.push(
+          `<span><i class="fa-solid fa-clock"></i> ${result.duration}s</span>`
+        );
+    } else if (ot === outputTypes.MUSIC && result.sections) {
+      parts.push(
+        `<span><i class="fa-solid fa-music"></i> ${result.sections.length} 段落</span>`
+      );
+      if (result.duration)
+        parts.push(
+          `<span><i class="fa-solid fa-clock"></i> ${result.duration}s</span>`
+        );
+    } else if (result.content) {
+      const len = this.extractPlainText(result.content).length;
+      parts.push(
+        `<span><i class="fa-solid fa-align-left"></i> ${len} 字</span>`
+      );
+    }
+    return parts.join('');
   }
 
-  // ===================== 方案 A：字段弹层 + 流式生成 =====================
+  // 统一摘要卡片（所有 outputType 共用）
+  renderChatSummaryCard(msg) {
+    const { template, result, selectedKBs } = msg;
+    const title = (result && result.title) || template.name;
+    const icon = this.getOutputTypeIcon(template.outputType);
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-chat-summary-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+
+    return `
+      <div class="wa-chat-summary-card" data-action="preview-result" data-msg-id="${msg.id}">
+        ${this.renderSummaryThumb(msg)}
+        <div class="wa-chat-summary-info">
+          <div class="wa-chat-summary-title"><i class="fa-solid fa-${icon}"></i> ${this.escapeHtml(title)}</div>
+          <div class="wa-chat-summary-meta">${this.getSummaryMeta(msg)}</div>
+          ${kbNote}
+          <div class="wa-chat-summary-desc">点击卡片预览、编辑并导出</div>
+          <div class="wa-chat-summary-actions">
+            <button class="wa-chat-summary-btn primary" data-action="preview-result" data-msg-id="${msg.id}">
+              <i class="fa-solid fa-eye"></i> 预览 / 编辑
+            </button>
+            <button class="wa-chat-summary-btn" data-action="copy" data-msg-id="${msg.id}">
+              <i class="fa-solid fa-copy"></i> 复制
+            </button>
+            <button class="wa-chat-summary-btn" data-action="save" data-msg-id="${msg.id}" ${msg.saved ? 'disabled' : ''}>
+              <i class="fa-solid fa-${msg.saved ? 'check' : 'floppy-disk'}"></i> ${msg.saved ? '已保存' : '保存'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  openPPTPreviewModal(msg) {
+    const { result, template, selectedKBs } = msg;
+    if (!result || !result.pages || !result.pages.length) return;
+
+    const modalId = 'wa-ppt-preview-modal-' + msg.id;
+    document.getElementById(modalId)?.remove();
+
+    let currentPage = 0;
+    let viewMode = 'slide';
+    let color = result.colorHex || '0E9F6E';
+    let dragSrcIndex = null;
+
+    const renderSlideList = () =>
+      result.pages
+        .map(
+          (p, index) => `
+      <div class="wa-ppt-modal-thumb ${index === currentPage ? 'active' : ''}" data-index="${index}" draggable="true" title="${this.escapeHtml(p.title)}">
+        <div class="wa-ppt-modal-thumb-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></div>
+        <div class="wa-ppt-modal-thumb-num">${index + 1}</div>
+        <div class="wa-ppt-modal-thumb-title">${this.escapeHtml(p.title).substring(0, 14)}${p.title.length > 14 ? '...' : ''}</div>
+        <div class="wa-ppt-modal-thumb-ops">
+          <button type="button" class="wa-ppt-modal-thumb-op" data-page-op="duplicate" data-index="${index}" title="复制此页"><i class="fa-solid fa-copy"></i></button>
+          <button type="button" class="wa-ppt-modal-thumb-op" data-page-op="delete" data-index="${index}" title="删除此页" ${result.pages.length <= 1 ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    `
+        )
+        .join('');
+
+    const renderCurrentSlide = () => {
+      const page = result.pages[currentPage];
+      const showPrev = currentPage > 0;
+      const showNext = currentPage < result.pages.length - 1;
+      return `
+        <div class="wa-ppt-modal-slide" style="border-color:#${color}40">
+          <button type="button" class="wa-ppt-modal-nav prev" data-nav="prev" ${showPrev ? '' : 'disabled'}><i class="fa-solid fa-chevron-left"></i></button>
+          <button type="button" class="wa-ppt-modal-nav next" data-nav="next" ${showNext ? '' : 'disabled'}><i class="fa-solid fa-chevron-right"></i></button>
+          <div class="wa-ppt-modal-slide-header" style="background:linear-gradient(135deg,#${color}20,#${color}05)">
+            <div class="wa-ppt-modal-slide-type" style="color:#${color}">${this.getPPTPageTypeLabel(page.type)}</div>
+            <div class="wa-ppt-modal-slide-title" contenteditable="true" data-field="title" data-index="${currentPage}">${this.formatContent(page.title)}</div>
+            ${page.subtitle ? `<div class="wa-ppt-modal-slide-subtitle" contenteditable="true" data-field="subtitle" data-index="${currentPage}">${this.formatContent(page.subtitle)}</div>` : ''}
+          </div>
+          <div class="wa-ppt-modal-slide-body">
+            <ul class="wa-ppt-modal-slide-bullets">
+              ${page.bullets
+                .map(
+                  (bullet, i) => `
+                <li class="wa-ppt-modal-bullet-item">
+                  <span class="wa-ppt-modal-bullet-text" contenteditable="true" data-field="bullet" data-index="${currentPage}" data-bi="${i}">${this.renderCellWithCitations(bullet)}</span>
+                  <button type="button" class="wa-ppt-modal-bullet-del" data-bullet-op="delete" data-index="${currentPage}" data-bi="${i}" title="删除条目"><i class="fa-solid fa-xmark"></i></button>
+                </li>
+              `
+                )
+                .join('')}
+            </ul>
+            <button type="button" class="wa-ppt-modal-add-bullet" data-bullet-op="add" data-index="${currentPage}"><i class="fa-solid fa-plus"></i> 添加条目</button>
+          </div>
+          <div class="wa-ppt-modal-slide-footer" style="color:#${color}">
+            <span>${result.title}</span>
+            <span>${currentPage + 1} / ${result.pages.length}</span>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderOutline = () => `
+      <div class="wa-ppt-modal-outline">
+        ${result.pages
+          .map(
+            (p, index) => `
+          <div class="wa-ppt-modal-outline-item ${index === currentPage ? 'active' : ''}" data-index="${index}">
+            <div class="wa-ppt-modal-outline-num">${index + 1}</div>
+            <div class="wa-ppt-modal-outline-body">
+              <div class="wa-ppt-modal-outline-title" contenteditable="true" data-field="title" data-index="${index}">${this.formatContent(p.title)}</div>
+              ${p.subtitle ? `<div class="wa-ppt-modal-outline-subtitle" contenteditable="true" data-field="subtitle" data-index="${index}">${this.formatContent(p.subtitle)}</div>` : ''}
+              ${p.note ? `<div class="wa-ppt-modal-outline-note" contenteditable="true" data-field="note" data-index="${index}">${this.formatContent(p.note)}</div>` : ''}
+            </div>
+            <div class="wa-ppt-modal-outline-ops">
+              <button type="button" class="wa-ppt-modal-thumb-op" data-page-op="duplicate" data-index="${index}" title="复制此页"><i class="fa-solid fa-copy"></i></button>
+              <button type="button" class="wa-ppt-modal-thumb-op" data-page-op="delete" data-index="${index}" title="删除此页" ${result.pages.length <= 1 ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+        <button type="button" class="wa-ppt-modal-add-page" data-page-op="add"><i class="fa-solid fa-plus"></i> 新增幻灯片</button>
+      </div>
+    `;
+
+    const refresh = () => {
+      const panel = document.getElementById(modalId);
+      if (!panel) return;
+      if (currentPage >= result.pages.length)
+        currentPage = result.pages.length - 1;
+      color = result.colorHex || '0E9F6E';
+      panel.querySelector('.wa-ppt-modal-thumbs').innerHTML = renderSlideList();
+      panel.querySelector('.wa-ppt-modal-stage').innerHTML =
+        viewMode === 'slide' ? renderCurrentSlide() : renderOutline();
+      panel
+        .querySelector('.wa-ppt-modal-view-tab[data-view="outline"]')
+        .classList.toggle('active', viewMode === 'outline');
+      panel
+        .querySelector('.wa-ppt-modal-view-tab[data-view="slide"]')
+        .classList.toggle('active', viewMode === 'slide');
+      const metaEl = panel.querySelector('.wa-ppt-modal-meta');
+      if (metaEl) {
+        const kbHtml =
+          selectedKBs && selectedKBs.length > 0
+            ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+            : '';
+        metaEl.innerHTML = `
+          <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">${result.style || '默认风格'}</span>
+          <span>${result.pages.length} 页</span>
+          ${kbHtml}
+        `;
+      }
+      bindEditable();
+    };
+
+    const bindEditable = () => {
+      const panel = document.getElementById(modalId);
+      if (!panel) return;
+      panel.querySelectorAll('[contenteditable="true"]').forEach((el) => {
+        if (el.__waPptBound) return;
+        el.__waPptBound = true;
+        el.addEventListener('blur', () => {
+          const field = el.dataset.field;
+          const index = parseInt(el.dataset.index, 10);
+          const page = result.pages[index];
+          if (!page) return;
+          if (field === 'bullet') {
+            const bi = parseInt(el.dataset.bi, 10);
+            page.bullets[bi] = el.innerText;
+          } else {
+            page[field] = el.innerText;
+          }
+          // 只刷新缩略图标题，避免重设当前编辑区导致光标丢失
+          const thumbs = panel.querySelector('.wa-ppt-modal-thumbs');
+          if (thumbs) thumbs.innerHTML = renderSlideList();
+        });
+      });
+    };
+
+    const addPage = (afterIndex) => {
+      const basePage = {
+        type: 'content',
+        title: '新幻灯片',
+        subtitle: '',
+        bullets: [''],
+        note: '',
+        visual: '',
+      };
+      const insertAt = afterIndex + 1;
+      result.pages.splice(insertAt, 0, basePage);
+      currentPage = insertAt;
+      refresh();
+    };
+
+    const duplicatePage = (index) => {
+      const page = result.pages[index];
+      if (!page) return;
+      const copy = JSON.parse(JSON.stringify(page));
+      result.pages.splice(index + 1, 0, copy);
+      currentPage = index + 1;
+      refresh();
+    };
+
+    const deletePage = (index) => {
+      if (result.pages.length <= 1) return;
+      result.pages.splice(index, 1);
+      if (currentPage >= result.pages.length)
+        currentPage = result.pages.length - 1;
+      refresh();
+    };
+
+    const addBullet = (index) => {
+      const page = result.pages[index];
+      if (!page) return;
+      if (!Array.isArray(page.bullets)) page.bullets = [];
+      page.bullets.push('新增条目');
+      refresh();
+    };
+
+    const deleteBullet = (index, bi) => {
+      const page = result.pages[index];
+      if (!page || !Array.isArray(page.bullets)) return;
+      page.bullets.splice(bi, 1);
+      refresh();
+    };
+
+    const reorderPages = (from, to) => {
+      if (
+        from === to ||
+        from < 0 ||
+        to < 0 ||
+        from >= result.pages.length ||
+        to >= result.pages.length
+      )
+        return;
+      const [moved] = result.pages.splice(from, 1);
+      result.pages.splice(to, 0, moved);
+      currentPage = to;
+      refresh();
+    };
+
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+
+    const themeOptions = Object.values(pptThemes)
+      .map(
+        (t) =>
+          `<option value="${t.id}" ${result.style === t.label ? 'selected' : ''}>${t.label}</option>`
+      )
+      .join('');
+    const colorOptions = Object.values(pptColors)
+      .map(
+        (c) =>
+          `<option value="${c.id}" ${result.color === c.label ? 'selected' : ''}>${c.label}</option>`
+      )
+      .join('');
+
+    const overlay = document.createElement('div');
+    overlay.id = modalId;
+    overlay.className = 'wa-modal-overlay wa-ppt-preview-overlay';
+    overlay.innerHTML = `
+      <div class="wa-modal wa-ppt-preview-modal" onclick="event.stopPropagation()">
+        <div class="wa-ppt-modal-header">
+          <div class="wa-ppt-modal-title">
+            <i class="fa-solid fa-file-powerpoint" style="color:#${color}"></i>
+            ${this.escapeHtml(result.title || template.name)}
+          </div>
+          <div class="wa-ppt-modal-meta">
+            <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">${result.style || '默认风格'}</span>
+            <span>${result.pages.length} 页</span>
+            ${kbNote}
+          </div>
+          <div class="wa-ppt-modal-tools">
+            <select class="wa-ppt-modal-select" data-select="theme" title="视觉主题">${themeOptions}</select>
+            <select class="wa-ppt-modal-select" data-select="color" title="配色方案">${colorOptions}</select>
+            <div class="wa-ppt-modal-view-tabs">
+              <button class="wa-ppt-modal-view-tab active" data-view="slide"><i class="fa-solid fa-image"></i> 幻灯片</button>
+              <button class="wa-ppt-modal-view-tab" data-view="outline"><i class="fa-solid fa-list"></i> 大纲</button>
+            </div>
+            <button class="wa-ppt-modal-tool" data-tool="export-md" title="导出 Markdown"><i class="fa-solid fa-file-code"></i></button>
+            <button class="wa-ppt-modal-tool" data-tool="export-pptx" title="导出 PPTX"><i class="fa-solid fa-file-powerpoint"></i></button>
+            <button class="wa-ppt-modal-tool" data-tool="close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div class="wa-ppt-modal-body">
+          <div class="wa-ppt-modal-sidebar">
+            <div class="wa-ppt-modal-thumbs">${renderSlideList()}</div>
+            <button type="button" class="wa-ppt-modal-add-page" data-page-op="add"><i class="fa-solid fa-plus"></i> 新增幻灯片</button>
+          </div>
+          <div class="wa-ppt-modal-stage">${renderCurrentSlide()}</div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const closeModal = () => {
+      overlay.remove();
+      document.body.style.overflow = '';
+      // 编辑后同步刷新聊天区摘要卡片
+      this.updateChatStreamingMessage(msg);
+    };
+
+    overlay.addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="close"]')
+      .addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="export-md"]')
+      .addEventListener('click', () => this.exportPPTToMarkdown(result));
+    overlay
+      .querySelector('[data-tool="export-pptx"]')
+      .addEventListener('click', () => this.exportPPTToPPTX(result));
+
+    overlay.querySelectorAll('.wa-ppt-modal-view-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        viewMode = tab.dataset.view;
+        refresh();
+      });
+    });
+
+    overlay
+      .querySelector('[data-select="theme"]')
+      .addEventListener('change', (e) => {
+        const theme = pptThemes[e.target.value];
+        if (theme) {
+          result.style = theme.label;
+          result.styleTone = theme.id;
+          refresh();
+        }
+      });
+
+    overlay
+      .querySelector('[data-select="color"]')
+      .addEventListener('change', (e) => {
+        const c = pptColors[e.target.value];
+        if (c) {
+          result.color = c.label;
+          result.colorHex = c.primary.replace('#', '');
+          refresh();
+        }
+      });
+
+    // 事件委托：幻灯片导航、页面增删、条目增删
+    overlay
+      .querySelector('.wa-ppt-modal-stage')
+      .addEventListener('click', (e) => {
+        const nav = e.target.closest('.wa-ppt-modal-nav');
+        if (nav && !nav.disabled) {
+          const dir = nav.dataset.nav;
+          if (dir === 'prev' && currentPage > 0) currentPage--;
+          if (dir === 'next' && currentPage < result.pages.length - 1)
+            currentPage++;
+          refresh();
+          return;
+        }
+        const bulletOp = e.target.closest('[data-bullet-op]');
+        if (bulletOp) {
+          const idx = parseInt(bulletOp.dataset.index, 10);
+          if (bulletOp.dataset.bulletOp === 'add') addBullet(idx);
+          else if (bulletOp.dataset.bulletOp === 'delete')
+            deleteBullet(idx, parseInt(bulletOp.dataset.bi, 10));
+          return;
+        }
+        const outlineItem = e.target.closest('.wa-ppt-modal-outline-item');
+        if (outlineItem) {
+          currentPage = parseInt(outlineItem.dataset.index, 10);
+          refresh();
+        }
+      });
+
+    // 事件委托：缩略图点击/增删/拖拽
+    const thumbsEl = overlay.querySelector('.wa-ppt-modal-thumbs');
+    thumbsEl.addEventListener('click', (e) => {
+      const op = e.target.closest('[data-page-op]');
+      if (op) {
+        e.stopPropagation();
+        const idx = parseInt(op.dataset.index, 10);
+        if (op.dataset.pageOp === 'add') addPage(idx);
+        else if (op.dataset.pageOp === 'duplicate') duplicatePage(idx);
+        else if (op.dataset.pageOp === 'delete') deletePage(idx);
+        return;
+      }
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (thumb) {
+        currentPage = parseInt(thumb.dataset.index, 10);
+        refresh();
+      }
+    });
+
+    thumbsEl.addEventListener('dragstart', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb) return;
+      dragSrcIndex = parseInt(thumb.dataset.index, 10);
+      thumb.classList.add('dragging');
+    });
+    thumbsEl.addEventListener('dragover', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSrcIndex === null) return;
+      e.preventDefault();
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('drag-over'));
+      thumb.classList.add('drag-over');
+    });
+    thumbsEl.addEventListener('dragleave', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (thumb) thumb.classList.remove('drag-over');
+    });
+    thumbsEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSrcIndex === null) return;
+      const targetIndex = parseInt(thumb.dataset.index, 10);
+      reorderPages(dragSrcIndex, targetIndex);
+      dragSrcIndex = null;
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('dragging', 'drag-over'));
+    });
+    thumbsEl.addEventListener('dragend', () => {
+      dragSrcIndex = null;
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('dragging', 'drag-over'));
+    });
+
+    bindEditable();
+  }
+
+  // ===================== 统一预览/编辑模态框分发 =====================
+
+  openResultPreviewModal(msg) {
+    const { template, result } = msg;
+    if (!result) return;
+    const ot = template.outputType;
+    if (ot === outputTypes.PPT && result.pages)
+      return this.openPPTPreviewModal(msg);
+    if (ot === outputTypes.TABLE && result.columns)
+      return this.openTablePreviewModal(msg);
+    if (ot === outputTypes.VIDEO && result.scenes)
+      return this.openVideoPreviewModal(msg);
+    if (ot === outputTypes.MUSIC && result.sections)
+      return this.openMusicPreviewModal(msg);
+    return this.openDocPreviewModal(msg);
+  }
+
+  // 通用模态框外壳：创建 overlay + header，返回 { overlay, bodyEl }
+  buildResultModal({ id, title, icon, color, metaHtml, toolsHtml }) {
+    document.getElementById(id)?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.className = 'wa-modal-overlay wa-ppt-preview-overlay';
+    overlay.innerHTML = `
+      <div class="wa-modal wa-ppt-preview-modal" onclick="event.stopPropagation()">
+        <div class="wa-ppt-modal-header">
+          <div class="wa-ppt-modal-title">
+            <i class="fa-solid fa-${icon}" style="color:#${color}"></i>
+            ${this.escapeHtml(title)}
+          </div>
+          <div class="wa-ppt-modal-meta">${metaHtml || ''}</div>
+          <div class="wa-ppt-modal-tools">${toolsHtml || ''}</div>
+        </div>
+        <div class="wa-ppt-modal-body">
+          <div class="wa-ppt-modal-stage wa-result-modal-stage"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+    return {
+      overlay,
+      bodyEl: overlay.querySelector('.wa-result-modal-stage'),
+    };
+  }
+
+  // ===================== 表格预览/编辑模态框（Excel 风格） =====================
+
+  openTablePreviewModal(msg) {
+    const { result, template, selectedKBs } = msg;
+    if (!result || !result.columns) return;
+
+    // 兼容旧数据，确保 result.sheets 结构存在
+    normalizeTableResult(result);
+
+    const color = result.colorHex || '0E9F6E';
+    const modalId = 'wa-table-preview-modal-' + msg.id;
+
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+    const metaHtml = `
+      <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">表格</span>
+      <span>${result.rows?.length || 0} 行 · ${result.columns.length} 列</span>
+      ${kbNote}
+    `;
+    const toolsHtml = `
+      <button class="wa-ppt-modal-tool" data-tool="export-csv" title="导出 CSV"><i class="fa-solid fa-file-csv"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="export-xlsx" title="导出 XLSX"><i class="fa-solid fa-file-excel"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+    `;
+
+    const { overlay, bodyEl } = this.buildResultModal({
+      id: modalId,
+      title: result.title || template.name,
+      icon: 'table',
+      color,
+      metaHtml,
+      toolsHtml,
+    });
+
+    let editor = null;
+
+    const closeModal = () => {
+      editor?.destroy?.();
+      overlay.remove();
+      document.body.style.overflow = '';
+      this.updateChatStreamingMessage(msg);
+    };
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+    overlay
+      .querySelector('[data-tool="close"]')
+      .addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="export-csv"]')
+      .addEventListener('click', () => this.exportTableToCSV(result));
+    overlay
+      .querySelector('[data-tool="export-xlsx"]')
+      .addEventListener('click', () => this.exportToXLSX(result, template));
+
+    editor = new SpreadsheetEditor(bodyEl, result, {
+      onChange: () => {
+        syncLegacyMirror(result);
+        this.updateChatStreamingMessage(msg);
+      },
+    });
+    editor.init();
+  }
+
+  // ===================== 文档预览/编辑模态框（Tiptap） =====================
+
+  openDocPreviewModal(msg) {
+    const { result, template, selectedKBs } = msg;
+    if (!result) return;
+    const color = result.colorHex || '0E9F6E';
+    const modalId = 'wa-doc-preview-modal-' + msg.id;
+    const ot = template.outputType;
+    const format =
+      ot === outputTypes.EMAIL
+        ? 'email'
+        : ot === outputTypes.LIST
+          ? 'list'
+          : ot === outputTypes.STEPS
+            ? 'steps'
+            : 'word';
+
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+    const metaHtml = `
+      <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">${this.getOutputTypeLabel(ot)}</span>
+      <span>${this.extractPlainText(result.content || '').length} 字</span>
+      ${kbNote}
+    `;
+    const toolsHtml = `
+      <button class="wa-ppt-modal-tool" data-tool="export-md" title="导出 Markdown"><i class="fa-solid fa-file-code"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="export-docx" title="导出 DOCX"><i class="fa-solid fa-file-word"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+    `;
+
+    const { overlay, bodyEl } = this.buildResultModal({
+      id: modalId,
+      title: result.title || template.name,
+      icon: this.getOutputTypeIcon(ot),
+      color,
+      metaHtml,
+      toolsHtml,
+    });
+    bodyEl.innerHTML = `
+      <div class="wa-doc-modal-wrap">
+        <div class="wa-doc-modal-toolbar" id="wa-doc-modal-toolbar-${msg.id}"></div>
+        <div class="wa-doc-modal-editor" id="wa-doc-modal-editor-${msg.id}"></div>
+      </div>
+    `;
+
+    let editorInstance = null;
+    let toolbarInstance = null;
+    try {
+      editorInstance = createRichEditor({
+        element: document.getElementById(`wa-doc-modal-editor-${msg.id}`),
+        format,
+        content: result.content || '<p></p>',
+        onUpdate: ({ html }) => {
+          result.content = html;
+        },
+      });
+      toolbarInstance = createRichToolbar({
+        editor: editorInstance,
+        container: document.getElementById(`wa-doc-modal-toolbar-${msg.id}`),
+        format,
+        mode: 'document',
+      });
+    } catch (err) {
+      console.error('[DocModal] RichEditor init failed:', err);
+      bodyEl.innerHTML = `<div class="wa-doc-modal-fallback"><textarea id="wa-doc-modal-fallback-${msg.id}">${this.escapeHtml(result.content || '')}</textarea></div>`;
+      const ta = document.getElementById(`wa-doc-modal-fallback-${msg.id}`);
+      ta?.addEventListener('input', () => {
+        result.content = ta.value;
+      });
+    }
+
+    const closeModal = () => {
+      try {
+        toolbarInstance?.destroy?.();
+      } catch (e) {}
+      try {
+        editorInstance?.destroy?.();
+      } catch (e) {}
+      overlay.remove();
+      document.body.style.overflow = '';
+      this.updateChatStreamingMessage(msg);
+    };
+
+    overlay.addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="close"]')
+      .addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="export-md"]')
+      .addEventListener('click', () => this.exportDocToMarkdown(result));
+    overlay
+      .querySelector('[data-tool="export-docx"]')
+      .addEventListener('click', () => {
+        // Tiptap 输出 HTML，转 Markdown 后复用 exportToDOCX
+        const md = this.htmlToMarkdown(result.content || '');
+        const tmpResult = { ...result, content: md };
+        this.exportToDOCX(tmpResult, template);
+      });
+  }
+
+  // ===================== 视频预览/编辑模态框 =====================
+
+  openVideoPreviewModal(msg) {
+    const { result, template, selectedKBs } = msg;
+    if (!result || !result.scenes) return;
+    const color = result.colorHex || '0E9F6E';
+    const modalId = 'wa-video-preview-modal-' + msg.id;
+    let currentScene = 0;
+    let dragSceneIndex = null;
+
+    const renderSceneList = () =>
+      result.scenes
+        .map(
+          (s, i) => `
+      <div class="wa-ppt-modal-thumb ${i === currentScene ? 'active' : ''}" data-index="${i}" draggable="true" title="${this.escapeHtml(s.shot)}">
+        <div class="wa-ppt-modal-thumb-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></div>
+        <div class="wa-ppt-modal-thumb-num">${i + 1}</div>
+        <div class="wa-ppt-modal-thumb-title">${this.escapeHtml(s.shot).substring(0, 16)}${s.shot.length > 16 ? '...' : ''}</div>
+        <div class="wa-ppt-modal-thumb-ops">
+          <button type="button" class="wa-ppt-modal-thumb-op" data-scene-op="duplicate" data-index="${i}" title="复制分镜"><i class="fa-solid fa-copy"></i></button>
+          <button type="button" class="wa-ppt-modal-thumb-op" data-scene-op="delete" data-index="${i}" title="删除分镜" ${result.scenes.length <= 1 ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    `
+        )
+        .join('');
+
+    const renderSceneEditor = () => {
+      const s = result.scenes[currentScene];
+      return `
+        <div class="wa-media-modal-editor">
+          <div class="wa-media-modal-field">
+            <label>时间</label>
+            <div class="wa-media-modal-input" contenteditable="true" data-field="time" data-index="${currentScene}">${this.escapeHtml(s.time)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>镜头</label>
+            <div class="wa-media-modal-input" contenteditable="true" data-field="shot" data-index="${currentScene}">${this.escapeHtml(s.shot)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>画面描述</label>
+            <div class="wa-media-modal-input area" contenteditable="true" data-field="desc" data-index="${currentScene}">${this.escapeHtml(s.desc)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>音频</label>
+            <div class="wa-media-modal-input" contenteditable="true" data-field="audio" data-index="${currentScene}">${this.escapeHtml(s.audio)}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderMeta = () => `
+      <div class="wa-media-modal-meta">
+        <div class="wa-media-modal-meta-item"><span>风格</span><div contenteditable="true" data-meta="style">${this.escapeHtml(result.style || '')}</div></div>
+        <div class="wa-media-modal-meta-item"><span>时长</span><div contenteditable="true" data-meta="duration">${this.escapeHtml(String(result.duration || ''))}</div></div>
+        <div class="wa-media-modal-meta-item"><span>比例</span><div contenteditable="true" data-meta="ratio">${this.escapeHtml(result.ratio || '')}</div></div>
+        <div class="wa-media-modal-meta-item"><span>分辨率</span><div contenteditable="true" data-meta="resolution">${this.escapeHtml(result.resolution || '')}</div></div>
+      </div>
+    `;
+
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+    const metaHtml = `
+      <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">视频脚本</span>
+      <span>${result.scenes.length} 分镜 · ${result.duration}s</span>
+      ${kbNote}
+    `;
+    const toolsHtml = `
+      <button class="wa-ppt-modal-tool" data-tool="export-md" title="导出脚本"><i class="fa-solid fa-file-code"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+    `;
+
+    const { overlay, bodyEl } = this.buildResultModal({
+      id: modalId,
+      title: result.title || template.name,
+      icon: 'film',
+      color,
+      metaHtml,
+      toolsHtml,
+    });
+    bodyEl.innerHTML = `
+      <div class="wa-media-modal-layout">
+        <div class="wa-ppt-modal-sidebar">
+          <div class="wa-ppt-modal-thumbs">${renderSceneList()}</div>
+          <button type="button" class="wa-ppt-modal-add-page" data-scene-op="add"><i class="fa-solid fa-plus"></i> 新增分镜</button>
+        </div>
+        <div class="wa-media-modal-main">
+          <div class="wa-media-player-container"></div>
+          ${renderMeta()}
+          <div class="wa-media-modal-stage">${renderSceneEditor()}</div>
+        </div>
+      </div>
+    `;
+
+    // 初始化播放预览（优先真实 videoUrl，否则模拟分镜预览）
+    const mediaPlayer = new MediaPlayer(
+      bodyEl.querySelector('.wa-media-player-container'),
+      {
+        type: 'video',
+        url: result.videoUrl || '',
+        color,
+        duration: result.duration || 10,
+        scenes: result.scenes,
+      }
+    );
+    mediaPlayer.init();
+
+    const refresh = () => {
+      if (currentScene >= result.scenes.length)
+        currentScene = result.scenes.length - 1;
+      bodyEl.querySelector('.wa-ppt-modal-thumbs').innerHTML =
+        renderSceneList();
+      bodyEl.querySelector('.wa-media-modal-stage').innerHTML =
+        renderSceneEditor();
+    };
+
+    const addScene = () => {
+      result.scenes.push({
+        time: '',
+        shot: `镜头 ${result.scenes.length + 1}`,
+        desc: '',
+        audio: '',
+      });
+      currentScene = result.scenes.length - 1;
+      refresh();
+    };
+    const duplicateScene = (i) => {
+      const copy = JSON.parse(JSON.stringify(result.scenes[i]));
+      result.scenes.splice(i + 1, 0, copy);
+      currentScene = i + 1;
+      refresh();
+    };
+    const deleteScene = (i) => {
+      if (result.scenes.length <= 1) return;
+      result.scenes.splice(i, 1);
+      refresh();
+    };
+    const reorderScenes = (from, to) => {
+      if (from === to) return;
+      const [m] = result.scenes.splice(from, 1);
+      result.scenes.splice(to, 0, m);
+      currentScene = to;
+      refresh();
+    };
+
+    const closeModal = () => {
+      mediaPlayer.destroy();
+      overlay.remove();
+      document.body.style.overflow = '';
+      this.updateChatStreamingMessage(msg);
+    };
+
+    overlay.addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="close"]')
+      .addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="export-md"]')
+      .addEventListener('click', () => this.exportVideoScript(result));
+
+    // 分镜列表操作（事件委托，统一在 sidebar 处理增删 + 选中）
+    const sidebarEl = bodyEl.querySelector('.wa-ppt-modal-sidebar');
+    const thumbsEl = bodyEl.querySelector('.wa-ppt-modal-thumbs');
+    sidebarEl.addEventListener('click', (e) => {
+      const op = e.target.closest('[data-scene-op]');
+      if (op) {
+        e.stopPropagation();
+        const opType = op.dataset.sceneOp;
+        const idx = parseInt(op.dataset.index, 10);
+        if (opType === 'add') addScene();
+        else if (opType === 'duplicate') duplicateScene(idx);
+        else if (opType === 'delete') deleteScene(idx);
+        return;
+      }
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (thumb) {
+        currentScene = parseInt(thumb.dataset.index, 10);
+        refresh();
+      }
+    });
+
+    // 拖拽排序
+    thumbsEl.addEventListener('dragstart', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb) return;
+      dragSceneIndex = parseInt(thumb.dataset.index, 10);
+      thumb.classList.add('dragging');
+    });
+    thumbsEl.addEventListener('dragover', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSceneIndex === null) return;
+      e.preventDefault();
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('drag-over'));
+      thumb.classList.add('drag-over');
+    });
+    thumbsEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSceneIndex === null) return;
+      reorderScenes(dragSceneIndex, parseInt(thumb.dataset.index, 10));
+      dragSceneIndex = null;
+    });
+    thumbsEl.addEventListener('dragend', () => {
+      dragSceneIndex = null;
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('dragging', 'drag-over'));
+    });
+
+    // 字段失焦写回（focusout 委托）
+    bodyEl.addEventListener('focusout', (e) => {
+      const el = e.target.closest('[contenteditable="true"]');
+      if (!el) return;
+      if (el.dataset.field && el.dataset.index != null) {
+        const idx = parseInt(el.dataset.index, 10);
+        const field = el.dataset.field;
+        if (result.scenes[idx]) result.scenes[idx][field] = el.innerText;
+      } else if (el.dataset.meta) {
+        const key = el.dataset.meta;
+        result[key] = el.innerText;
+      }
+    });
+  }
+
+  // ===================== 音乐预览/编辑模态框 =====================
+
+  openMusicPreviewModal(msg) {
+    const { result, template, selectedKBs } = msg;
+    if (!result || !result.sections) return;
+    const color = result.colorHex || '0E9F6E';
+    const modalId = 'wa-music-preview-modal-' + msg.id;
+    let currentSection = 0;
+    let dragSectionIndex = null;
+
+    const renderSectionList = () =>
+      result.sections
+        .map(
+          (s, i) => `
+      <div class="wa-ppt-modal-thumb ${i === currentSection ? 'active' : ''}" data-index="${i}" draggable="true" title="${this.escapeHtml(s.label)}">
+        <div class="wa-ppt-modal-thumb-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></div>
+        <div class="wa-ppt-modal-thumb-num">${i + 1}</div>
+        <div class="wa-ppt-modal-thumb-title">${this.escapeHtml(s.label).substring(0, 16)}${s.label.length > 16 ? '...' : ''}</div>
+        <div class="wa-ppt-modal-thumb-ops">
+          <button type="button" class="wa-ppt-modal-thumb-op" data-section-op="duplicate" data-index="${i}" title="复制段落"><i class="fa-solid fa-copy"></i></button>
+          <button type="button" class="wa-ppt-modal-thumb-op" data-section-op="delete" data-index="${i}" title="删除段落" ${result.sections.length <= 1 ? 'disabled' : ''}><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>
+    `
+        )
+        .join('');
+
+    const renderSectionEditor = () => {
+      const s = result.sections[currentSection];
+      return `
+        <div class="wa-media-modal-editor">
+          <div class="wa-media-modal-field">
+            <label>段落</label>
+            <div class="wa-media-modal-input" contenteditable="true" data-field="label" data-index="${currentSection}">${this.escapeHtml(s.label)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>时间</label>
+            <div class="wa-media-modal-input" contenteditable="true" data-field="time" data-index="${currentSection}">${this.escapeHtml(s.time)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>描述</label>
+            <div class="wa-media-modal-input area" contenteditable="true" data-field="desc" data-index="${currentSection}">${this.escapeHtml(s.desc)}</div>
+          </div>
+          <div class="wa-media-modal-field">
+            <label>歌词</label>
+            <div class="wa-media-modal-input area lyrics" contenteditable="true" data-meta="lyrics">${this.escapeHtml(result.lyrics || '')}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderMeta = () => `
+      <div class="wa-media-modal-meta">
+        <div class="wa-media-modal-meta-item"><span>曲风</span><div contenteditable="true" data-meta="genre">${this.escapeHtml(result.genre || '')}</div></div>
+        <div class="wa-media-modal-meta-item"><span>情绪</span><div contenteditable="true" data-meta="mood">${this.escapeHtml(result.mood || '')}</div></div>
+        <div class="wa-media-modal-meta-item"><span>时长</span><div contenteditable="true" data-meta="duration">${this.escapeHtml(String(result.duration || ''))}</div></div>
+        <div class="wa-media-modal-meta-item"><span>节奏</span><div contenteditable="true" data-meta="tempo">${this.escapeHtml(result.tempo || '')}</div></div>
+        <div class="wa-media-modal-meta-item"><span>乐器</span><div contenteditable="true" data-meta="instruments">${this.escapeHtml(result.instruments || '')}</div></div>
+      </div>
+    `;
+
+    const kbNote =
+      selectedKBs && selectedKBs.length > 0
+        ? `<div class="wa-ppt-modal-kb"><i class="fa-solid fa-book"></i> 已参考《${selectedKBs.map((k) => k.name).join('、')}》</div>`
+        : '';
+    const metaHtml = `
+      <span class="wa-ppt-modal-style" style="background:#${color}15;color:#${color}">音乐</span>
+      <span>${result.sections.length} 段落 · ${result.duration}s</span>
+      ${kbNote}
+    `;
+    const toolsHtml = `
+      <button class="wa-ppt-modal-tool" data-tool="export-md" title="导出曲谱"><i class="fa-solid fa-file-code"></i></button>
+      <button class="wa-ppt-modal-tool" data-tool="close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+    `;
+
+    const { overlay, bodyEl } = this.buildResultModal({
+      id: modalId,
+      title: result.title || template.name,
+      icon: 'music',
+      color,
+      metaHtml,
+      toolsHtml,
+    });
+    bodyEl.innerHTML = `
+      <div class="wa-media-modal-layout">
+        <div class="wa-ppt-modal-sidebar">
+          <div class="wa-ppt-modal-thumbs">${renderSectionList()}</div>
+          <button type="button" class="wa-ppt-modal-add-page" data-section-op="add"><i class="fa-solid fa-plus"></i> 新增段落</button>
+        </div>
+        <div class="wa-media-modal-main">
+          <div class="wa-media-player-container"></div>
+          ${renderMeta()}
+          <div class="wa-media-modal-stage">${renderSectionEditor()}</div>
+        </div>
+      </div>
+    `;
+
+    // 初始化播放预览（优先真实 audioUrl，否则模拟旋律 + 歌词同步预览）
+    const mediaPlayer = new MediaPlayer(
+      bodyEl.querySelector('.wa-media-player-container'),
+      {
+        type: 'music',
+        url: result.audioUrl || '',
+        color,
+        duration: result.duration || 60,
+        sections: result.sections,
+        lyrics: result.lyrics || '',
+        tempo: result.tempo || '100 BPM',
+        genre: result.genre || '流行',
+        mood: result.mood || '',
+      }
+    );
+    mediaPlayer.init();
+
+    const refresh = () => {
+      if (currentSection >= result.sections.length)
+        currentSection = result.sections.length - 1;
+      bodyEl.querySelector('.wa-ppt-modal-thumbs').innerHTML =
+        renderSectionList();
+      bodyEl.querySelector('.wa-media-modal-stage').innerHTML =
+        renderSectionEditor();
+    };
+
+    const addSection = () => {
+      result.sections.push({
+        label: `段落 ${result.sections.length + 1}`,
+        time: '',
+        desc: '',
+      });
+      currentSection = result.sections.length - 1;
+      refresh();
+    };
+    const duplicateSection = (i) => {
+      const copy = JSON.parse(JSON.stringify(result.sections[i]));
+      result.sections.splice(i + 1, 0, copy);
+      currentSection = i + 1;
+      refresh();
+    };
+    const deleteSection = (i) => {
+      if (result.sections.length <= 1) return;
+      result.sections.splice(i, 1);
+      refresh();
+    };
+    const reorderSections = (from, to) => {
+      if (from === to) return;
+      const [m] = result.sections.splice(from, 1);
+      result.sections.splice(to, 0, m);
+      currentSection = to;
+      refresh();
+    };
+
+    const closeModal = () => {
+      mediaPlayer.destroy();
+      overlay.remove();
+      document.body.style.overflow = '';
+      this.updateChatStreamingMessage(msg);
+    };
+
+    overlay.addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="close"]')
+      .addEventListener('click', closeModal);
+    overlay
+      .querySelector('[data-tool="export-md"]')
+      .addEventListener('click', () => this.exportMusicScore(result));
+
+    // 段落列表操作（事件委托，统一在 sidebar 处理增删 + 选中）
+    const sidebarEl = bodyEl.querySelector('.wa-ppt-modal-sidebar');
+    const thumbsEl = bodyEl.querySelector('.wa-ppt-modal-thumbs');
+    sidebarEl.addEventListener('click', (e) => {
+      const op = e.target.closest('[data-section-op]');
+      if (op) {
+        e.stopPropagation();
+        const opType = op.dataset.sectionOp;
+        const idx = parseInt(op.dataset.index, 10);
+        if (opType === 'add') addSection();
+        else if (opType === 'duplicate') duplicateSection(idx);
+        else if (opType === 'delete') deleteSection(idx);
+        return;
+      }
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (thumb) {
+        currentSection = parseInt(thumb.dataset.index, 10);
+        refresh();
+      }
+    });
+
+    thumbsEl.addEventListener('dragstart', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb) return;
+      dragSectionIndex = parseInt(thumb.dataset.index, 10);
+      thumb.classList.add('dragging');
+    });
+    thumbsEl.addEventListener('dragover', (e) => {
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSectionIndex === null) return;
+      e.preventDefault();
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('drag-over'));
+      thumb.classList.add('drag-over');
+    });
+    thumbsEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const thumb = e.target.closest('.wa-ppt-modal-thumb');
+      if (!thumb || dragSectionIndex === null) return;
+      reorderSections(dragSectionIndex, parseInt(thumb.dataset.index, 10));
+      dragSectionIndex = null;
+    });
+    thumbsEl.addEventListener('dragend', () => {
+      dragSectionIndex = null;
+      thumbsEl
+        .querySelectorAll('.wa-ppt-modal-thumb')
+        .forEach((t) => t.classList.remove('dragging', 'drag-over'));
+    });
+
+    bodyEl.addEventListener('focusout', (e) => {
+      const el = e.target.closest('[contenteditable="true"]');
+      if (!el) return;
+      if (el.dataset.field && el.dataset.index != null) {
+        const idx = parseInt(el.dataset.index, 10);
+        const field = el.dataset.field;
+        if (result.sections[idx]) result.sections[idx][field] = el.innerText;
+      } else if (el.dataset.meta) {
+        result[el.dataset.meta] = el.innerText;
+      }
+    });
+  }
+
+  // ===================== 导出方法 =====================
+
+  exportTableToCSV(result) {
+    if (!result) return;
+    const sheet = result.sheets?.[result.activeSheetIndex || 0] || result;
+    if (!sheet || !sheet.columns) return;
+    const esc = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [
+      sheet.columns.map(esc).join(','),
+      ...(sheet.rows || []).map((r) => r.map(esc).join(',')),
+    ];
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], {
+      type: 'text/csv;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${result.title || '表格'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.showToast('CSV 文件已导出');
+  }
+
+  exportVideoScript(result) {
+    if (!result || !result.scenes) return;
+    let md = `# ${result.title}\n\n`;
+    md += `> 风格：${result.style || ''} | 时长：${result.duration}s | 比例：${result.ratio || ''} | 分辨率：${result.resolution || ''}\n\n---\n\n`;
+    result.scenes.forEach((s, i) => {
+      md += `## 镜头 ${i + 1}：${s.shot}\n\n`;
+      md += `- **时间**：${s.time}\n`;
+      md += `- **画面**：${s.desc}\n`;
+      md += `- **音频**：${s.audio}\n\n`;
+    });
+    this.downloadMarkdown(md, `${result.title || '视频脚本'}.md`);
+    this.showToast('视频脚本已导出');
+  }
+
+  exportMusicScore(result) {
+    if (!result || !result.sections) return;
+    let md = `# ${result.title}\n\n`;
+    md += `> 曲风：${result.genre || ''} | 情绪：${result.mood || ''} | 时长：${result.duration}s | 节奏：${result.tempo || ''} | 乐器：${result.instruments || ''}\n\n---\n\n`;
+    result.sections.forEach((s, i) => {
+      md += `## ${s.label}（${s.time}）\n\n${s.desc}\n\n`;
+    });
+    if (result.lyrics) md += `---\n\n## 歌词\n\n${result.lyrics}\n`;
+    this.downloadMarkdown(md, `${result.title || '音乐曲谱'}.md`);
+    this.showToast('音乐曲谱已导出');
+  }
+
+  exportDocToMarkdown(result) {
+    const md = this.htmlToMarkdown(result.content || '');
+    this.downloadMarkdown(md, `${result.title || '文档'}.md`);
+    this.showToast('Markdown 已导出');
+  }
+
+  downloadMarkdown(text, filename) {
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // 简易 HTML → Markdown 转换（用于 Tiptap 输出）
+  htmlToMarkdown(html) {
+    if (!html) return '';
+    let s = html;
+    s = s.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n\n');
+    s = s.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n\n');
+    s = s.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n\n');
+    s = s.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**');
+    s = s.replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**');
+    s = s.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*');
+    s = s.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '$1');
+    s = s.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n');
+    s = s.replace(/<\/?(ul|ol)[^>]*>/gi, '\n');
+    s = s.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
+    s = s.replace(/<br\s*\/?>/gi, '\n');
+    s = s.replace(/<[^>]+>/g, '');
+    s = s
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"');
+    s = s.replace(/\n{3,}/g, '\n\n').trim();
+    return s;
+  }
+
+  scrollToChatBottom() {
+    const main = document.getElementById('wa-chat-main');
+    if (main)
+      requestAnimationFrame(() => {
+        main.scrollTop = main.scrollHeight;
+      });
+  }
 
   openFieldModal(template, type, options = {}) {
     if (type === 'content') {
       if (this.onNavigate) {
-        this.onNavigate('contentTemplates', { initialContentTemplateId: template.id });
+        this.onNavigate('contentTemplates', {
+          initialContentTemplateId: template.id,
+        });
       }
       return;
     }
@@ -808,7 +2332,13 @@ export class WorkAssistant {
     }).open();
   }
 
-  async startChatGeneration({ template, formData, selectedKBs, mode, options = {} }) {
+  async startChatGeneration({
+    template,
+    formData,
+    selectedKBs,
+    mode,
+    options = {},
+  }) {
     const userMsg = {
       id: generateId('chatmsg'),
       role: 'user',
@@ -835,12 +2365,20 @@ export class WorkAssistant {
     this.render();
 
     try {
-      const stream = generateContent(template, formData, mode, selectedKBs, options);
+      const stream = generateContent(
+        template,
+        formData,
+        mode,
+        selectedKBs,
+        options
+      );
       for await (const event of stream) {
         if (event.type === 'thinking') {
           aiMsg.thinkingSteps.push({ text: event.step, status: 'active' });
         } else if (event.type === 'thinking_done') {
-          const step = aiMsg.thinkingSteps.find((s) => s.text === event.step && s.status !== 'done');
+          const step = aiMsg.thinkingSteps.find(
+            (s) => s.text === event.step && s.status !== 'done'
+          );
           if (step) step.status = 'done';
         } else if (event.type === 'result_meta') {
           aiMsg.result = event.result;
@@ -892,8 +2430,10 @@ export class WorkAssistant {
       const record = {
         id: generateId('wa'),
         templateId: template?.id,
-        templateName: isFreeChat ? (aiMsg.title || 'AI 对话') : template?.name,
-        title: isFreeChat ? (aiMsg.title || 'AI 对话') : (aiMsg.title || template?.name),
+        templateName: isFreeChat ? aiMsg.title || 'AI 对话' : template?.name,
+        title: isFreeChat
+          ? aiMsg.title || 'AI 对话'
+          : aiMsg.title || template?.name,
         source: aiMsg.source || (isFreeChat ? 'freeChat' : 'scene'),
         isFreeChat,
         abilityId: template?.abilityId,
@@ -921,7 +2461,7 @@ export class WorkAssistant {
     if (!msg) return;
 
     if (action === 'copy') {
-      const text = this.extractPlainText(msg.content || '');
+      const text = this.extractResultText(msg);
       navigator.clipboard?.writeText(text).then(
         () => this.showToast('已复制到剪贴板', 'success'),
         () => this.showToast('复制失败', 'error')
@@ -934,13 +2474,52 @@ export class WorkAssistant {
       this.currentKBs = msg.selectedKBs || [];
       this.activeTab = 'editor';
       this.render();
+    } else if (action === 'preview-result' || action === 'preview-ppt') {
+      this.openResultPreviewModal(msg);
     } else if (action === 'save') {
       if (msg.saved) return;
       this.saveChatResultToHistory(msg);
       msg.saved = true;
       this.updateChatStreamingMessage(msg);
-      this.showToast('已保存到我的文档', 'success');
+      this.showToast('已保存到创作记录', 'success');
     }
+  }
+
+  // 按 result 类型提取可复制的纯文本
+  extractResultText(msg) {
+    const { result, template } = msg;
+    if (!result) return this.extractPlainText(msg.content || '');
+    const ot = template.outputType;
+    if (ot === outputTypes.TABLE && result.columns) {
+      const header = result.columns.join('\t');
+      const rows = (result.rows || []).map((r) =>
+        result.columns
+          .map((_, i) => String(r[i] != null ? r[i] : ''))
+          .join('\t')
+      );
+      return [header, ...rows].join('\n');
+    }
+    if (ot === outputTypes.PPT && result.pages) {
+      return result.pages
+        .map((p, i) => {
+          const bullets = (p.bullets || []).map((b) => `  - ${b}`).join('\n');
+          return `${i + 1}. ${p.title}${p.subtitle ? `（${p.subtitle}）` : ''}${bullets ? '\n' + bullets : ''}`;
+        })
+        .join('\n\n');
+    }
+    if (ot === outputTypes.VIDEO && result.scenes) {
+      return result.scenes
+        .map((s) => `${s.shot}｜${s.time}\n画面：${s.desc}\n音频：${s.audio}`)
+        .join('\n\n');
+    }
+    if (ot === outputTypes.MUSIC && result.sections) {
+      const head = `曲风：${result.genre}｜情绪：${result.mood}｜节奏：${result.tempo}`;
+      const body = result.sections
+        .map((s) => `${s.label}（${s.time}）\n${s.desc}`)
+        .join('\n\n');
+      return `${head}\n\n${body}\n\n${result.lyrics || ''}`;
+    }
+    return this.extractPlainText(result.content || msg.content || '');
   }
 
   extractPlainText(html) {
@@ -976,12 +2555,17 @@ export class WorkAssistant {
             this.render();
           }
         } else {
-          if (this.onNavigate) this.onNavigate('contentTemplates', { initialContentTemplateId: id });
+          if (this.onNavigate)
+            this.onNavigate('contentTemplates', {
+              initialContentTemplateId: id,
+            });
         }
       });
     });
     this.container.querySelectorAll('.wa-quick-manage').forEach((btn) => {
-      btn.addEventListener('click', () => this.openQuickConfigModal(btn.dataset.quickType));
+      btn.addEventListener('click', () =>
+        this.openQuickConfigModal(btn.dataset.quickType)
+      );
     });
   }
 
@@ -989,19 +2573,23 @@ export class WorkAssistant {
     if (document.getElementById('wa-quick-config-modal')) return;
     const isScene = type === 'scene';
     const all = isScene ? getAllTemplates() : defaultContentTemplates;
-    const selectedIds = new Set(isScene ? this.quickSceneIds : this.quickContentIds);
+    const selectedIds = new Set(
+      isScene ? this.quickSceneIds : this.quickContentIds
+    );
     const title = isScene ? '管理常用场景模板' : '管理常用内容模板';
 
-    const items = all.map((t) => {
-      if (!t) return '';
-      const ic = isScene
-        ? this.getSceneIcon(t.outputType)
-        : this.getContentIcon(t.format);
-      const tag = isScene
-        ? this.getOutputTypeLabel(t.outputType)
-        : (formatLabels[t.format] && formatLabels[t.format].label) || t.format;
-      const checked = selectedIds.has(t.id) ? ' selected' : '';
-      return `
+    const items = all
+      .map((t) => {
+        if (!t) return '';
+        const ic = isScene
+          ? this.getSceneIcon(t.outputType)
+          : this.getContentIcon(t.format);
+        const tag = isScene
+          ? this.getOutputTypeLabel(t.outputType)
+          : (formatLabels[t.format] && formatLabels[t.format].label) ||
+            t.format;
+        const checked = selectedIds.has(t.id) ? ' selected' : '';
+        return `
         <div class="wa-quick-opt${checked}" data-id="${t.id}">
           <span class="wa-quick-opt-icon"><i class="fa-solid fa-${ic}"></i></span>
           <span class="wa-quick-opt-body">
@@ -1011,7 +2599,8 @@ export class WorkAssistant {
           <span class="wa-quick-opt-check"><i class="fa-solid fa-check"></i></span>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
     const html = `
       <div class="wa-modal-overlay wa-quick-config-overlay" id="wa-quick-config-modal">
@@ -1042,14 +2631,24 @@ export class WorkAssistant {
     const countEl = document.getElementById('wa-quick-config-count');
     const MAX = 3;
 
-    const getSelected = () => Array.from(modal.querySelectorAll('.wa-quick-opt.selected'))
-      .map((el) => el.dataset.id);
-    const updateCount = () => { if (countEl) countEl.textContent = getSelected().length; };
+    const getSelected = () =>
+      Array.from(modal.querySelectorAll('.wa-quick-opt.selected')).map(
+        (el) => el.dataset.id
+      );
+    const updateCount = () => {
+      if (countEl) countEl.textContent = getSelected().length;
+    };
 
     const close = () => modal.remove();
-    document.getElementById('wa-quick-config-close')?.addEventListener('click', close);
-    document.getElementById('wa-quick-config-cancel')?.addEventListener('click', close);
-    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document
+      .getElementById('wa-quick-config-close')
+      ?.addEventListener('click', close);
+    document
+      .getElementById('wa-quick-config-cancel')
+      ?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
 
     modal.querySelectorAll('.wa-quick-opt').forEach((opt) => {
       opt.addEventListener('click', () => {
@@ -1063,27 +2662,31 @@ export class WorkAssistant {
       });
     });
 
-    document.getElementById('wa-quick-config-save')?.addEventListener('click', () => {
-      const ids = getSelected();
-      if (isScene) {
-        setQuickSceneTemplateIds(ids);
-        this.quickSceneIds = getQuickSceneTemplateIds();
-      } else {
-        setQuickContentTemplateIds(ids);
-        this.quickContentIds = getQuickContentTemplateIds();
-      }
-      close();
-      // 局部刷新对应 alt-mode 卡片内的快速入口区，避免整体 re-render 导致输入框失焦
-      ['scene', 'content'].forEach((t) => {
-        const modeCard = this.container.querySelector(`.wa-chat-alt-mode[data-mode="${t}"]`);
-        const oldSection = modeCard?.querySelector('.wa-quick-section');
-        if (oldSection) {
-          oldSection.outerHTML = this.renderQuickEntries(t);
+    document
+      .getElementById('wa-quick-config-save')
+      ?.addEventListener('click', () => {
+        const ids = getSelected();
+        if (isScene) {
+          setQuickSceneTemplateIds(ids);
+          this.quickSceneIds = getQuickSceneTemplateIds();
+        } else {
+          setQuickContentTemplateIds(ids);
+          this.quickContentIds = getQuickContentTemplateIds();
         }
+        close();
+        // 局部刷新对应 alt-mode 卡片内的快速入口区，避免整体 re-render 导致输入框失焦
+        ['scene', 'content'].forEach((t) => {
+          const modeCard = this.container.querySelector(
+            `.wa-chat-alt-mode[data-mode="${t}"]`
+          );
+          const oldSection = modeCard?.querySelector('.wa-quick-section');
+          if (oldSection) {
+            oldSection.outerHTML = this.renderQuickEntries(t);
+          }
+        });
+        this.bindQuickEntryEvents();
+        this.showToast('已更新常用模板', 'success');
       });
-      this.bindQuickEntryEvents();
-      this.showToast('已更新常用模板', 'success');
-    });
   }
 
   getQuickStartPrompts() {
@@ -1171,7 +2774,8 @@ export class WorkAssistant {
     const template = item.template || {};
     const type = template.type || template.outputType;
     if (type === 'content' || template.format) return 'content';
-    if (template.fields || template.abilityId || template.roleId) return 'scene';
+    if (template.fields || template.abilityId || template.roleId)
+      return 'scene';
     return 'scene';
   }
 
@@ -1187,7 +2791,16 @@ export class WorkAssistant {
     }
     if (source === 'content') {
       const format = item.template?.format || item.result?.format || 'word';
-      const label = format === 'table' ? 'Excel' : format === 'ppt' ? 'PPT' : format === 'email' ? '邮件' : format === 'list' ? '列表' : 'Word';
+      const label =
+        format === 'table'
+          ? 'Excel'
+          : format === 'ppt'
+            ? 'PPT'
+            : format === 'email'
+              ? '邮件'
+              : format === 'list'
+                ? '列表'
+                : 'Word';
       return {
         icon: 'file-lines',
         bgColor: 'rgba(16,185,129,0.12)',
@@ -1197,8 +2810,18 @@ export class WorkAssistant {
       };
     }
     // scene
-    const outputType = item.template?.outputType || item.result?.outputType || 'ppt';
-    const label = outputType === 'report' ? '报告' : outputType === 'markdown' ? '文档' : outputType === 'email' ? '邮件' : outputType === 'table' ? '表格' : 'PPT';
+    const outputType =
+      item.template?.outputType || item.result?.outputType || 'ppt';
+    const label =
+      outputType === 'report'
+        ? '报告'
+        : outputType === 'markdown'
+          ? '文档'
+          : outputType === 'email'
+            ? '邮件'
+            : outputType === 'table'
+              ? '表格'
+              : 'PPT';
     const roleName = item.roleName || getRoleById(item.roleId)?.name || '';
     return {
       icon: 'layer-group',
@@ -1217,7 +2840,10 @@ export class WorkAssistant {
       return;
     }
     // 结构化生成模式：按所选类型 + 配置项流式生成
-    this.startTypedGeneration(value, type, { ...this.chatContentConfig, model: this.homeModel });
+    this.startTypedGeneration(value, type, {
+      ...this.chatContentConfig,
+      model: this.homeModel,
+    });
   }
 
   // ===================== 内容类型选择 + 按类型配置（参考豆包/Kimi） =====================
@@ -1253,22 +2879,103 @@ export class WorkAssistant {
           ],
           default: '12',
         },
-        { id: 'style', label: '风格模板', type: 'theme_picker', default: 'business' },
+        {
+          id: 'style',
+          label: '风格模板',
+          type: 'theme_picker',
+          default: 'business',
+        },
       ],
       markdown: [
-        { id: 'length', label: '篇幅', options: [{ v: 'short', l: '简短' }, { v: 'standard', l: '标准' }, { v: 'detailed', l: '详细' }], default: 'standard' },
-        { id: 'style', label: '风格', options: [{ v: 'formal', l: '正式' }, { v: 'plain', l: '通俗' }, { v: 'professional', l: '专业' }], default: 'professional' },
+        {
+          id: 'length',
+          label: '篇幅',
+          options: [
+            { v: 'short', l: '简短' },
+            { v: 'standard', l: '标准' },
+            { v: 'detailed', l: '详细' },
+          ],
+          default: 'standard',
+        },
+        {
+          id: 'style',
+          label: '风格',
+          options: [
+            { v: 'formal', l: '正式' },
+            { v: 'plain', l: '通俗' },
+            { v: 'professional', l: '专业' },
+          ],
+          default: 'professional',
+        },
       ],
       table: [],
       video: [
-        { id: 'duration', label: '时长', options: [{ v: '5', l: '5 秒' }, { v: '10', l: '10 秒' }, { v: '15', l: '15 秒' }], default: '10' },
-        { id: 'style', label: '风格', options: [{ v: 'realistic', l: '写实' }, { v: 'anime', l: '动画' }, { v: 'cinematic', l: '电影感' }, { v: 'cartoon', l: '卡通' }], default: 'cinematic' },
-        { id: 'ratio', label: '画面比例', options: [{ v: '16:9', l: '16:9' }, { v: '9:16', l: '9:16' }, { v: '1:1', l: '1:1' }], default: '16:9' },
+        {
+          id: 'duration',
+          label: '时长',
+          options: [
+            { v: '5', l: '5 秒' },
+            { v: '10', l: '10 秒' },
+            { v: '15', l: '15 秒' },
+          ],
+          default: '10',
+        },
+        {
+          id: 'style',
+          label: '风格',
+          options: [
+            { v: 'realistic', l: '写实' },
+            { v: 'anime', l: '动画' },
+            { v: 'cinematic', l: '电影感' },
+            { v: 'cartoon', l: '卡通' },
+          ],
+          default: 'cinematic',
+        },
+        {
+          id: 'ratio',
+          label: '画面比例',
+          options: [
+            { v: '16:9', l: '16:9' },
+            { v: '9:16', l: '9:16' },
+            { v: '1:1', l: '1:1' },
+          ],
+          default: '16:9',
+        },
       ],
       music: [
-        { id: 'duration', label: '时长', options: [{ v: '30', l: '30 秒' }, { v: '60', l: '1 分钟' }, { v: '120', l: '2 分钟' }], default: '60' },
-        { id: 'genre', label: '曲风', options: [{ v: 'pop', l: '流行' }, { v: 'classical', l: '古典' }, { v: 'electronic', l: '电子' }, { v: 'light', l: '轻音乐' }, { v: 'folk', l: '民谣' }], default: 'pop' },
-        { id: 'mood', label: '情绪', options: [{ v: 'happy', l: '欢快' }, { v: 'calm', l: '舒缓' }, { v: 'energetic', l: '激昂' }, { v: 'sad', l: '忧伤' }], default: 'happy' },
+        {
+          id: 'duration',
+          label: '时长',
+          options: [
+            { v: '30', l: '30 秒' },
+            { v: '60', l: '1 分钟' },
+            { v: '120', l: '2 分钟' },
+          ],
+          default: '60',
+        },
+        {
+          id: 'genre',
+          label: '曲风',
+          options: [
+            { v: 'pop', l: '流行' },
+            { v: 'classical', l: '古典' },
+            { v: 'electronic', l: '电子' },
+            { v: 'light', l: '轻音乐' },
+            { v: 'folk', l: '民谣' },
+          ],
+          default: 'pop',
+        },
+        {
+          id: 'mood',
+          label: '情绪',
+          options: [
+            { v: 'happy', l: '欢快' },
+            { v: 'calm', l: '舒缓' },
+            { v: 'energetic', l: '激昂' },
+            { v: 'sad', l: '忧伤' },
+          ],
+          default: 'happy',
+        },
       ],
     };
     return specs[type] || [];
@@ -1291,29 +2998,100 @@ export class WorkAssistant {
 
   getChatModels() {
     return [
-      { id: 'glm-4-air', name: 'GLM-4 Air', vendor: '智谱', abbr: 'Z', tag: '快速' },
-      { id: 'glm-4.6', name: 'GLM-4.6', vendor: '智谱', abbr: 'Z', tag: '均衡' },
+      {
+        id: 'glm-4-air',
+        name: 'GLM-4 Air',
+        vendor: '智谱',
+        abbr: 'Z',
+        tag: '快速',
+      },
+      {
+        id: 'glm-4.6',
+        name: 'GLM-4.6',
+        vendor: '智谱',
+        abbr: 'Z',
+        tag: '均衡',
+      },
       { id: 'glm-z1', name: 'GLM-Z1', vendor: '智谱', abbr: 'Z', tag: '推理' },
-      { id: 'gpt-4o', name: 'GPT-4o', vendor: 'OpenAI', abbr: 'O', tag: '多模态' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o mini', vendor: 'OpenAI', abbr: 'O', tag: '轻量' },
-      { id: 'o3-mini', name: 'o3-mini', vendor: 'OpenAI', abbr: 'O', tag: '推理' },
-      { id: 'claude-sonnet', name: 'Claude Sonnet', vendor: 'Anthropic', abbr: 'A', tag: '长文' },
-      { id: 'claude-haiku', name: 'Claude Haiku', vendor: 'Anthropic', abbr: 'A', tag: '极速' },
-      { id: 'gemini-pro', name: 'Gemini Pro', vendor: 'Google', abbr: 'G', tag: '长上下文' },
-      { id: 'gemini-flash', name: 'Gemini Flash', vendor: 'Google', abbr: 'G', tag: '经济' },
-      { id: 'deepseek-chat', name: 'DeepSeek Chat', vendor: 'DeepSeek', abbr: 'D', tag: '高性价比' },
-      { id: 'deepseek-r1', name: 'DeepSeek R1', vendor: 'DeepSeek', abbr: 'D', tag: '代码' },
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        vendor: 'OpenAI',
+        abbr: 'O',
+        tag: '多模态',
+      },
+      {
+        id: 'gpt-4o-mini',
+        name: 'GPT-4o mini',
+        vendor: 'OpenAI',
+        abbr: 'O',
+        tag: '轻量',
+      },
+      {
+        id: 'o3-mini',
+        name: 'o3-mini',
+        vendor: 'OpenAI',
+        abbr: 'O',
+        tag: '推理',
+      },
+      {
+        id: 'claude-sonnet',
+        name: 'Claude Sonnet',
+        vendor: 'Anthropic',
+        abbr: 'A',
+        tag: '长文',
+      },
+      {
+        id: 'claude-haiku',
+        name: 'Claude Haiku',
+        vendor: 'Anthropic',
+        abbr: 'A',
+        tag: '极速',
+      },
+      {
+        id: 'gemini-pro',
+        name: 'Gemini Pro',
+        vendor: 'Google',
+        abbr: 'G',
+        tag: '长上下文',
+      },
+      {
+        id: 'gemini-flash',
+        name: 'Gemini Flash',
+        vendor: 'Google',
+        abbr: 'G',
+        tag: '经济',
+      },
+      {
+        id: 'deepseek-chat',
+        name: 'DeepSeek Chat',
+        vendor: 'DeepSeek',
+        abbr: 'D',
+        tag: '高性价比',
+      },
+      {
+        id: 'deepseek-r1',
+        name: 'DeepSeek R1',
+        vendor: 'DeepSeek',
+        abbr: 'D',
+        tag: '代码',
+      },
     ];
   }
 
   getCurrentModel() {
-    return this.getChatModels().find((m) => m.id === this.homeModel) || this.getChatModels()[1];
+    return (
+      this.getChatModels().find((m) => m.id === this.homeModel) ||
+      this.getChatModels()[1]
+    );
   }
 
   renderModelSelector() {
     const current = this.getCurrentModel();
     const models = this.getChatModels();
-    const listHtml = models.map((m) => `
+    const listHtml = models
+      .map(
+        (m) => `
       <button type="button" class="wa-chat-model-item ${m.id === this.homeModel ? 'active' : ''}" data-model="${m.id}">
         <div class="wa-chat-model-item-main">
           <span class="wa-chat-model-item-abbr">${m.abbr || m.vendor[0]}</span>
@@ -1322,7 +3100,9 @@ export class WorkAssistant {
         </div>
         ${m.id === this.homeModel ? '<i class="fa-solid fa-check wa-chat-model-item-check"></i>' : ''}
       </button>
-    `).join('');
+    `
+      )
+      .join('');
     return `
       <div class="wa-chat-model-wrap">
         <button class="wa-chat-model-btn" id="wa-chat-model" type="button" title="选择模型">
@@ -1379,7 +3159,9 @@ export class WorkAssistant {
   initChatContentConfig(type) {
     const spec = this.getContentTypeConfigSpec(type);
     const config = {};
-    spec.forEach((g) => { config[g.id] = g.default; });
+    spec.forEach((g) => {
+      config[g.id] = g.default;
+    });
     this.chatContentConfig = config;
   }
 
@@ -1415,9 +3197,11 @@ export class WorkAssistant {
   selectChatConfig(key, val) {
     if (!key || !val) return;
     this.chatContentConfig = { ...this.chatContentConfig, [key]: val };
-    this.container.querySelectorAll(`.wa-chat-config-chip[data-config="${key}"]`).forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.value === val);
-    });
+    this.container
+      .querySelectorAll(`.wa-chat-config-chip[data-config="${key}"]`)
+      .forEach((chip) => {
+        chip.classList.toggle('active', chip.dataset.value === val);
+      });
   }
 
   // 加号菜单展开/收起
@@ -1438,11 +3222,17 @@ export class WorkAssistant {
     const btn = this.container.querySelector('#wa-chat-plus');
     if (btn) btn.classList.toggle('active', hasActive);
     const kbDesc = this.container.querySelector('#wa-chat-plus-kb-desc');
-    if (kbDesc) kbDesc.textContent = kbCount > 0 ? `已选 ${kbCount} 个` : '从知识库检索资料';
+    if (kbDesc)
+      kbDesc.textContent =
+        kbCount > 0 ? `已选 ${kbCount} 个` : '从知识库检索资料';
     const kbItem = this.container.querySelector('#wa-chat-plus-kb');
     if (kbItem) kbItem.classList.toggle('active', kbCount > 0);
-    const attachDesc = this.container.querySelector('#wa-chat-plus-attach-desc');
-    if (attachDesc) attachDesc.textContent = attachCount > 0 ? `已上传 ${attachCount} 个` : '结合附件内容生成';
+    const attachDesc = this.container.querySelector(
+      '#wa-chat-plus-attach-desc'
+    );
+    if (attachDesc)
+      attachDesc.textContent =
+        attachCount > 0 ? `已上传 ${attachCount} 个` : '结合附件内容生成';
     const attachItem = this.container.querySelector('#wa-chat-plus-attach');
     if (attachItem) attachItem.classList.toggle('active', attachCount > 0);
   }
@@ -1503,24 +3293,30 @@ export class WorkAssistant {
       });
     });
     // 3) 主题模板选择器
-    this.container.querySelectorAll('.wa-chat-config-theme-trigger').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        if (this.chatStreaming) return;
-        this.openPPTThemeModal(btn.dataset.config);
+    this.container
+      .querySelectorAll('.wa-chat-config-theme-trigger')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (this.chatStreaming) return;
+          this.openPPTThemeModal(btn.dataset.config);
+        });
       });
-    });
   }
 
   // 仅渲染类型芯片 innerHTML（外层容器由模板提供，支持局部刷新）
   renderTypeChips() {
     const options = this.getContentTypeOptions();
     const current = this.chatContentType;
-    return options.map((o) => `
+    return options
+      .map(
+        (o) => `
       <button type="button" class="wa-chat-type-chip ${o.id === current ? 'active' : ''}" data-type="${o.id}" title="${o.label}">
         <i class="fa-solid fa-${o.icon}"></i>
         <span>${o.label}</span>
       </button>
-    `).join('');
+    `
+      )
+      .join('');
   }
 
   // 生成当前类型配置项的 innerHTML（供初始渲染与切换类型时局部更新）
@@ -1528,13 +3324,18 @@ export class WorkAssistant {
     const spec = this.getContentTypeConfigSpec(type);
     if (!spec || spec.length === 0) return '';
     const config = this.chatContentConfig || {};
-    return spec.map((g) => {
-      const controlType = g.type || 'chip';
-      if (controlType === 'select') {
-        const selectOptions = g.options.map((opt) => `
+    return spec
+      .map((g) => {
+        const controlType = g.type || 'chip';
+        if (controlType === 'select') {
+          const selectOptions = g.options
+            .map(
+              (opt) => `
           <option value="${opt.v}" ${config[g.id] === opt.v ? 'selected' : ''}>${opt.l}</option>
-        `).join('');
-        return `
+        `
+            )
+            .join('');
+          return `
           <div class="wa-chat-config-group wa-chat-config-group--select">
             <span class="wa-chat-config-label">${g.label}</span>
             <div class="wa-chat-config-options">
@@ -1542,11 +3343,11 @@ export class WorkAssistant {
             </div>
           </div>
         `;
-      }
-      if (controlType === 'theme_picker') {
-        const themeId = config[g.id] || g.default;
-        const theme = pptThemes[themeId] || Object.values(pptThemes)[0];
-        return `
+        }
+        if (controlType === 'theme_picker') {
+          const themeId = config[g.id] || g.default;
+          const theme = pptThemes[themeId] || Object.values(pptThemes)[0];
+          return `
           <div class="wa-chat-config-group wa-chat-config-group--theme">
             <span class="wa-chat-config-label">${g.label}</span>
             <button type="button" class="wa-chat-config-theme-trigger" data-config="${g.id}" data-theme="${themeId}">
@@ -1556,30 +3357,63 @@ export class WorkAssistant {
             </button>
           </div>
         `;
-      }
-      const chips = g.options.map((opt) => `
+        }
+        const chips = g.options
+          .map(
+            (opt) => `
         <div class="wa-chat-config-chip ${config[g.id] === opt.v ? 'active' : ''}" data-config="${g.id}" data-value="${opt.v}">${opt.l}</div>
-      `).join('');
-      return `
+      `
+          )
+          .join('');
+        return `
         <div class="wa-chat-config-group">
           <span class="wa-chat-config-label">${g.label}</span>
           <div class="wa-chat-config-options">${chips}</div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   // 按所选类型构建临时模板与表单数据，复用流式生成管线
   startTypedGeneration(prompt, type, config) {
     const typeMap = {
-      markdown: { outputType: outputTypes.MARKDOWN, abilityId: 'writing', name: '文档报告', icon: 'file-lines' },
-      ppt: { outputType: outputTypes.PPT, abilityId: 'ppt', name: 'PPT', icon: 'file-powerpoint' },
-      table: { outputType: outputTypes.TABLE, abilityId: 'table', name: '表格', icon: 'table-cells' },
-      video: { outputType: outputTypes.VIDEO, abilityId: 'video', name: '视频', icon: 'film' },
-      music: { outputType: outputTypes.MUSIC, abilityId: 'music', name: '音乐', icon: 'music' },
+      markdown: {
+        outputType: outputTypes.MARKDOWN,
+        abilityId: 'writing',
+        name: '文档报告',
+        icon: 'file-lines',
+      },
+      ppt: {
+        outputType: outputTypes.PPT,
+        abilityId: 'ppt',
+        name: 'PPT',
+        icon: 'file-powerpoint',
+      },
+      table: {
+        outputType: outputTypes.TABLE,
+        abilityId: 'table',
+        name: '表格',
+        icon: 'table-cells',
+      },
+      video: {
+        outputType: outputTypes.VIDEO,
+        abilityId: 'video',
+        name: '视频',
+        icon: 'film',
+      },
+      music: {
+        outputType: outputTypes.MUSIC,
+        abilityId: 'music',
+        name: '音乐',
+        icon: 'music',
+      },
     };
     const m = typeMap[type];
-    if (!m) { this.startFreeChat(prompt); return; }
+    if (!m) {
+      this.startFreeChat(prompt);
+      return;
+    }
     const template = {
       id: `chat_type_${type}`,
       name: `${m.name}生成`,
@@ -1588,12 +3422,18 @@ export class WorkAssistant {
       outputType: m.outputType,
       icon: m.icon,
       defaultMode: 'free',
-      fields: [{ id: 'topic', type: fieldTypes.TEXT, label: '主题', required: true }],
+      fields: [
+        { id: 'topic', type: fieldTypes.TEXT, label: '主题', required: true },
+      ],
       chatContentType: type,
     };
     const formData = { topic: prompt };
     // PPT 配置字段映射：length -> pageCount, style -> theme
-    const mappedOptions = { ...config, chatContentType: type, attachments: this.homeAttachments || [] };
+    const mappedOptions = {
+      ...config,
+      chatContentType: type,
+      attachments: this.homeAttachments || [],
+    };
     if (type === 'ppt') {
       if (mappedOptions.length) {
         mappedOptions.pageCount = mappedOptions.length;
@@ -1628,7 +3468,12 @@ export class WorkAssistant {
       thinkingSteps: [],
       content: '',
       result: null,
-      template: { id: 'free-chat', name: 'AI 对话', icon: 'comments', outputType: 'markdown' },
+      template: {
+        id: 'free-chat',
+        name: 'AI 对话',
+        icon: 'comments',
+        outputType: 'markdown',
+      },
       formData: { content: value },
       selectedKBs,
       mode: 'free',
@@ -1641,14 +3486,21 @@ export class WorkAssistant {
 
     try {
       // 思考步骤
-      const steps = selectedKBs.length > 0
-        ? [`检索知识库：${selectedKBs.map((k) => k.name).join('、')}`, '分析问题', '组织回复']
-        : ['分析问题', '组织回复'];
+      const steps =
+        selectedKBs.length > 0
+          ? [
+              `检索知识库：${selectedKBs.map((k) => k.name).join('、')}`,
+              '分析问题',
+              '组织回复',
+            ]
+          : ['分析问题', '组织回复'];
       for (const step of steps) {
         aiMsg.thinkingSteps.push({ text: step, status: 'active' });
         this.updateChatStreamingMessage(aiMsg);
         await this._chatDelay(500);
-        const s = aiMsg.thinkingSteps.find((x) => x.text === step && x.status !== 'done');
+        const s = aiMsg.thinkingSteps.find(
+          (x) => x.text === step && x.status !== 'done'
+        );
         if (s) s.status = 'done';
         this.updateChatStreamingMessage(aiMsg);
         await this._chatDelay(150);
@@ -1683,9 +3535,10 @@ export class WorkAssistant {
   }
 
   generateFreeChatReply(value, selectedKBs) {
-    const kbNote = selectedKBs.length > 0
-      ? `\n\n> 📖 已参考《${selectedKBs.map((k) => k.name).join('、')}》中的相关资料`
-      : '';
+    const kbNote =
+      selectedKBs.length > 0
+        ? `\n\n> 📖 已参考《${selectedKBs.map((k) => k.name).join('、')}》中的相关资料`
+        : '';
     return `关于「${value}」，以下是我的建议：\n\n1. **明确目标**：首先梳理核心需求，确保方向清晰。\n2. **拆解要点**：将任务分解为可执行的步骤，便于跟踪进度。\n3. **执行方案**：根据实际情况选择合适的方法，逐步推进。\n4. **复盘优化**：完成后回顾效果，持续改进。\n\n如果你需要更具体的内容（如 PPT、报告、表格），可以点击下方"场景模板"选择对应模板生成。${kbNote}`;
   }
 
@@ -1711,9 +3564,13 @@ export class WorkAssistant {
           </div>
           <div class="wa-modal-body">
             <div class="wa-ability-modal-desc">${ability.description}</div>
-            ${templates.length > 0 ? `
+            ${
+              templates.length > 0
+                ? `
               <div class="wa-template-list">
-                ${templates.map((template) => `
+                ${templates
+                  .map(
+                    (template) => `
                   <div class="wa-template-list-item" data-template="${template.id}">
                     <div class="wa-template-list-icon"><i class="fa-solid fa-${template.icon}"></i></div>
                     <div class="wa-template-list-info">
@@ -1722,14 +3579,18 @@ export class WorkAssistant {
                     </div>
                     <button class="btn btn-sm btn-primary">使用</button>
                   </div>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>
-            ` : `
+            `
+                : `
               <div class="wa-empty-state" style="padding:40px 0;">
                 <div class="wa-empty-title">该岗位暂无可用的${ability.name}模板</div>
                 <div class="wa-empty-desc">试试切换其他岗位，或使用通用任务</div>
               </div>
-            `}
+            `
+            }
           </div>
         </div>
       </div>
@@ -1748,12 +3609,16 @@ export class WorkAssistant {
 
     const close = () => modal.remove();
 
-    document.getElementById('wa-ability-modal-close')?.addEventListener('click', close);
+    document
+      .getElementById('wa-ability-modal-close')
+      ?.addEventListener('click', close);
 
     modal.querySelectorAll('.wa-template-list-item').forEach((item) => {
       item.addEventListener('click', () => {
         const templateId = item.dataset.template;
-        this.selectedTemplate = getAllTemplates().find((t) => t.id === templateId);
+        this.selectedTemplate = getAllTemplates().find(
+          (t) => t.id === templateId
+        );
         this.activeTab = 'editor';
         modal.remove();
         this.render();
@@ -1779,18 +3644,22 @@ export class WorkAssistant {
       </header>
 
       <div class="content wa-history">
-        ${history.length === 0 ? `
+        ${
+          history.length === 0
+            ? `
           <div class="wa-empty-state">
             <div class="wa-empty-icon"><i class="fa-solid fa-folder-open"></i></div>
             <div class="wa-empty-title">还没有创作记录</div>
             <div class="wa-empty-desc">从首页选择一个模板开始生成内容</div>
             <button class="btn btn-primary" id="wa-back-home-empty">去创作</button>
           </div>
-        ` : `
+        `
+            : `
           <div class="wa-history-list">
             ${history.map((item) => this.renderHistoryItem(item)).join('')}
           </div>
-        `}
+        `
+        }
       </div>
     `;
 
@@ -1828,12 +3697,17 @@ export class WorkAssistant {
     if (template.contentTemplateId) {
       if (template.outputType === outputTypes.PPT) {
         // PPT 内容模板是骨架模板
-        const skeleton = pptSkeletonTemplates.find((s) => s.id === template.contentTemplateId);
+        const skeleton = pptSkeletonTemplates.find(
+          (s) => s.id === template.contentTemplateId
+        );
         if (skeleton) this.selectedSkeletonId = template.contentTemplateId;
       } else {
         // 非 PPT 内容模板
-        const contentTemplate = getContentTemplateById(template.contentTemplateId);
-        if (contentTemplate) this.selectedContentTemplateId = template.contentTemplateId;
+        const contentTemplate = getContentTemplateById(
+          template.contentTemplateId
+        );
+        if (contentTemplate)
+          this.selectedContentTemplateId = template.contentTemplateId;
       }
     }
 
@@ -1846,8 +3720,10 @@ export class WorkAssistant {
     const role = getRoleById(template.roleId);
     this.pptStage = 'outline';
     const draft = getDraft(template.id);
-    const initialFormData = this.currentFormData || (draft ? draft.formData : {});
-    const initialMode = this.currentMode || (draft ? draft.mode : template.defaultMode);
+    const initialFormData =
+      this.currentFormData || (draft ? draft.formData : {});
+    const initialMode =
+      this.currentMode || (draft ? draft.mode : template.defaultMode);
 
     this.container.innerHTML = `
       <div class="wa-editor">
@@ -1913,8 +3789,10 @@ export class WorkAssistant {
     const role = getRoleById(template.roleId);
     this.pptStage = 'outline';
     const draft = getDraft(template.id);
-    const initialFormData = this.currentFormData || (draft && draft.formData) || {};
-    const initialMode = this.currentMode || (draft && draft.mode) || template.defaultMode;
+    const initialFormData =
+      this.currentFormData || (draft && draft.formData) || {};
+    const initialMode =
+      this.currentMode || (draft && draft.mode) || template.defaultMode;
 
     if (draft && draft.pptConfig) {
       this.pptConfig = { ...this.getDefaultPPTConfig(), ...draft.pptConfig };
@@ -1934,7 +3812,11 @@ export class WorkAssistant {
     // 恢复视觉模式
     if (draft && draft.pptVisualMode) {
       this.pptVisualMode = draft.pptVisualMode;
-    } else if (this.currentMasterData || template.masterData || template.parsedFromFile) {
+    } else if (
+      this.currentMasterData ||
+      template.masterData ||
+      template.parsedFromFile
+    ) {
       this.pptVisualMode = 'upload';
     } else if (this.currentStructureTemplateId) {
       this.pptVisualMode = 'template';
@@ -1953,7 +3835,9 @@ export class WorkAssistant {
     }
 
     // 若当前选中了结构模板，根据结构模板初始化视觉/结构配置
-    const structureTemplate = this.currentStructureTemplateId ? getStructureTemplateById(this.currentStructureTemplateId) : null;
+    const structureTemplate = this.currentStructureTemplateId
+      ? getStructureTemplateById(this.currentStructureTemplateId)
+      : null;
     if (structureTemplate && structureTemplate.style) {
       const style = structureTemplate.style;
       if (style.theme) this.pptConfig.theme = style.theme;
@@ -2035,16 +3919,18 @@ export class WorkAssistant {
     ];
     return `
       <div class="wa-ppt-stepper">
-        ${steps.map((step) => {
-          const active = step.id === this.pptStep;
-          const completed = step.id < this.pptStep;
-          return `
+        ${steps
+          .map((step) => {
+            const active = step.id === this.pptStep;
+            const completed = step.id < this.pptStep;
+            return `
             <div class="wa-ppt-step ${active ? 'active' : ''} ${completed ? 'completed' : ''}" data-step="${step.id}">
               <div class="wa-ppt-step-num">${completed ? '<i class="fa-solid fa-check"></i>' : step.id}</div>
               <span>${step.label}</span>
             </div>
           `;
-        }).join('<div class="wa-ppt-step-divider"></div>')}
+          })
+          .join('<div class="wa-ppt-step-divider"></div>')}
       </div>
     `;
   }
@@ -2105,7 +3991,10 @@ export class WorkAssistant {
     const template = this.selectedTemplate;
     const ability = getAbilityById(template.abilityId);
     const mode = this.currentMode || template.defaultMode;
-    return this.renderPPTSettingsCard(ability, mode, template) + this.renderPPTRightPanel();
+    return (
+      this.renderPPTSettingsCard(ability, mode, template) +
+      this.renderPPTRightPanel()
+    );
   }
 
   renderPPTRightPanel() {
@@ -2156,7 +4045,14 @@ export class WorkAssistant {
       advanced: '高级设置',
     };
 
-    const visualFieldIds = ['theme', 'color', 'ratio', 'background', 'font', 'decorations'];
+    const visualFieldIds = [
+      'theme',
+      'color',
+      'ratio',
+      'background',
+      'font',
+      'decorations',
+    ];
     const hideVisual = this.pptVisualMode !== 'custom';
 
     const groupedFields = {};
@@ -2172,11 +4068,15 @@ export class WorkAssistant {
         ${this.pptVisualMode === 'template' ? this.renderPPTTemplateSelector() : ''}
         ${this.pptVisualMode === 'upload' ? this.renderPPTUploadTemplatePanel(template) : ''}
         <div class="wa-ppt-config-groups">
-          ${Object.entries(groupedFields).map(([group, fields]) => {
-            const expanded = this.pptExpandedGroups.includes(group);
-            const content = fields.map((def) => this.renderPPTConfigField(def)).join('');
-            const skeletonSection = group === 'structure' ? this.renderPPTSkeletonSelector() : '';
-            return `
+          ${Object.entries(groupedFields)
+            .map(([group, fields]) => {
+              const expanded = this.pptExpandedGroups.includes(group);
+              const content = fields
+                .map((def) => this.renderPPTConfigField(def))
+                .join('');
+              const skeletonSection =
+                group === 'structure' ? this.renderPPTSkeletonSelector() : '';
+              return `
               <div class="wa-panel wa-ppt-config-group ${expanded ? 'expanded' : ''}" data-group="${group}">
                 <div class="wa-ppt-config-group-header">
                   <div class="wa-ppt-config-group-title">${groups[group]}</div>
@@ -2188,7 +4088,8 @@ export class WorkAssistant {
                 </div>
               </div>
             `;
-          }).join('')}
+            })
+            .join('')}
         </div>
         <div class="wa-ppt-step-actions">
           <button class="btn btn-ghost" id="wa-ppt-step2-prev">← 上一步</button>
@@ -2200,15 +4101,32 @@ export class WorkAssistant {
 
   renderPPTVisualModeSelector() {
     const modes = [
-      { id: 'custom', label: '自由配置', desc: '灵活调整配色、主题、版式等视觉参数', icon: 'sliders' },
-      { id: 'template', label: '选择模板', desc: '从预设模板中选择完整视觉风格', icon: 'layer-group' },
-      { id: 'upload', label: '上传模板', desc: '上传已有PPT文件作为视觉母版', icon: 'cloud-arrow-up' },
+      {
+        id: 'custom',
+        label: '自由配置',
+        desc: '灵活调整配色、主题、版式等视觉参数',
+        icon: 'sliders',
+      },
+      {
+        id: 'template',
+        label: '选择模板',
+        desc: '从预设模板中选择完整视觉风格',
+        icon: 'layer-group',
+      },
+      {
+        id: 'upload',
+        label: '上传模板',
+        desc: '上传已有PPT文件作为视觉母版',
+        icon: 'cloud-arrow-up',
+      },
     ];
     return `
       <div class="wa-panel wa-ppt-visual-mode-panel">
         <div class="wa-panel-title">视觉生成方式</div>
         <div class="wa-ppt-visual-mode-list">
-          ${modes.map((mode) => `
+          ${modes
+            .map(
+              (mode) => `
             <div class="wa-ppt-visual-mode-item ${this.pptVisualMode === mode.id ? 'active' : ''}" data-mode="${mode.id}">
               <div class="wa-ppt-visual-mode-icon"><i class="fa-solid fa-${mode.icon}"></i></div>
               <div class="wa-ppt-visual-mode-info">
@@ -2217,7 +4135,9 @@ export class WorkAssistant {
               </div>
               <div class="wa-ppt-visual-mode-check"><i class="fa-solid fa-check"></i></div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -2232,7 +4152,9 @@ export class WorkAssistant {
       <div class="wa-ppt-skeleton-section">
         <div class="wa-ppt-skeleton-label">内容骨架</div>
         <div class="wa-ppt-skeleton-current" id="wa-ppt-skeleton-current">
-          ${selectedSkeleton ? `
+          ${
+            selectedSkeleton
+              ? `
             <div class="wa-ppt-skeleton-current-info">
               <div class="wa-ppt-skeleton-current-icon"><i class="fa-solid fa-sitemap"></i></div>
               <div>
@@ -2241,7 +4163,8 @@ export class WorkAssistant {
               </div>
             </div>
             <button class="wa-ppt-skeleton-change" id="wa-ppt-skeleton-change">更换</button>
-          ` : `
+          `
+              : `
             <div class="wa-ppt-skeleton-placeholder">
               <div class="wa-ppt-skeleton-placeholder-icon"><i class="fa-regular fa-folder-open"></i></div>
               <div class="wa-ppt-skeleton-placeholder-text">
@@ -2250,7 +4173,8 @@ export class WorkAssistant {
               </div>
               <i class="fa-solid fa-chevron-right wa-ppt-skeleton-arrow"></i>
             </div>
-          `}
+          `
+          }
         </div>
         ${this.pptSkeletonDropdownOpen ? this.renderPPTSkeletonDropdown() : ''}
       </div>
@@ -2272,7 +4196,9 @@ export class WorkAssistant {
               <div class="wa-ppt-skeleton-option-desc">AI 根据主题自由组织内容结构</div>
             </div>
           </div>
-          ${pptSkeletonTemplates.map((s) => `
+          ${pptSkeletonTemplates
+            .map(
+              (s) => `
             <div class="wa-ppt-skeleton-option ${this.selectedSkeletonId === s.id ? 'active' : ''}" data-skeleton-id="${s.id}">
               <div class="wa-ppt-skeleton-option-icon"><i class="fa-solid fa-sitemap"></i></div>
               <div>
@@ -2280,7 +4206,9 @@ export class WorkAssistant {
                 <div class="wa-ppt-skeleton-option-desc">${s.storyline.length} 个章节 · ${s.description}</div>
               </div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -2291,7 +4219,8 @@ export class WorkAssistant {
     const theme = pptThemes[style.theme] || {};
     const color = pptColors[style.color] || {};
     const selected = this.currentStructureTemplateId === t.id ? 'selected' : '';
-    const compact = options.size === 'compact' ? 'wa-ppt-template-card-compact' : '';
+    const compact =
+      options.size === 'compact' ? 'wa-ppt-template-card-compact' : '';
     const shortName = t.name.replace(/\s*\d+\s*页\s*PPT/i, '');
 
     const coverScenes = {
@@ -2321,8 +4250,16 @@ export class WorkAssistant {
 
   // 渲染 PPT 风格模板选择弹窗（与 renderPPTTemplateModal 结构保持一致）
   renderPPTThemeModal(configKey) {
-    const currentTheme = (this.chatContentConfig || {})[configKey] || 'business';
-    const themeColorMap = { business: 'green', tech: 'blue', minimal: 'green', lively: 'orange', academic: 'gray', dark: 'purple' };
+    const currentTheme =
+      (this.chatContentConfig || {})[configKey] || 'business';
+    const themeColorMap = {
+      business: 'green',
+      tech: 'blue',
+      minimal: 'green',
+      lively: 'orange',
+      academic: 'gray',
+      dark: 'purple',
+    };
     const templates = Object.values(pptThemes).map((theme) => ({
       id: `theme_${theme.id}`,
       name: theme.label,
@@ -2338,10 +4275,13 @@ export class WorkAssistant {
           <div class="wa-modal-body">
             <div class="wa-ppt-template-modal-desc">选择一个视觉风格，系统将自动应用对应的配色、字体和版式。</div>
             <div class="wa-ppt-template-grid wa-ppt-template-grid-modal">
-              ${templates.map((t) => {
-                const selected = t.style.theme === currentTheme ? 'selected' : '';
-                return `<div class="wa-ppt-theme-card-wrap ${selected}" data-theme="${t.style.theme}">${this.renderPPTTemplateCard(t, { size: 'compact' })}</div>`;
-              }).join('')}
+              ${templates
+                .map((t) => {
+                  const selected =
+                    t.style.theme === currentTheme ? 'selected' : '';
+                  return `<div class="wa-ppt-theme-card-wrap ${selected}" data-theme="${t.style.theme}">${this.renderPPTTemplateCard(t, { size: 'compact' })}</div>`;
+                })
+                .join('')}
             </div>
           </div>
         </div>
@@ -2364,7 +4304,9 @@ export class WorkAssistant {
     const close = () => modal.remove();
     const configKey = this._currentThemeConfigKey;
 
-    document.getElementById('wa-chat-theme-modal-close')?.addEventListener('click', close);
+    document
+      .getElementById('wa-chat-theme-modal-close')
+      ?.addEventListener('click', close);
 
     // 预览按钮
     modal.querySelectorAll('.wa-ppt-preview-eye').forEach((btn) => {
@@ -2381,7 +4323,9 @@ export class WorkAssistant {
         const theme = card.dataset.theme;
         if (configKey) this.selectChatConfig(configKey, theme);
         // 同步更新触发按钮显示
-        const trigger = this.container.querySelector('.wa-chat-config-theme-trigger');
+        const trigger = this.container.querySelector(
+          '.wa-chat-config-theme-trigger'
+        );
         if (trigger) {
           const t = pptThemes[theme] || Object.values(pptThemes)[0];
           trigger.dataset.theme = theme;
@@ -2395,7 +4339,9 @@ export class WorkAssistant {
     });
 
     // 点击遮罩关闭
-    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close();
+    });
   }
 
   closePPTThemePicker() {
@@ -2532,14 +4478,18 @@ export class WorkAssistant {
               </div>
             </div>
             <div class="wa-preview-thumbs">
-              ${pages.map((p, i) => `
+              ${pages
+                .map(
+                  (p, i) => `
                 <div class="wa-preview-thumb ${i === 0 ? 'active' : ''}" data-preview-type="${p.type}" data-idx="${i}">
                   <div class="wa-preview-thumb-slide theme-${style.theme || 'business'}" style="--accent:${accent};">
                     ${this.renderPPTSlidePreview(template, p.type, 'small')}
                   </div>
                   <div class="wa-preview-thumb-label">${p.label}</div>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
           <div class="wa-modal-footer wa-preview-footer">
@@ -2553,7 +4503,9 @@ export class WorkAssistant {
 
   renderPPTSlidePreview(template, type, size = 'small') {
     const style = template.style || {};
-    const accent = style.color ? (pptColors[style.color]?.primary || '#10b981') : '#10b981';
+    const accent = style.color
+      ? pptColors[style.color]?.primary || '#10b981'
+      : '#10b981';
     const isLarge = size === 'large';
     const scale = isLarge ? 2 : 1;
     if (type === 'cover') {
@@ -2632,8 +4584,12 @@ export class WorkAssistant {
 
     const modal = document.getElementById('wa-template-preview-modal');
     const close = () => modal.remove();
-    document.getElementById('wa-template-preview-close')?.addEventListener('click', close);
-    document.getElementById('wa-template-preview-cancel')?.addEventListener('click', close);
+    document
+      .getElementById('wa-template-preview-close')
+      ?.addEventListener('click', close);
+    document
+      .getElementById('wa-template-preview-cancel')
+      ?.addEventListener('click', close);
     modal.addEventListener('click', (e) => {
       if (e.target === modal) close();
     });
@@ -2646,26 +4602,32 @@ export class WorkAssistant {
         const type = thumb.dataset.previewType;
         thumbs.forEach((t) => t.classList.remove('active'));
         thumb.classList.add('active');
-        mainSlide.innerHTML = this.renderPPTSlidePreview(template, type, 'large');
+        mainSlide.innerHTML = this.renderPPTSlidePreview(
+          template,
+          type,
+          'large'
+        );
       });
     });
 
     // 使用此模板
-    document.getElementById('wa-template-preview-use')?.addEventListener('click', () => {
-      this.currentStructureTemplateId = templateId;
-      const structureTemplate = getStructureTemplateById(templateId);
-      if (structureTemplate && structureTemplate.style) {
-        const style = structureTemplate.style;
-        if (style.theme) this.pptConfig.theme = style.theme;
-        if (style.color) this.pptConfig.color = style.color;
-        if (style.ratio) this.pptConfig.ratio = style.ratio;
-        if (style.font) this.pptConfig.font = style.font;
-        if (style.background) this.pptConfig.background = style.background;
-      }
-      this.savePPTDraft(this.selectedTemplate);
-      modal.remove();
-      this.renderPPTEditor();
-    });
+    document
+      .getElementById('wa-template-preview-use')
+      ?.addEventListener('click', () => {
+        this.currentStructureTemplateId = templateId;
+        const structureTemplate = getStructureTemplateById(templateId);
+        if (structureTemplate && structureTemplate.style) {
+          const style = structureTemplate.style;
+          if (style.theme) this.pptConfig.theme = style.theme;
+          if (style.color) this.pptConfig.color = style.color;
+          if (style.ratio) this.pptConfig.ratio = style.ratio;
+          if (style.font) this.pptConfig.font = style.font;
+          if (style.background) this.pptConfig.background = style.background;
+        }
+        this.savePPTDraft(this.selectedTemplate);
+        modal.remove();
+        this.renderPPTEditor();
+      });
   }
 
   renderPPTTemplateSelector() {
@@ -2682,7 +4644,9 @@ export class WorkAssistant {
         if (style.background) this.pptConfig.background = style.background;
       }
     }
-    const currentTemplate = templates.find((t) => t.id === this.currentStructureTemplateId);
+    const currentTemplate = templates.find(
+      (t) => t.id === this.currentStructureTemplateId
+    );
     return `
       <div class="wa-panel">
         <div class="wa-panel-title">
@@ -2731,7 +4695,9 @@ export class WorkAssistant {
 
     const close = () => modal.remove();
 
-    document.getElementById('wa-ppt-template-modal-close')?.addEventListener('click', close);
+    document
+      .getElementById('wa-ppt-template-modal-close')
+      ?.addEventListener('click', close);
 
     // 预览按钮
     modal.querySelectorAll('.wa-ppt-preview-eye').forEach((btn) => {
@@ -2785,10 +4751,19 @@ export class WorkAssistant {
       `;
     }
 
-    const fileTypeLabel = { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[master?.fileType] || '文件';
-    const themeHint = master?.theme ? `主题色 ${Object.values(master.theme.colors || {})[0] || ''}` : '';
+    const fileTypeLabel =
+      { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[
+        master?.fileType
+      ] || '文件';
+    const themeHint = master?.theme
+      ? `主题色 ${Object.values(master.theme.colors || {})[0] || ''}`
+      : '';
     const structureHint = master?.slides?.length
-      ? `${master.slides.length} 页 · ${Object.entries(master.typeDistribution || {}).map(([k, v]) => `${k} ${v}`).join('/')}`
+      ? `${master.slides.length} 页 · ${Object.entries(
+          master.typeDistribution || {}
+        )
+          .map(([k, v]) => `${k} ${v}`)
+          .join('/')}`
       : master?.sheets?.length
         ? `${master.sheets.length} 张表`
         : master?.headings?.length
@@ -2846,12 +4821,14 @@ export class WorkAssistant {
         <div class="wa-form-item">
           <label class="wa-form-label">${def.label}</label>
           <div class="wa-ppt-option-group" data-field="${def.id}">
-            ${def.options.map((opt) => {
-              const optValue = typeof opt === 'string' ? opt : opt.value;
-              const optLabel = typeof opt === 'string' ? opt : opt.label;
-              const selected = value === optValue ? 'selected' : '';
-              return `<div class="wa-ppt-option-card ${selected}" data-value="${this.escapeHtml(optValue)}">${optLabel}</div>`;
-            }).join('')}
+            ${def.options
+              .map((opt) => {
+                const optValue = typeof opt === 'string' ? opt : opt.value;
+                const optLabel = typeof opt === 'string' ? opt : opt.label;
+                const selected = value === optValue ? 'selected' : '';
+                return `<div class="wa-ppt-option-card ${selected}" data-value="${this.escapeHtml(optValue)}">${optLabel}</div>`;
+              })
+              .join('')}
           </div>
         </div>
       `;
@@ -2862,12 +4839,16 @@ export class WorkAssistant {
         <div class="wa-form-item">
           <label class="wa-form-label">${def.label}</label>
           <div class="wa-ppt-option-group" data-field="${def.id}" data-multi="true">
-            ${def.options.map((opt) => {
-              const optValue = typeof opt === 'string' ? opt : opt.value;
-              const optLabel = typeof opt === 'string' ? opt : opt.label;
-              const selected = selectedValues.includes(optValue) ? 'selected' : '';
-              return `<div class="wa-ppt-option-card ${selected}" data-value="${this.escapeHtml(optValue)}">${optLabel}</div>`;
-            }).join('')}
+            ${def.options
+              .map((opt) => {
+                const optValue = typeof opt === 'string' ? opt : opt.value;
+                const optLabel = typeof opt === 'string' ? opt : opt.label;
+                const selected = selectedValues.includes(optValue)
+                  ? 'selected'
+                  : '';
+                return `<div class="wa-ppt-option-card ${selected}" data-value="${this.escapeHtml(optValue)}">${optLabel}</div>`;
+              })
+              .join('')}
           </div>
         </div>
       `;
@@ -2880,7 +4861,9 @@ export class WorkAssistant {
     const theme = pptThemes[cfg.theme] || pptThemes.business;
     const color = pptColors[cfg.color] || pptColors.green;
     const formData = this.currentFormData || {};
-    const structureTemplate = getStructureTemplateById(this.currentStructureTemplateId);
+    const structureTemplate = getStructureTemplateById(
+      this.currentStructureTemplateId
+    );
 
     const outline = this.getMockPPTOutline();
     const contentTitles = outline
@@ -2898,7 +4881,12 @@ export class WorkAssistant {
       return {
         type: page.type,
         title: page.title,
-        subtitle: page.type === 'cover' ? (cfg.company || theme.label) : (page.type === 'end' ? (formData.coreMessage || '让知识创造价值') : undefined),
+        subtitle:
+          page.type === 'cover'
+            ? cfg.company || theme.label
+            : page.type === 'end'
+              ? formData.coreMessage || '让知识创造价值'
+              : undefined,
         bullets: page.bullets,
       };
     });
@@ -2911,7 +4899,9 @@ export class WorkAssistant {
     const selectedSkeleton = this.selectedSkeletonId
       ? pptSkeletonTemplates.find((s) => s.id === this.selectedSkeletonId)
       : null;
-    const skeletonInfo = selectedSkeleton ? ` · 骨架：${selectedSkeleton.name}` : ' · 骨架：自由生成';
+    const skeletonInfo = selectedSkeleton
+      ? ` · 骨架：${selectedSkeleton.name}`
+      : ' · 骨架：自由生成';
 
     return `
       <div class="wa-ppt-preview">
@@ -2934,7 +4924,9 @@ export class WorkAssistant {
     const bg = isCoverOrEnd ? theme.coverBg : theme.contentBg;
     const textColor = isCoverOrEnd ? theme.textColor : theme.contentTextColor;
     const ratioClass = `wa-ppt-ratio-${cfg.ratio.replace(':', '-')}`;
-    const decorationClass = (cfg.decorations || []).map((d) => `wa-ppt-deco-${d}`).join(' ');
+    const decorationClass = (cfg.decorations || [])
+      .map((d) => `wa-ppt-deco-${d}`)
+      .join(' ');
 
     return `
       <div class="wa-ppt-slide-thumb ${ratioClass} ${decorationClass}" style="font-family:${theme.fontFamily};background:${bg};color:${textColor};--accent:${color.primary};">
@@ -2949,7 +4941,12 @@ export class WorkAssistant {
   }
 
   getSlideTypeLabel(type) {
-    const labels = { cover: '封面', toc: '目录', content: '内容页', end: '结束页' };
+    const labels = {
+      cover: '封面',
+      toc: '目录',
+      content: '内容页',
+      end: '结束页',
+    };
     return labels[type] || type;
   }
 
@@ -2986,7 +4983,8 @@ export class WorkAssistant {
       standard: ['要点一', '要点二', '要点三'],
       detailed: ['要点一', '要点二', '要点三', '要点四', '要点五'],
     };
-    const bullets = bulletsMap[cfg.density || 'standard'] || bulletsMap.standard;
+    const bullets =
+      bulletsMap[cfg.density || 'standard'] || bulletsMap.standard;
 
     const outline = [{ type: 'cover', title: topic }];
     if (pageCount >= 6) outline.push({ type: 'toc', title: '目录' });
@@ -2994,7 +4992,11 @@ export class WorkAssistant {
     const contentPageCount = Math.max(2, pageCount - (pageCount >= 6 ? 3 : 2));
     for (let i = 0; i < contentPageCount; i++) {
       let title = '补充内容';
-      if (selectedSkeleton && selectedSkeleton.storyline && selectedSkeleton.storyline[i]) {
+      if (
+        selectedSkeleton &&
+        selectedSkeleton.storyline &&
+        selectedSkeleton.storyline[i]
+      ) {
         title = selectedSkeleton.storyline[i].title;
       } else if (i === 0) {
         title = '背景与痛点';
@@ -3024,11 +5026,15 @@ export class WorkAssistant {
           <span class="wa-ppt-outline-item-page">第 ${idx + 1} 页</span>
           <button class="wa-ppt-outline-item-delete" data-index="${idx}"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        ${page.bullets ? `
+        ${
+          page.bullets
+            ? `
           <ul class="wa-ppt-outline-item-points">
             ${page.bullets.map((b) => `<li>${this.escapeHtml(b)}</li>`).join('')}
           </ul>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -3036,7 +5042,9 @@ export class WorkAssistant {
   renderPPTPageStructure() {
     const outline = this.pptOutline || this.getMockPPTOutline();
     const cfg = this.pptConfig;
-    const structureTemplate = getStructureTemplateById(this.currentStructureTemplateId);
+    const structureTemplate = getStructureTemplateById(
+      this.currentStructureTemplateId
+    );
     const selectedSkeleton = this.selectedSkeletonId
       ? pptSkeletonTemplates.find((s) => s.id === this.selectedSkeletonId)
       : null;
@@ -3062,13 +5070,17 @@ export class WorkAssistant {
           ${cfg.density ? ` · 密度：${densityLabels[cfg.density] || cfg.density}` : ''}
         </div>
         <div class="wa-ppt-outline-list-compact" id="wa-ppt-page-structure">
-          ${outline.map((page, idx) => `
+          ${outline
+            .map(
+              (page, idx) => `
             <div class="wa-ppt-outline-compact-item">
               <span class="wa-ppt-outline-compact-num">${idx + 1}</span>
               <span class="wa-ppt-outline-compact-title">${this.escapeHtml(page.title)}</span>
               <span class="wa-ppt-outline-compact-type">${this.getSlideTypeLabel(page.type)}</span>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -3094,10 +5106,18 @@ export class WorkAssistant {
             )
             .join('');
 
-    const suggestions = imageLevel === 'none' ? [] : this.generatePPTImageSuggestions(outline, imageLevel);
+    const suggestions =
+      imageLevel === 'none'
+        ? []
+        : this.generatePPTImageSuggestions(outline, imageLevel);
     const imagesHtml =
       suggestions.length > 0
-        ? suggestions.map((s) => `<div class="wa-ppt-image-suggestion">${this.escapeHtml(s)}</div>`).join('')
+        ? suggestions
+            .map(
+              (s) =>
+                `<div class="wa-ppt-image-suggestion">${this.escapeHtml(s)}</div>`
+            )
+            .join('')
         : '<div class="wa-ppt-image-suggestion">已关闭配图建议，可在第二步“输出形式”中开启。</div>';
 
     return `
@@ -3138,7 +5158,9 @@ export class WorkAssistant {
     const suggestions = [];
     outline.forEach((page, idx) => {
       if (page.type === 'cover') {
-        suggestions.push(`封面：使用符合“${this.pptConfig.theme || 'business'}”主题的品牌主视觉`);
+        suggestions.push(
+          `封面：使用符合“${this.pptConfig.theme || 'business'}”主题的品牌主视觉`
+        );
         return;
       }
       if (page.type === 'end') {
@@ -3150,14 +5172,22 @@ export class WorkAssistant {
         return;
       }
       if (level === 'each') {
-        suggestions.push(`第 ${idx + 1} 页（${page.title}）：${this.getImageThemeForTitle(page.title)}`);
+        suggestions.push(
+          `第 ${idx + 1} 页（${page.title}）：${this.getImageThemeForTitle(page.title)}`
+        );
       } else if (level === 'key') {
-        if (idx === 1 || (page.title && /核心|价值|优势|方案|产品/.test(page.title))) {
-          suggestions.push(`第 ${idx + 1} 页（${page.title}）：${this.getImageThemeForTitle(page.title)}`);
+        if (
+          idx === 1 ||
+          (page.title && /核心|价值|优势|方案|产品/.test(page.title))
+        ) {
+          suggestions.push(
+            `第 ${idx + 1} 页（${page.title}）：${this.getImageThemeForTitle(page.title)}`
+          );
         }
       }
     });
-    if (suggestions.length === 0) suggestions.push('当前配置下暂无关键页配图建议');
+    if (suggestions.length === 0)
+      suggestions.push('当前配置下暂无关键页配图建议');
     return suggestions;
   }
 
@@ -3178,10 +5208,20 @@ export class WorkAssistant {
   renderModeSelector(selectedMode, ability) {
     const modes = [];
     if (ability.supportsKB) {
-      modes.push({ id: 'kb', icon: 'book-open', label: '基于知识库', desc: '从知识库检索资料后生成，结果可追溯' });
+      modes.push({
+        id: 'kb',
+        icon: 'book-open',
+        label: '基于知识库',
+        desc: '从知识库检索资料后生成，结果可追溯',
+      });
     }
     if (ability.supportsFree) {
-      modes.push({ id: 'free', icon: 'sparkles', label: '自由生成', desc: '调用大模型能力，适合创意与发散' });
+      modes.push({
+        id: 'free',
+        icon: 'sparkles',
+        label: '自由生成',
+        desc: '调用大模型能力，适合创意与发散',
+      });
     }
 
     if (modes.length === 1) {
@@ -3204,7 +5244,9 @@ export class WorkAssistant {
       <div class="wa-panel">
         <div class="wa-panel-title">生成模式</div>
         <div class="wa-mode-list">
-          ${modes.map((mode) => `
+          ${modes
+            .map(
+              (mode) => `
             <div class="wa-mode-item ${selectedMode === mode.id ? 'active' : ''}" data-mode="${mode.id}">
               <div class="wa-mode-icon"><i class="fa-solid fa-${mode.icon}"></i></div>
               <div class="wa-mode-info">
@@ -3213,7 +5255,9 @@ export class WorkAssistant {
               </div>
               <div class="wa-mode-check"><i class="fa-solid fa-check"></i></div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -3231,13 +5275,17 @@ export class WorkAssistant {
         </div>
         <div class="wa-attachment-description">上传文件后，生成内容将结合附件中的信息进行创作。</div>
         <div class="wa-attachment-list">
-          ${attachments.map((file, index) => `
+          ${attachments
+            .map(
+              (file, index) => `
             <div class="wa-attachment-tag" data-index="${index}">
               <i class="fa-solid fa-${this.getFileIcon(file.fileType)}"></i>
               <span>${this.escapeHtml(file.fileName)}</span>
               <button class="wa-attachment-remove" data-index="${index}"><i class="fa-solid fa-xmark"></i></button>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
         <div class="wa-attachment-upload" id="wa-attachment-upload-zone">
           <input type="file" id="wa-attachment-file" accept=".pptx,.ppt,.docx,.doc,.xlsx,.xls,.pdf,.txt,.md" style="display:none;">
@@ -3261,13 +5309,17 @@ export class WorkAssistant {
         </div>
         <div class="wa-kb-description">选择后，生成内容将基于这些知识库中的资料。</div>
         <div class="wa-kb-list">
-          ${selectedKBs.map((kb) => `
+          ${selectedKBs
+            .map(
+              (kb) => `
             <div class="wa-kb-tag" data-id="${kb.id}">
               <i class="fa-solid fa-${this.getKBTypeIcon(kb.type)}"></i>
               <span>${kb.name}</span>
               <button class="wa-kb-remove" data-id="${kb.id}"><i class="fa-solid fa-xmark"></i></button>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
         <button class="wa-kb-add-btn" id="wa-add-kb">
           <i class="fa-solid fa-plus"></i> 添加知识库
@@ -3296,10 +5348,19 @@ export class WorkAssistant {
       `;
     }
 
-    const fileTypeLabel = { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[master?.fileType] || '文件';
-    const themeHint = master?.theme ? `主题色 ${Object.values(master.theme.colors || {})[0] || ''}` : '';
+    const fileTypeLabel =
+      { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[
+        master?.fileType
+      ] || '文件';
+    const themeHint = master?.theme
+      ? `主题色 ${Object.values(master.theme.colors || {})[0] || ''}`
+      : '';
     const structureHint = master?.slides?.length
-      ? `${master.slides.length} 页 · ${Object.entries(master.typeDistribution || {}).map(([k, v]) => `${k} ${v}`).join('/')}`
+      ? `${master.slides.length} 页 · ${Object.entries(
+          master.typeDistribution || {}
+        )
+          .map(([k, v]) => `${k} ${v}`)
+          .join('/')}`
       : master?.sheets?.length
         ? `${master.sheets.length} 张表`
         : master?.headings?.length
@@ -3348,7 +5409,9 @@ export class WorkAssistant {
               <input type="text" placeholder="搜索知识库..." id="wa-kb-search-input">
             </div>
             <div class="wa-kb-options" id="wa-kb-options">
-              ${knowledgeBases.map((kb) => `
+              ${knowledgeBases
+                .map(
+                  (kb) => `
                 <div class="wa-kb-option ${selectedIds.includes(kb.id) ? 'selected' : ''}" data-id="${kb.id}">
                   <div class="wa-kb-option-check">
                     <i class="fa-solid ${selectedIds.includes(kb.id) ? 'fa-check-square' : 'fa-square'}"></i>
@@ -3359,7 +5422,9 @@ export class WorkAssistant {
                     <div class="wa-kb-option-desc">${kb.documentCount} ${kb.type === '问答' ? '问答' : '文档'} · ${kb.description}</div>
                   </div>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
           <div class="wa-modal-footer">
@@ -3374,13 +5439,21 @@ export class WorkAssistant {
   renderContentTemplateSelector(template) {
     const allTemplates = getAllContentTemplates();
     const selectedId = this.selectedContentTemplateId;
-    const selectedTemplate = selectedId ? getContentTemplateById(selectedId) : null;
+    const selectedTemplate = selectedId
+      ? getContentTemplateById(selectedId)
+      : null;
 
     const compatibleTemplates = allTemplates.filter((t) => {
       if (!t.format) return true;
       const templateFormat = template.outputType;
-      if (templateFormat === outputTypes.MARKDOWN || templateFormat === outputTypes.TEXT || templateFormat === outputTypes.REPORT) {
-        return t.format === 'word' || t.format === 'list' || t.format === 'steps';
+      if (
+        templateFormat === outputTypes.MARKDOWN ||
+        templateFormat === outputTypes.TEXT ||
+        templateFormat === outputTypes.REPORT
+      ) {
+        return (
+          t.format === 'word' || t.format === 'list' || t.format === 'steps'
+        );
       }
       if (templateFormat === outputTypes.TABLE) return t.format === 'table';
       if (templateFormat === outputTypes.EMAIL) return t.format === 'email';
@@ -3402,7 +5475,9 @@ export class WorkAssistant {
         </div>
         <div class="wa-ct-tip">选择模板可控制输出结构和风格，让内容更符合你的需求</div>
         <div class="wa-content-template-select">
-          ${selectedTemplate ? `
+          ${
+            selectedTemplate
+              ? `
             <div class="wa-ct-selected">
               <div class="wa-ct-icon" style="background:var(--kb-primary-subtle);color:var(--kb-primary);">
                 <i class="fa-solid ${template.outputType === outputTypes.TABLE ? 'fa-table-cells' : template.outputType === outputTypes.EMAIL ? 'fa-envelope' : template.outputType === outputTypes.STEPS ? 'fa-list-ol' : template.outputType === outputTypes.LIST ? 'fa-list-check' : 'fa-file-lines'}"></i>
@@ -3413,7 +5488,8 @@ export class WorkAssistant {
               </div>
               <button class="wa-ct-change" id="wa-ct-change"><i class="fa-solid fa-rotate-right"></i> 更换</button>
             </div>
-          ` : `
+          `
+              : `
             <div class="wa-ct-placeholder" id="wa-ct-select-btn">
               <div class="wa-ct-placeholder-icon"><i class="fa-regular fa-file-lines"></i></div>
               <div class="wa-ct-placeholder-text">
@@ -3422,8 +5498,11 @@ export class WorkAssistant {
               </div>
               <i class="fa-solid fa-chevron-right wa-ct-arrow"></i>
             </div>
-          `}
-          ${this.contentTemplateDropdownOpen ? `
+          `
+          }
+          ${
+            this.contentTemplateDropdownOpen
+              ? `
             <div class="wa-ct-dropdown">
               <div class="wa-ct-dropdown-header">
                 <span>选择内容模板</span>
@@ -3437,7 +5516,9 @@ export class WorkAssistant {
                     <div class="wa-ct-option-desc">AI 自由发挥，不限制内容结构</div>
                   </div>
                 </div>
-                ${compatibleTemplates.map((t) => `
+                ${compatibleTemplates
+                  .map(
+                    (t) => `
                   <div class="wa-ct-option ${selectedId === t.id ? 'active' : ''}" data-ct-id="${t.id}">
                     <div class="wa-ct-option-icon" style="background:${t.format === 'word' ? '#EFF6FF;color:#1D4ED8' : t.format === 'table' ? '#ECFDF5;color:#047857' : t.format === 'email' ? '#EFF6FF;color:#1D4ED8' : t.format === 'steps' ? '#F5F3FF;color:#6D28D9' : '#F3F4F6;color:#374151'}">
                       <i class="fa-solid ${t.format === 'word' ? 'fa-file-lines' : t.format === 'table' ? 'fa-table-cells' : t.format === 'email' ? 'fa-envelope' : t.format === 'steps' ? 'fa-list-ol' : 'fa-list-check'}"></i>
@@ -3447,10 +5528,14 @@ export class WorkAssistant {
                       <div class="wa-ct-option-desc">${t.description || ''}</div>
                     </div>
                   </div>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
     `;
@@ -3525,7 +5610,13 @@ export class WorkAssistant {
     const isPPT = template.outputType === outputTypes.PPT;
     const isPPTOutline = isPPT && result.isOutline;
     const isTable = template.outputType === outputTypes.TABLE;
-    const isDocument = ['text', 'markdown', 'email', 'steps', 'report'].includes(template.outputType);
+    const isDocument = [
+      'text',
+      'markdown',
+      'email',
+      'steps',
+      'report',
+    ].includes(template.outputType);
 
     container.style.display = 'flex';
     const kbBtn = `<button class="btn btn-sm btn-ghost" id="wa-result-to-kb" title="将此内容添加到知识库"><i class="fa-solid fa-book-bookmark"></i> 添加到知识库</button>`;
@@ -3533,27 +5624,37 @@ export class WorkAssistant {
       <div class="wa-result-header">
         <div class="wa-result-title">${result.title}${isPPTOutline ? ' <span style="font-size:13px;font-weight:500;color:var(--kb-primary)">(大纲预览)</span>' : ''}</div>
         <div class="wa-result-actions">
-          ${isPPTOutline ? `
+          ${
+            isPPTOutline
+              ? `
             <button class="btn btn-sm btn-ghost" id="wa-result-regen"><i class="fa-solid fa-rotate-right"></i> 重新生成大纲</button>
             <button class="btn btn-sm btn-primary" id="wa-ppt-confirm-outline"><i class="fa-solid fa-wand-magic-sparkles"></i> 确认生成完整内容</button>
-          ` : isPPT ? `
+          `
+              : isPPT
+                ? `
             <button class="btn btn-sm btn-ghost" id="wa-ppt-export-md"><i class="fa-solid fa-file-code"></i> 导出MD</button>
             <button class="btn btn-sm btn-ghost" id="wa-ppt-export-pptx"><i class="fa-solid fa-file-powerpoint"></i> 导出PPTX</button>
             <button class="btn btn-sm btn-ghost" id="wa-result-regen"><i class="fa-solid fa-rotate-right"></i> 重新生成</button>
             <button class="btn btn-sm btn-ghost" id="wa-result-save"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
             ${kbBtn}
-          ` : isTable ? `
+          `
+                : isTable
+                  ? `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
             <button class="btn btn-sm btn-ghost" id="wa-export-xlsx"><i class="fa-solid fa-file-excel"></i> 导出XLSX</button>
             ${kbBtn}
-          ` : isDocument ? `
+          `
+                  : isDocument
+                    ? `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
             <button class="btn btn-sm btn-ghost" id="wa-export-docx"><i class="fa-solid fa-file-word"></i> 导出DOCX</button>
             ${kbBtn}
-          ` : `
+          `
+                    : `
             <button class="btn btn-sm btn-ghost" id="wa-result-copy"><i class="fa-solid fa-copy"></i> 复制</button>
             ${kbBtn}
-          `}
+          `
+          }
         </div>
       </div>
       <div class="wa-result-content" id="wa-result-content">
@@ -3566,7 +5667,9 @@ export class WorkAssistant {
       if (isPPT) {
         rightPanel.innerHTML = this.renderPPTSidePanel(result);
       } else {
-        rightPanel.innerHTML = hasCitations ? this.renderCitationsPanel(result.citations) : this.renderEmptyCitations(ability);
+        rightPanel.innerHTML = hasCitations
+          ? this.renderCitationsPanel(result.citations)
+          : this.renderEmptyCitations(ability);
       }
     }
 
@@ -3581,12 +5684,16 @@ export class WorkAssistant {
       case outputTypes.PPT:
         return this.renderPPTOutput(result);
       default:
-        return this.renderContentWithCitations(result.content, result.citations);
+        return this.renderContentWithCitations(
+          result.content,
+          result.citations
+        );
     }
   }
 
   renderTableOutput(result) {
-    if (!result.columns || !result.rows) return '<div class="wa-result-text">表格数据异常</div>';
+    if (!result.columns || !result.rows)
+      return '<div class="wa-result-text">表格数据异常</div>';
 
     return `
       <div class="wa-table-wrapper">
@@ -3597,11 +5704,15 @@ export class WorkAssistant {
             </tr>
           </thead>
           <tbody>
-            ${result.rows.map((row) => `
+            ${result.rows
+              .map(
+                (row) => `
               <tr>
                 ${row.map((cell) => `<td>${this.renderCellWithCitations(cell)}</td>`).join('')}
               </tr>
-            `).join('')}
+            `
+              )
+              .join('')}
           </tbody>
         </table>
       </div>
@@ -3632,7 +5743,9 @@ export class WorkAssistant {
           </div>
         </div>
         <div class="wa-ppt-pages">
-          ${result.pages.map((page, index) => `
+          ${result.pages
+            .map(
+              (page, index) => `
             <div class="wa-ppt-page" draggable="true" data-index="${index}">
               <div class="wa-ppt-page-num">${index + 1}</div>
               <div class="wa-ppt-page-content">
@@ -3645,7 +5758,10 @@ export class WorkAssistant {
                 </div>
                 <div class="wa-ppt-page-title" contenteditable="true" data-index="${index}" data-field="title">${this.formatContent(page.title)}</div>
                 ${page.subtitle ? `<div class="wa-ppt-page-subtitle" contenteditable="true" data-index="${index}" data-field="subtitle">${this.formatContent(page.subtitle)}</div>` : ''}
-                ${isOutline ? '' : `
+                ${
+                  isOutline
+                    ? ''
+                    : `
                   <ul class="wa-ppt-page-bullets">
                     ${page.bullets.map((bullet, bidx) => `<li contenteditable="true" data-index="${index}" data-field="bullet" data-bidx="${bidx}">${this.renderCellWithCitations(bullet)}</li>`).join('')}
                   </ul>
@@ -3657,17 +5773,24 @@ export class WorkAssistant {
                     <i class="fa-solid fa-image"></i>
                     <span contenteditable="true" data-index="${index}" data-field="visual">${this.formatContent(page.visual)}</span>
                   </div>
-                `}
+                `
+                }
               </div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
         <button class="wa-ppt-add-page" id="wa-ppt-add-page"><i class="fa-solid fa-plus"></i> 新增一页</button>
-        ${isOutline ? `
+        ${
+          isOutline
+            ? `
           <div class="wa-ppt-outline-actions">
             <button class="btn btn-primary" id="wa-ppt-confirm-outline"><i class="fa-solid fa-wand-magic-sparkles"></i> 确认生成完整内容</button>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -3708,12 +5831,16 @@ export class WorkAssistant {
           <button class="wa-ppt-slide-nav next" id="wa-ppt-slide-next"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
         <div class="wa-ppt-slide-thumbs">
-          ${result.pages.map((p, index) => `
+          ${result.pages
+            .map(
+              (p, index) => `
             <div class="wa-ppt-slide-thumb ${index === this.pptCurrentPage ? 'active' : ''}" data-index="${index}">
               <div class="wa-ppt-thumb-num">${index + 1}</div>
               <div class="wa-ppt-thumb-title">${p.title}</div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -3775,7 +5902,10 @@ export class WorkAssistant {
   renderCellWithCitations(cell) {
     if (!cell) return '';
     const text = this.formatContent(cell);
-    return text.replace(/\[(\d+)\]/g, '<span class="wa-citation-marker" data-id="$1">[$1]</span>');
+    return text.replace(
+      /\[(\d+)\]/g,
+      '<span class="wa-citation-marker" data-id="$1">[$1]</span>'
+    );
   }
 
   renderContentWithCitations(content, citations) {
@@ -3800,7 +5930,9 @@ export class WorkAssistant {
       <div class="wa-panel wa-citations-panel">
         <div class="wa-panel-title">引用来源 (${citations.length})</div>
         <div class="wa-citations-list">
-          ${citations.map((c) => `
+          ${citations
+            .map(
+              (c) => `
             <div class="wa-citation-item" data-id="${c.id}">
               <div class="wa-citation-header">
                 <span class="wa-citation-num">[${c.id}]</span>
@@ -3809,7 +5941,9 @@ export class WorkAssistant {
               <div class="wa-citation-doc">${c.docName} · ${c.section}</div>
               <div class="wa-citation-text">${c.text}</div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -3840,7 +5974,12 @@ export class WorkAssistant {
   }
 
   getKBTypeIcon(type) {
-    const icons = { 文档: 'file-lines', 网页: 'globe', 数据库: 'database', 问答: 'message' };
+    const icons = {
+      文档: 'file-lines',
+      网页: 'globe',
+      数据库: 'database',
+      问答: 'message',
+    };
     return icons[type] || 'file-lines';
   }
 
@@ -3862,7 +6001,9 @@ export class WorkAssistant {
 
   getSelectedKBs() {
     if (!this.selectedTemplate) return [];
-    const saved = localStorage.getItem(`wa_selected_kbs_${this.selectedTemplate.id}`);
+    const saved = localStorage.getItem(
+      `wa_selected_kbs_${this.selectedTemplate.id}`
+    );
     if (saved) {
       const ids = JSON.parse(saved);
       return knowledgeBases.filter((kb) => ids.includes(kb.id));
@@ -3873,7 +6014,10 @@ export class WorkAssistant {
 
   setSelectedKBs(kbIds) {
     if (!this.selectedTemplate) return;
-    localStorage.setItem(`wa_selected_kbs_${this.selectedTemplate.id}`, JSON.stringify(kbIds));
+    localStorage.setItem(
+      `wa_selected_kbs_${this.selectedTemplate.id}`,
+      JSON.stringify(kbIds)
+    );
   }
 
   getFormData() {
@@ -3940,41 +6084,51 @@ export class WorkAssistant {
     }
 
     // 辅助模式入口：场景模板 / 内容模板（点击头部跳转，快速入口区单独处理）
-    this.container.querySelectorAll('.wa-chat-alt-mode-head').forEach((head) => {
-      head.addEventListener('click', () => {
-        const type = head.dataset.mode;
-        if (type === 'scene') {
-          this.activeTab = 'templateMarket';
-          this.render();
-        } else if (type === 'content') {
-          if (this.onNavigate) this.onNavigate('contentTemplates');
-        }
+    this.container
+      .querySelectorAll('.wa-chat-alt-mode-head')
+      .forEach((head) => {
+        head.addEventListener('click', () => {
+          const type = head.dataset.mode;
+          if (type === 'scene') {
+            this.activeTab = 'templateMarket';
+            this.render();
+          } else if (type === 'content') {
+            if (this.onNavigate) this.onNavigate('contentTemplates');
+          }
+        });
       });
-    });
 
     // 加号按钮 → 展开知识库 / 附件菜单（局部切换）
-    this.container.querySelector('#wa-chat-plus')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.togglePlusMenu(!this.homePlusOpen);
-    });
+    this.container
+      .querySelector('#wa-chat-plus')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePlusMenu(!this.homePlusOpen);
+      });
     // 加号菜单项：关联知识库 → 打开知识库选择器
-    this.container.querySelector('#wa-chat-plus-kb')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.togglePlusMenu(false);
-      this.toggleKBPicker(true);
-    });
+    this.container
+      .querySelector('#wa-chat-plus-kb')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePlusMenu(false);
+        this.toggleKBPicker(true);
+      });
     // 加号菜单项：上传附件（占位提示）
-    this.container.querySelector('#wa-chat-plus-attach')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.togglePlusMenu(false);
-      this.showToast('附件上传功能开发中', 'info');
-    });
+    this.container
+      .querySelector('#wa-chat-plus-attach')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePlusMenu(false);
+        this.showToast('附件上传功能开发中', 'info');
+      });
 
     // 模型选择按钮 → 展开/收起下拉（局部切换）
-    this.container.querySelector('#wa-chat-model')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleModelMenu(!this.homeModelOpen);
-    });
+    this.container
+      .querySelector('#wa-chat-model')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleModelMenu(!this.homeModelOpen);
+      });
     // 模型项点击 → 切换模型（局部更新）
     this.container.querySelectorAll('.wa-chat-model-item').forEach((item) => {
       item.addEventListener('click', (e) => {
@@ -3984,27 +6138,36 @@ export class WorkAssistant {
     });
 
     // 知识库选择器关闭（局部切换）
-    this.container.querySelector('#wa-chat-kb-close')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.toggleKBPicker(false);
-    });
-    this.container.querySelectorAll('#wa-chat-kb-picker input[type="checkbox"]').forEach((cb) => {
-      cb.addEventListener('change', () => {
-        const kbId = cb.dataset.kbId;
-        const kb = (knowledgeBases || []).find((k) => k.id === kbId);
-        if (!kb) return;
-        if (!this.homeSelectedKBs) this.homeSelectedKBs = [];
-        if (cb.checked) {
-          if (!this.homeSelectedKBs.some((s) => s.id === kbId)) {
-            this.homeSelectedKBs.push(kb);
-          }
-        } else {
-          this.homeSelectedKBs = this.homeSelectedKBs.filter((s) => s.id !== kbId);
-        }
-        cb.closest('.wa-chat-kb-item')?.classList.toggle('checked', cb.checked);
-        this.syncPlusButton();
+    this.container
+      .querySelector('#wa-chat-kb-close')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleKBPicker(false);
       });
-    });
+    this.container
+      .querySelectorAll('#wa-chat-kb-picker input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.addEventListener('change', () => {
+          const kbId = cb.dataset.kbId;
+          const kb = (knowledgeBases || []).find((k) => k.id === kbId);
+          if (!kb) return;
+          if (!this.homeSelectedKBs) this.homeSelectedKBs = [];
+          if (cb.checked) {
+            if (!this.homeSelectedKBs.some((s) => s.id === kbId)) {
+              this.homeSelectedKBs.push(kb);
+            }
+          } else {
+            this.homeSelectedKBs = this.homeSelectedKBs.filter(
+              (s) => s.id !== kbId
+            );
+          }
+          cb.closest('.wa-chat-kb-item')?.classList.toggle(
+            'checked',
+            cb.checked
+          );
+          this.syncPlusButton();
+        });
+      });
 
     // 点击页面空白处收起加号菜单 / 模型下拉 / 知识库选择器（局部切换，不刷新）
     if (this._homePopoverDocHandler) {
@@ -4016,20 +6179,31 @@ export class WorkAssistant {
       const inModel = t.closest && t.closest('.wa-chat-model-wrap');
       const inKB = t.closest && t.closest('#wa-chat-kb-picker');
       let changed = false;
-      if (!inPlus && this.homePlusOpen) { this.togglePlusMenu(false); changed = true; }
-      if (!inModel && this.homeModelOpen) { this.toggleModelMenu(false); changed = true; }
-      if (!inKB && this.homeKBPickerOpen) { this.toggleKBPicker(false); changed = true; }
+      if (!inPlus && this.homePlusOpen) {
+        this.togglePlusMenu(false);
+        changed = true;
+      }
+      if (!inModel && this.homeModelOpen) {
+        this.toggleModelMenu(false);
+        changed = true;
+      }
+      if (!inKB && this.homeKBPickerOpen) {
+        this.toggleKBPicker(false);
+        changed = true;
+      }
       // 阻止后续无意义处理
       if (changed) return;
     };
     document.addEventListener('click', this._homePopoverDocHandler);
 
     // 选择模板按钮（消息状态下）→ 新对话回到首页
-    this.container.querySelector('#wa-chat-pick-template')?.addEventListener('click', () => {
-      this.startNewChat();
-    });
+    this.container
+      .querySelector('#wa-chat-pick-template')
+      ?.addEventListener('click', () => {
+        this.startNewChat();
+      });
 
-    // 最近创作项点击 → 跳转到我的文档
+    // 最近创作项点击 → 跳转到创作记录
     this.container.querySelectorAll('.wa-recent-item').forEach((item) => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
@@ -4037,9 +6211,11 @@ export class WorkAssistant {
         if (this.onNavigate) this.onNavigate('myDocuments');
       });
     });
-    this.container.querySelector('#wa-chat-recents-more')?.addEventListener('click', () => {
-      if (this.onNavigate) this.onNavigate('myDocuments');
-    });
+    this.container
+      .querySelector('#wa-chat-recents-more')
+      ?.addEventListener('click', () => {
+        if (this.onNavigate) this.onNavigate('myDocuments');
+      });
 
     // 快速入口卡片点击 → 直接进入对应编辑器
     this.bindQuickEntryEvents();
@@ -4058,41 +6234,52 @@ export class WorkAssistant {
       });
     }
 
-    // 我的文档
-    this.container.querySelector('#wa-chat-docs')?.addEventListener('click', () => {
-      if (this.onNavigate) this.onNavigate('myDocuments');
-    });
-
-    // 结果卡片操作（事件委托）
-    this.container.querySelectorAll('.wa-chat-result-btn[data-action]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action;
-        const msgId = btn.dataset.msgId;
-        if (action && msgId) this.handleChatResultAction(action, msgId);
+    // 创作记录
+    this.container
+      .querySelector('#wa-chat-docs')
+      ?.addEventListener('click', () => {
+        if (this.onNavigate) this.onNavigate('myDocuments');
       });
-    });
+
+    // 结果卡片 / 摘要卡片操作（事件委托，避免流式更新 innerHTML 后事件丢失）
+    if (this._chatResultDelegateHandler) {
+      this.container.removeEventListener(
+        'click',
+        this._chatResultDelegateHandler
+      );
+    }
+    this._chatResultDelegateHandler = (e) => {
+      const target = e.target.closest(
+        '.wa-chat-result-btn[data-action], .wa-chat-summary-btn[data-action], .wa-chat-summary-card[data-action], .wa-chat-ppt-btn[data-action], .wa-chat-ppt-card[data-action]'
+      );
+      if (!target) return;
+      const action = target.dataset.action;
+      const msgId = target.dataset.msgId;
+      if (!action || !msgId) return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.handleChatResultAction(action, msgId);
+    };
+    this.container.addEventListener('click', this._chatResultDelegateHandler);
   }
 
   bindHistoryEvents() {
-    this.container.querySelectorAll('#wa-back-home, #wa-back-home-empty').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.activeTab = 'home';
-        this.render();
+    this.container
+      .querySelectorAll('#wa-back-home, #wa-back-home-empty')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          this.activeTab = 'home';
+          this.render();
+        });
       });
-    });
 
     this.container.querySelectorAll('.wa-history-open').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const id = btn.dataset.id;
-        const history = getWorkHistory();
-        const record = history.find((h) => h.id === id);
-        if (record) {
-          this.selectedTemplate = getAllTemplates().find((t) => t.id === record.templateId);
-          this.activeTab = 'editor';
-          this.render();
-        }
+        // 复用 restoreInitialRecord：含模板回退重建与完整状态恢复
+        this.initialRecordId = btn.dataset.id;
+        this.restoreInitialRecord();
+        this.render();
       });
     });
 
@@ -4103,7 +6290,10 @@ export class WorkAssistant {
         const history = getWorkHistory();
         const record = history.find((h) => h.id === id);
         if (record && record.result) {
-          const text = record.result.content || this.tableToText(record.result) || this.pptToText(record.result);
+          const text =
+            record.result.content ||
+            this.tableToText(record.result) ||
+            this.pptToText(record.result);
           navigator.clipboard.writeText(text);
           this.showToast('已复制到剪贴板');
         }
@@ -4129,14 +6319,18 @@ export class WorkAssistant {
     });
 
     // 切换能力
-    document.getElementById('wa-switch-ability')?.addEventListener('click', () => {
-      this.openAbilityModal(template.abilityId);
-    });
+    document
+      .getElementById('wa-switch-ability')
+      ?.addEventListener('click', () => {
+        this.openAbilityModal(template.abilityId);
+      });
 
     // 模式选择
     this.container.querySelectorAll('.wa-mode-item').forEach((item) => {
       item.addEventListener('click', () => {
-        this.container.querySelectorAll('.wa-mode-item').forEach((i) => i.classList.remove('active'));
+        this.container
+          .querySelectorAll('.wa-mode-item')
+          .forEach((i) => i.classList.remove('active'));
         item.classList.add('active');
         this.updateKBPanel();
         this.updateAttachmentPanel();
@@ -4144,18 +6338,20 @@ export class WorkAssistant {
     });
 
     // 第二步视觉生成方式切换
-    this.container.querySelectorAll('.wa-ppt-visual-mode-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        const mode = item.dataset.mode;
-        if (mode === this.pptVisualMode) return;
-        this.pptVisualMode = mode;
-        if (mode !== 'template') {
-          this.currentStructureTemplateId = null;
-        }
-        this.savePPTDraft(template);
-        this.renderPPTEditor();
+    this.container
+      .querySelectorAll('.wa-ppt-visual-mode-item')
+      .forEach((item) => {
+        item.addEventListener('click', () => {
+          const mode = item.dataset.mode;
+          if (mode === this.pptVisualMode) return;
+          this.pptVisualMode = mode;
+          if (mode !== 'template') {
+            this.currentStructureTemplateId = null;
+          }
+          this.savePPTDraft(template);
+          this.renderPPTEditor();
+        });
       });
-    });
 
     // 第二步模板预览按钮
     this.container.querySelectorAll('.wa-ppt-preview-eye').forEach((btn) => {
@@ -4186,9 +6382,11 @@ export class WorkAssistant {
     });
 
     // 第二步更多模板弹窗
-    document.getElementById('wa-ppt-template-more')?.addEventListener('click', () => {
-      this.openPPTTemplateModal();
-    });
+    document
+      .getElementById('wa-ppt-template-more')
+      ?.addEventListener('click', () => {
+        this.openPPTTemplateModal();
+      });
 
     // 第二步上传模板
     this.bindPPTTemplateUploadEvents();
@@ -4205,164 +6403,229 @@ export class WorkAssistant {
     });
 
     // 步骤 1：下一步
-    document.getElementById('wa-ppt-step1-next')?.addEventListener('click', () => {
-      const formData = this.collectFormData(template);
-      const requiredFields = template.fields.filter((f) => f.required);
-      const missing = requiredFields.find((f) => !formData[f.id]?.trim());
-      if (missing) {
-        this.showToast(`请填写必填项：${missing.label}`, 'error');
-        const el = document.getElementById(`field-${missing.id}`);
-        if (el) {
-          el.focus();
-          el.classList.add('error');
-          setTimeout(() => el.classList.remove('error'), 2000);
+    document
+      .getElementById('wa-ppt-step1-next')
+      ?.addEventListener('click', () => {
+        const formData = this.collectFormData(template);
+        const requiredFields = template.fields.filter((f) => f.required);
+        const missing = requiredFields.find((f) => !formData[f.id]?.trim());
+        if (missing) {
+          this.showToast(`请填写必填项：${missing.label}`, 'error');
+          const el = document.getElementById(`field-${missing.id}`);
+          if (el) {
+            el.focus();
+            el.classList.add('error');
+            setTimeout(() => el.classList.remove('error'), 2000);
+          }
+          return;
         }
-        return;
-      }
-      this.currentFormData = formData;
-      saveDraft(template.id, { formData, mode: this.getSelectedMode(), pptConfig: this.pptConfig, structureTemplateId: this.currentStructureTemplateId, pptVisualMode: this.pptVisualMode });
-      this.pptStep = 2;
-      this.renderPPTEditor();
-    });
+        this.currentFormData = formData;
+        saveDraft(template.id, {
+          formData,
+          mode: this.getSelectedMode(),
+          pptConfig: this.pptConfig,
+          structureTemplateId: this.currentStructureTemplateId,
+          pptVisualMode: this.pptVisualMode,
+        });
+        this.pptStep = 2;
+        this.renderPPTEditor();
+      });
 
     // 步骤 2：上一步/下一步
-    document.getElementById('wa-ppt-step2-prev')?.addEventListener('click', () => {
-      const formData = { ...this.currentFormData, ...this.collectFormData(template) };
-      this.currentFormData = formData;
-      saveDraft(template.id, { formData, mode: this.getSelectedMode(), pptConfig: this.pptConfig, structureTemplateId: this.currentStructureTemplateId, pptVisualMode: this.pptVisualMode });
-      this.pptStep = 1;
-      this.renderPPTEditor();
-    });
-    document.getElementById('wa-ppt-step2-next')?.addEventListener('click', () => {
-      const formData = { ...this.currentFormData, ...this.collectFormData(template) };
-      this.currentFormData = formData;
-      saveDraft(template.id, { formData, mode: this.getSelectedMode(), pptConfig: this.pptConfig, structureTemplateId: this.currentStructureTemplateId, pptVisualMode: this.pptVisualMode, skeletonId: this.selectedSkeletonId });
-      this.pptStep = 3;
-      this.pptOutline = null; // 重新生成大纲
-      this.renderPPTEditor();
-      this.startPPTOutlineGeneration(template);
-    });
+    document
+      .getElementById('wa-ppt-step2-prev')
+      ?.addEventListener('click', () => {
+        const formData = {
+          ...this.currentFormData,
+          ...this.collectFormData(template),
+        };
+        this.currentFormData = formData;
+        saveDraft(template.id, {
+          formData,
+          mode: this.getSelectedMode(),
+          pptConfig: this.pptConfig,
+          structureTemplateId: this.currentStructureTemplateId,
+          pptVisualMode: this.pptVisualMode,
+        });
+        this.pptStep = 1;
+        this.renderPPTEditor();
+      });
+    document
+      .getElementById('wa-ppt-step2-next')
+      ?.addEventListener('click', () => {
+        const formData = {
+          ...this.currentFormData,
+          ...this.collectFormData(template),
+        };
+        this.currentFormData = formData;
+        saveDraft(template.id, {
+          formData,
+          mode: this.getSelectedMode(),
+          pptConfig: this.pptConfig,
+          structureTemplateId: this.currentStructureTemplateId,
+          pptVisualMode: this.pptVisualMode,
+          skeletonId: this.selectedSkeletonId,
+        });
+        this.pptStep = 3;
+        this.pptOutline = null; // 重新生成大纲
+        this.renderPPTEditor();
+        this.startPPTOutlineGeneration(template);
+      });
 
     // 内容骨架选择器
-    document.getElementById('wa-ppt-skeleton-current')?.addEventListener('click', () => {
-      this.pptSkeletonDropdownOpen = !this.pptSkeletonDropdownOpen;
-      this.renderPPTEditor();
-    });
-    document.getElementById('wa-ppt-skeleton-change')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.pptSkeletonDropdownOpen = !this.pptSkeletonDropdownOpen;
-      this.renderPPTEditor();
-    });
-    document.getElementById('wa-ppt-skeleton-close')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.pptSkeletonDropdownOpen = false;
-      this.renderPPTEditor();
-    });
-    this.container.querySelectorAll('.wa-ppt-skeleton-option').forEach((opt) => {
-      opt.addEventListener('click', () => {
-        const skeletonId = opt.dataset.skeletonId;
-        this.selectedSkeletonId = skeletonId || null;
+    document
+      .getElementById('wa-ppt-skeleton-current')
+      ?.addEventListener('click', () => {
+        this.pptSkeletonDropdownOpen = !this.pptSkeletonDropdownOpen;
+        this.renderPPTEditor();
+      });
+    document
+      .getElementById('wa-ppt-skeleton-change')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.pptSkeletonDropdownOpen = !this.pptSkeletonDropdownOpen;
+        this.renderPPTEditor();
+      });
+    document
+      .getElementById('wa-ppt-skeleton-close')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
         this.pptSkeletonDropdownOpen = false;
         this.renderPPTEditor();
-        this.savePPTDraft(template);
       });
-    });
+    this.container
+      .querySelectorAll('.wa-ppt-skeleton-option')
+      .forEach((opt) => {
+        opt.addEventListener('click', () => {
+          const skeletonId = opt.dataset.skeletonId;
+          this.selectedSkeletonId = skeletonId || null;
+          this.pptSkeletonDropdownOpen = false;
+          this.renderPPTEditor();
+          this.savePPTDraft(template);
+        });
+      });
 
     // 步骤 3：上一步/确认生成
-    document.getElementById('wa-ppt-step3-prev')?.addEventListener('click', () => {
-      saveDraft(template.id, { formData: this.currentFormData, mode: this.getSelectedMode(), pptConfig: this.pptConfig, structureTemplateId: this.currentStructureTemplateId, pptVisualMode: this.pptVisualMode });
-      this.pptStep = 2;
-      this.renderPPTEditor();
-    });
-    document.getElementById('wa-ppt-step3-generate')?.addEventListener('click', () => {
-      this.startPPTContentGeneration(template);
-    });
+    document
+      .getElementById('wa-ppt-step3-prev')
+      ?.addEventListener('click', () => {
+        saveDraft(template.id, {
+          formData: this.currentFormData,
+          mode: this.getSelectedMode(),
+          pptConfig: this.pptConfig,
+          structureTemplateId: this.currentStructureTemplateId,
+          pptVisualMode: this.pptVisualMode,
+        });
+        this.pptStep = 2;
+        this.renderPPTEditor();
+      });
+    document
+      .getElementById('wa-ppt-step3-generate')
+      ?.addEventListener('click', () => {
+        this.startPPTContentGeneration(template);
+      });
 
     // 顶部主按钮
-    document.getElementById('wa-start-generate')?.addEventListener('click', () => {
-      if (this.pptStep === 1) {
-        document.getElementById('wa-ppt-step1-next')?.click();
-      } else if (this.pptStep === 2) {
-        document.getElementById('wa-ppt-step2-next')?.click();
-      } else {
-        this.startPPTContentGeneration(template);
-      }
-    });
+    document
+      .getElementById('wa-start-generate')
+      ?.addEventListener('click', () => {
+        if (this.pptStep === 1) {
+          document.getElementById('wa-ppt-step1-next')?.click();
+        } else if (this.pptStep === 2) {
+          document.getElementById('wa-ppt-step2-next')?.click();
+        } else {
+          this.startPPTContentGeneration(template);
+        }
+      });
 
     // 体验示例
-    document.getElementById('wa-load-example')?.addEventListener('click', () => {
-      this.loadExample(template);
-    });
+    document
+      .getElementById('wa-load-example')
+      ?.addEventListener('click', () => {
+        this.loadExample(template);
+      });
 
     // 生成设置折叠
     this.bindPPTSettingsToggle();
 
     // 第二步配置分组折叠（手风琴效果，DOM 直接操作避免滚动跳动）
-    this.container.querySelectorAll('.wa-ppt-config-group-header').forEach((header) => {
-      header.addEventListener('click', () => {
-        const groupEl = header.closest('.wa-ppt-config-group');
-        const group = groupEl?.dataset.group;
-        if (!group) return;
+    this.container
+      .querySelectorAll('.wa-ppt-config-group-header')
+      .forEach((header) => {
+        header.addEventListener('click', () => {
+          const groupEl = header.closest('.wa-ppt-config-group');
+          const group = groupEl?.dataset.group;
+          if (!group) return;
 
-        const body = groupEl.querySelector('.wa-ppt-config-group-body');
-        const arrow = groupEl.querySelector('.wa-ppt-config-group-arrow');
-        const willExpand = !this.pptExpandedGroups.includes(group);
+          const body = groupEl.querySelector('.wa-ppt-config-group-body');
+          const arrow = groupEl.querySelector('.wa-ppt-config-group-arrow');
+          const willExpand = !this.pptExpandedGroups.includes(group);
 
-        // 收起其他分组（手风琴）
-        this.container.querySelectorAll('.wa-ppt-config-group').forEach((el) => {
-          if (el !== groupEl && el.classList.contains('expanded')) {
-            el.classList.remove('expanded');
-            const otherBody = el.querySelector('.wa-ppt-config-group-body');
-            const otherArrow = el.querySelector('.wa-ppt-config-group-arrow');
-            if (otherBody) otherBody.style.display = 'none';
-            if (otherArrow) {
-              otherArrow.classList.remove('fa-chevron-up');
-              otherArrow.classList.add('fa-chevron-down');
+          // 收起其他分组（手风琴）
+          this.container
+            .querySelectorAll('.wa-ppt-config-group')
+            .forEach((el) => {
+              if (el !== groupEl && el.classList.contains('expanded')) {
+                el.classList.remove('expanded');
+                const otherBody = el.querySelector('.wa-ppt-config-group-body');
+                const otherArrow = el.querySelector(
+                  '.wa-ppt-config-group-arrow'
+                );
+                if (otherBody) otherBody.style.display = 'none';
+                if (otherArrow) {
+                  otherArrow.classList.remove('fa-chevron-up');
+                  otherArrow.classList.add('fa-chevron-down');
+                }
+              }
+            });
+
+          if (willExpand) {
+            this.pptExpandedGroups = [group];
+            groupEl.classList.add('expanded');
+            if (body) body.style.display = 'block';
+            if (arrow) {
+              arrow.classList.remove('fa-chevron-down');
+              arrow.classList.add('fa-chevron-up');
+            }
+          } else {
+            this.pptExpandedGroups = [];
+            groupEl.classList.remove('expanded');
+            if (body) body.style.display = 'none';
+            if (arrow) {
+              arrow.classList.remove('fa-chevron-up');
+              arrow.classList.add('fa-chevron-down');
             }
           }
+
+          this.savePPTDraft(template);
         });
-
-        if (willExpand) {
-          this.pptExpandedGroups = [group];
-          groupEl.classList.add('expanded');
-          if (body) body.style.display = 'block';
-          if (arrow) {
-            arrow.classList.remove('fa-chevron-down');
-            arrow.classList.add('fa-chevron-up');
-          }
-        } else {
-          this.pptExpandedGroups = [];
-          groupEl.classList.remove('expanded');
-          if (body) body.style.display = 'none';
-          if (arrow) {
-            arrow.classList.remove('fa-chevron-up');
-            arrow.classList.add('fa-chevron-down');
-          }
-        }
-
-        this.savePPTDraft(template);
       });
-    });
 
     // 结构模板切换
-    document.getElementById('wa-ppt-structure-template')?.addEventListener('change', (e) => {
-      const structureTemplateId = e.target.value;
-      this.currentStructureTemplateId = structureTemplateId;
-      const structureTemplate = structureTemplateId ? getStructureTemplateById(structureTemplateId) : null;
-      const hint = document.getElementById('wa-ppt-structure-template-hint');
-      if (hint) {
-        hint.textContent = structureTemplate ? structureTemplate.description : '选择后，PPT 的页面结构和视觉风格将按模板固定。';
-      }
-      if (structureTemplate && structureTemplate.style) {
-        const style = structureTemplate.style;
-        if (style.theme) this.pptConfig.theme = style.theme;
-        if (style.color) this.pptConfig.color = style.color;
-        if (style.ratio) this.pptConfig.ratio = style.ratio;
-        if (style.font) this.pptConfig.font = style.font;
-        if (style.background) this.pptConfig.background = style.background;
-      }
-      this.refreshPPTPreview();
-    });
+    document
+      .getElementById('wa-ppt-structure-template')
+      ?.addEventListener('change', (e) => {
+        const structureTemplateId = e.target.value;
+        this.currentStructureTemplateId = structureTemplateId;
+        const structureTemplate = structureTemplateId
+          ? getStructureTemplateById(structureTemplateId)
+          : null;
+        const hint = document.getElementById('wa-ppt-structure-template-hint');
+        if (hint) {
+          hint.textContent = structureTemplate
+            ? structureTemplate.description
+            : '选择后，PPT 的页面结构和视觉风格将按模板固定。';
+        }
+        if (structureTemplate && structureTemplate.style) {
+          const style = structureTemplate.style;
+          if (style.theme) this.pptConfig.theme = style.theme;
+          if (style.color) this.pptConfig.color = style.color;
+          if (style.ratio) this.pptConfig.ratio = style.ratio;
+          if (style.font) this.pptConfig.font = style.font;
+          if (style.background) this.pptConfig.background = style.background;
+        }
+        this.refreshPPTPreview();
+      });
 
     // 配置项输入事件
     this.container.querySelectorAll('.wa-ppt-config-input').forEach((input) => {
@@ -4381,7 +6644,9 @@ export class WorkAssistant {
         card.addEventListener('click', () => {
           const value = card.dataset.value;
           if (isMulti) {
-            const current = Array.isArray(this.pptConfig[field]) ? this.pptConfig[field] : [];
+            const current = Array.isArray(this.pptConfig[field])
+              ? this.pptConfig[field]
+              : [];
             if (current.includes(value)) {
               this.pptConfig[field] = current.filter((v) => v !== value);
               card.classList.remove('selected');
@@ -4391,7 +6656,9 @@ export class WorkAssistant {
             }
           } else {
             this.pptConfig[field] = value;
-            group.querySelectorAll('.wa-ppt-option-card').forEach((c) => c.classList.remove('selected'));
+            group
+              .querySelectorAll('.wa-ppt-option-card')
+              .forEach((c) => c.classList.remove('selected'));
             card.classList.add('selected');
           }
           this.refreshPPTPreview();
@@ -4400,10 +6667,12 @@ export class WorkAssistant {
     });
 
     // 重新生成大纲
-    document.getElementById('wa-ppt-regenerate-outline')?.addEventListener('click', () => {
-      this.pptOutline = null;
-      this.startPPTOutlineGeneration(template);
-    });
+    document
+      .getElementById('wa-ppt-regenerate-outline')
+      ?.addEventListener('click', () => {
+        this.pptOutline = null;
+        this.startPPTOutlineGeneration(template);
+      });
 
     // 知识库、附件、母版事件复用现有逻辑
     this.bindKBSelectorEvents();
@@ -4428,7 +6697,9 @@ export class WorkAssistant {
     if (!toggle) return;
     toggle.addEventListener('click', () => {
       const body = document.getElementById('wa-ppt-settings-body');
-      const icon = document.querySelector('#wa-ppt-settings-toggle .wa-ppt-settings-arrow');
+      const icon = document.querySelector(
+        '#wa-ppt-settings-toggle .wa-ppt-settings-arrow'
+      );
       if (!body || !icon) return;
       if (body.style.display === 'none') {
         body.style.display = 'block';
@@ -4501,7 +6772,11 @@ export class WorkAssistant {
         e.preventDefault();
         item.classList.remove('drag-over');
         const dstIndex = parseInt(item.dataset.index, 10);
-        if (this.pptOutline && this.dragSrcIndex !== null && this.dragSrcIndex !== dstIndex) {
+        if (
+          this.pptOutline &&
+          this.dragSrcIndex !== null &&
+          this.dragSrcIndex !== dstIndex
+        ) {
           const [moved] = this.pptOutline.splice(this.dragSrcIndex, 1);
           this.pptOutline.splice(dstIndex, 0, moved);
           const main = document.getElementById('wa-ppt-main');
@@ -4544,7 +6819,9 @@ export class WorkAssistant {
   generatePPTOutline(template) {
     const formData = this.currentFormData || this.collectFormData(template);
     const topic = formData.topic || '汇报主题';
-    const keyPoints = (formData.keyPoints || '').split(/[,，、]/).filter(Boolean);
+    const keyPoints = (formData.keyPoints || '')
+      .split(/[,，、]/)
+      .filter(Boolean);
     const cfg = this.pptConfig;
     const pageCount = parseInt(cfg.pageCount, 10) || 8;
     const density = cfg.density || 'standard';
@@ -4558,17 +6835,30 @@ export class WorkAssistant {
     const bulletsPerPage = bulletsMap[density] || 3;
 
     const attachmentPoints = this.extractAttachmentOutlinePoints();
-    const defaultPoints = attachmentPoints.length > 0
-      ? attachmentPoints
-      : ['背景与痛点', '产品核心能力', '应用场景', '实施路径', '客户价值'];
+    const defaultPoints =
+      attachmentPoints.length > 0
+        ? attachmentPoints
+        : ['背景与痛点', '产品核心能力', '应用场景', '实施路径', '客户价值'];
     const contentPoints = keyPoints.length > 0 ? keyPoints : defaultPoints;
 
     const structureMap = {
-      'total-part-total': ['项目背景', '核心能力', '应用场景', '实施路径', '价值总结'],
-      'problem-solution': ['现状问题', '痛点分析', '解决方案', '实施路径', '预期效果'],
-      'timeline': ['发展历程', '当前阶段', '核心成果', '未来规划', '战略展望'],
-      'compare': ['方案对比', '优势分析', '劣势分析', '适用场景', '结论建议'],
-      'story': ['故事背景', '挑战与冲突', '关键转折', '解决方案', '成果与启示'],
+      'total-part-total': [
+        '项目背景',
+        '核心能力',
+        '应用场景',
+        '实施路径',
+        '价值总结',
+      ],
+      'problem-solution': [
+        '现状问题',
+        '痛点分析',
+        '解决方案',
+        '实施路径',
+        '预期效果',
+      ],
+      timeline: ['发展历程', '当前阶段', '核心成果', '未来规划', '战略展望'],
+      compare: ['方案对比', '优势分析', '劣势分析', '适用场景', '结论建议'],
+      story: ['故事背景', '挑战与冲突', '关键转折', '解决方案', '成果与启示'],
     };
 
     let structureTitles;
@@ -4579,7 +6869,8 @@ export class WorkAssistant {
     if (selectedSkeleton && selectedSkeleton.storyline) {
       structureTitles = selectedSkeleton.storyline.map((s) => s.title);
     } else {
-      structureTitles = structureMap[structure] || structureMap['total-part-total'];
+      structureTitles =
+        structureMap[structure] || structureMap['total-part-total'];
     }
 
     const makeBullets = (count, guide) => {
@@ -4608,11 +6899,20 @@ export class WorkAssistant {
       } else {
         title = `补充内容 ${i - structureTitles.length + 1}`;
       }
-      outline.push({ type: 'content', title, bullets: makeBullets(bulletsPerPage, guide), guide });
+      outline.push({
+        type: 'content',
+        title,
+        bullets: makeBullets(bulletsPerPage, guide),
+        guide,
+      });
     }
 
     while (outline.length < pageCount - 1) {
-      outline.push({ type: 'content', title: `补充内容 ${outline.length}`, bullets: makeBullets(bulletsPerPage) });
+      outline.push({
+        type: 'content',
+        title: `补充内容 ${outline.length}`,
+        bullets: makeBullets(bulletsPerPage),
+      });
     }
 
     outline.push({ type: 'end', title: '感谢聆听' });
@@ -4621,7 +6921,9 @@ export class WorkAssistant {
 
   extractAttachmentOutlinePoints() {
     if (this.getCurrentMode() !== 'free') return [];
-    const attachments = this.currentAttachments?.length ? this.currentAttachments : this.freeAttachments;
+    const attachments = this.currentAttachments?.length
+      ? this.currentAttachments
+      : this.freeAttachments;
     if (!attachments || !attachments.length) return [];
 
     const points = [];
@@ -4629,12 +6931,14 @@ export class WorkAssistant {
       if (file.headings && file.headings.length) {
         file.headings.slice(0, 5).forEach((h) => {
           const text = typeof h === 'string' ? h : h.text;
-          if (text && text.length <= 20 && !points.includes(text)) points.push(text);
+          if (text && text.length <= 20 && !points.includes(text))
+            points.push(text);
         });
       } else if (file.slides && file.slides.length) {
         file.slides.slice(1, 6).forEach((s) => {
           const text = s.title;
-          if (text && text.length <= 20 && !points.includes(text)) points.push(text);
+          if (text && text.length <= 20 && !points.includes(text))
+            points.push(text);
         });
       } else if (file.sheets && file.sheets.length && file.sheets[0].headers) {
         const header = file.sheets[0].headers[0];
@@ -4645,10 +6949,12 @@ export class WorkAssistant {
   }
 
   startPPTContentGeneration(template) {
-    this.currentFormData = this.currentFormData || this.collectFormData(template);
+    this.currentFormData =
+      this.currentFormData || this.collectFormData(template);
     this.currentMode = this.getSelectedMode();
     this.currentKBs = this.getSelectedKBs();
-    this.currentAttachments = this.currentMode === 'free' ? [...this.freeAttachments] : [];
+    this.currentAttachments =
+      this.currentMode === 'free' ? [...this.freeAttachments] : [];
 
     const main = document.getElementById('wa-ppt-main');
     if (main) {
@@ -4719,15 +7025,19 @@ export class WorkAssistant {
   }
 
   bindPPTResultPanelEvents(result, template) {
-    document.getElementById('wa-ppt-regenerate-result')?.addEventListener('click', () => {
-      this.pptStep = 3;
-      this.startPPTContentGeneration(template);
-    });
-    document.getElementById('wa-ppt-back-to-outline')?.addEventListener('click', () => {
-      this.pptStep = 3;
-      this.renderPPTEditor();
-      this.bindPPTOutlineEvents();
-    });
+    document
+      .getElementById('wa-ppt-regenerate-result')
+      ?.addEventListener('click', () => {
+        this.pptStep = 3;
+        this.startPPTContentGeneration(template);
+      });
+    document
+      .getElementById('wa-ppt-back-to-outline')
+      ?.addEventListener('click', () => {
+        this.pptStep = 3;
+        this.renderPPTEditor();
+        this.bindPPTOutlineEvents();
+      });
   }
 
   collectFormData(template) {
@@ -4746,13 +7056,17 @@ export class WorkAssistant {
       this.handleEditorBack();
     });
 
-    document.getElementById('wa-switch-ability')?.addEventListener('click', () => {
-      this.openAbilityModal(template.abilityId);
-    });
+    document
+      .getElementById('wa-switch-ability')
+      ?.addEventListener('click', () => {
+        this.openAbilityModal(template.abilityId);
+      });
 
     this.container.querySelectorAll('.wa-mode-item').forEach((item) => {
       item.addEventListener('click', () => {
-        this.container.querySelectorAll('.wa-mode-item').forEach((i) => i.classList.remove('active'));
+        this.container
+          .querySelectorAll('.wa-mode-item')
+          .forEach((i) => i.classList.remove('active'));
         item.classList.add('active');
         this.updateKBPanel();
         this.updateAttachmentPanel();
@@ -4768,30 +7082,43 @@ export class WorkAssistant {
       const removeBtn = e.target.closest('.wa-kb-remove');
       if (removeBtn) {
         const kbId = removeBtn.dataset.id;
-        const selectedIds = this.getSelectedKBs().map((kb) => kb.id).filter((id) => id !== kbId);
+        const selectedIds = this.getSelectedKBs()
+          .map((kb) => kb.id)
+          .filter((id) => id !== kbId);
         this.setSelectedKBs(selectedIds);
         this.updateKBPanel();
       }
     });
 
-    document.getElementById('wa-load-example')?.addEventListener('click', () => {
-      this.loadExample(template);
-    });
+    document
+      .getElementById('wa-load-example')
+      ?.addEventListener('click', () => {
+        this.loadExample(template);
+      });
 
-    document.getElementById('wa-start-generate')?.addEventListener('click', () => {
-      this.startGenerate(template);
-    });
+    document
+      .getElementById('wa-start-generate')
+      ?.addEventListener('click', () => {
+        this.startGenerate(template);
+      });
 
     // 母版相关事件
-    document.getElementById('wa-use-master')?.addEventListener('change', (e) => {
-      this.useMaster = e.target.checked;
-    });
+    document
+      .getElementById('wa-use-master')
+      ?.addEventListener('change', (e) => {
+        this.useMaster = e.target.checked;
+      });
 
     const masterFileInput = document.getElementById('wa-master-file');
     const masterUploadZone = document.getElementById('wa-master-upload-zone');
     masterUploadZone?.addEventListener('click', () => masterFileInput?.click());
-    masterUploadZone?.addEventListener('dragover', (e) => { e.preventDefault(); masterUploadZone.classList.add('dragover'); });
-    masterUploadZone?.addEventListener('dragleave', () => masterUploadZone.classList.remove('dragover'));
+    masterUploadZone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      masterUploadZone.classList.add('dragover');
+    });
+    masterUploadZone?.addEventListener('dragleave', () =>
+      masterUploadZone.classList.remove('dragover')
+    );
     masterUploadZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       masterUploadZone.classList.remove('dragover');
@@ -4805,10 +7132,19 @@ export class WorkAssistant {
 
     // 自由生成附件事件
     const attachmentFileInput = document.getElementById('wa-attachment-file');
-    const attachmentUploadZone = document.getElementById('wa-attachment-upload-zone');
-    attachmentUploadZone?.addEventListener('click', () => attachmentFileInput?.click());
-    attachmentUploadZone?.addEventListener('dragover', (e) => { e.preventDefault(); attachmentUploadZone.classList.add('dragover'); });
-    attachmentUploadZone?.addEventListener('dragleave', () => attachmentUploadZone.classList.remove('dragover'));
+    const attachmentUploadZone = document.getElementById(
+      'wa-attachment-upload-zone'
+    );
+    attachmentUploadZone?.addEventListener('click', () =>
+      attachmentFileInput?.click()
+    );
+    attachmentUploadZone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      attachmentUploadZone.classList.add('dragover');
+    });
+    attachmentUploadZone?.addEventListener('dragleave', () =>
+      attachmentUploadZone.classList.remove('dragover')
+    );
     attachmentUploadZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       attachmentUploadZone.classList.remove('dragover');
@@ -4881,34 +7217,45 @@ export class WorkAssistant {
 
   bindResultEvents(result, template) {
     document.getElementById('wa-result-copy')?.addEventListener('click', () => {
-      const text = result.content || this.tableToText(result) || this.pptToText(result);
+      const text =
+        result.content || this.tableToText(result) || this.pptToText(result);
       navigator.clipboard.writeText(text);
       this.showToast('已复制到剪贴板');
     });
 
-    document.getElementById('wa-result-regen')?.addEventListener('click', () => {
-      this.startGenerate(template);
-    });
+    document
+      .getElementById('wa-result-regen')
+      ?.addEventListener('click', () => {
+        this.startGenerate(template);
+      });
 
     document.getElementById('wa-result-save')?.addEventListener('click', () => {
       this.saveCurrentResult(result);
     });
 
-    document.getElementById('wa-result-to-kb')?.addEventListener('click', () => {
-      this.openAddToKBModal(result, template);
-    });
+    document
+      .getElementById('wa-result-to-kb')
+      ?.addEventListener('click', () => {
+        this.openAddToKBModal(result, template);
+      });
 
-    document.getElementById('wa-ppt-export-md')?.addEventListener('click', () => {
-      this.exportPPTToMarkdown(result);
-    });
+    document
+      .getElementById('wa-ppt-export-md')
+      ?.addEventListener('click', () => {
+        this.exportPPTToMarkdown(result);
+      });
 
-    document.getElementById('wa-ppt-export-pptx')?.addEventListener('click', () => {
-      this.exportPPTToPPTX(result);
-    });
+    document
+      .getElementById('wa-ppt-export-pptx')
+      ?.addEventListener('click', () => {
+        this.exportPPTToPPTX(result);
+      });
 
-    document.getElementById('wa-ppt-confirm-outline')?.addEventListener('click', () => {
-      this.confirmOutlineAndGenerate(template);
-    });
+    document
+      .getElementById('wa-ppt-confirm-outline')
+      ?.addEventListener('click', () => {
+        this.confirmOutlineAndGenerate(template);
+      });
 
     document.getElementById('wa-export-docx')?.addEventListener('click', () => {
       this.exportToDOCX(result, template);
@@ -4921,7 +7268,9 @@ export class WorkAssistant {
     this.container.querySelectorAll('.wa-citation-marker').forEach((marker) => {
       marker.addEventListener('mouseenter', () => {
         const id = parseInt(marker.dataset.id);
-        const item = this.container.querySelector(`.wa-citation-item[data-id="${id}"]`);
+        const item = this.container.querySelector(
+          `.wa-citation-item[data-id="${id}"]`
+        );
         if (item) {
           item.classList.add('highlight');
           item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4929,7 +7278,9 @@ export class WorkAssistant {
       });
       marker.addEventListener('mouseleave', () => {
         const id = parseInt(marker.dataset.id);
-        const item = this.container.querySelector(`.wa-citation-item[data-id="${id}"]`);
+        const item = this.container.querySelector(
+          `.wa-citation-item[data-id="${id}"]`
+        );
         if (item) item.classList.remove('highlight');
       });
     });
@@ -4937,7 +7288,9 @@ export class WorkAssistant {
     this.container.querySelectorAll('.wa-citation-item').forEach((item) => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
-        const marker = this.container.querySelector(`.wa-citation-marker[data-id="${id}"]`);
+        const marker = this.container.querySelector(
+          `.wa-citation-marker[data-id="${id}"]`
+        );
         if (marker) {
           marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
           marker.classList.add('flash');
@@ -4948,11 +7301,13 @@ export class WorkAssistant {
 
     // PPT 内容实时编辑
     if (template.outputType === outputTypes.PPT) {
-      this.container.querySelectorAll('[contenteditable="true"]').forEach((el) => {
-        el.addEventListener('blur', () => {
-          this.updatePPTPageFromEditable(result, el);
+      this.container
+        .querySelectorAll('[contenteditable="true"]')
+        .forEach((el) => {
+          el.addEventListener('blur', () => {
+            this.updatePPTPageFromEditable(result, el);
+          });
         });
-      });
     }
   }
 
@@ -4975,24 +7330,28 @@ export class WorkAssistant {
     });
 
     // 确认大纲并生成完整内容
-    document.getElementById('wa-ppt-confirm-outline')?.addEventListener('click', () => {
-      this.confirmOutlineAndGenerate(template);
-    });
+    document
+      .getElementById('wa-ppt-confirm-outline')
+      ?.addEventListener('click', () => {
+        this.confirmOutlineAndGenerate(template);
+      });
 
     // 新增一页
-    document.getElementById('wa-ppt-add-page')?.addEventListener('click', () => {
-      result.pages.push({
-        type: 'content',
-        title: '新页面',
-        subtitle: '',
-        bullets: ['要点一', '要点二'],
-        note: '请补充演讲备注。',
-        visual: '建议配图：与主题相关的示意图',
-        layout: 'left-title-right-content',
+    document
+      .getElementById('wa-ppt-add-page')
+      ?.addEventListener('click', () => {
+        result.pages.push({
+          type: 'content',
+          title: '新页面',
+          subtitle: '',
+          bullets: ['要点一', '要点二'],
+          note: '请补充演讲备注。',
+          visual: '建议配图：与主题相关的示意图',
+          layout: 'left-title-right-content',
+        });
+        refreshPPTView();
+        this.showToast('已新增一页');
       });
-      refreshPPTView();
-      this.showToast('已新增一页');
-    });
 
     // 删除页面
     this.container.querySelectorAll('.wa-ppt-delete-page').forEach((btn) => {
@@ -5023,18 +7382,22 @@ export class WorkAssistant {
     });
 
     // 幻灯片翻页
-    document.getElementById('wa-ppt-slide-prev')?.addEventListener('click', () => {
-      if (this.pptCurrentPage > 0) {
-        this.pptCurrentPage--;
-        refreshPPTView();
-      }
-    });
-    document.getElementById('wa-ppt-slide-next')?.addEventListener('click', () => {
-      if (this.pptCurrentPage < result.pages.length - 1) {
-        this.pptCurrentPage++;
-        refreshPPTView();
-      }
-    });
+    document
+      .getElementById('wa-ppt-slide-prev')
+      ?.addEventListener('click', () => {
+        if (this.pptCurrentPage > 0) {
+          this.pptCurrentPage--;
+          refreshPPTView();
+        }
+      });
+    document
+      .getElementById('wa-ppt-slide-next')
+      ?.addEventListener('click', () => {
+        if (this.pptCurrentPage < result.pages.length - 1) {
+          this.pptCurrentPage++;
+          refreshPPTView();
+        }
+      });
 
     // 缩略图点击
     this.container.querySelectorAll('.wa-ppt-slide-thumb').forEach((thumb) => {
@@ -5045,35 +7408,39 @@ export class WorkAssistant {
     });
 
     // 拖拽排序
-    this.container.querySelectorAll('.wa-ppt-page[draggable="true"]').forEach((page) => {
-      page.addEventListener('dragstart', (e) => {
-        this.dragSrcIndex = parseInt(page.dataset.index);
-        page.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
+    this.container
+      .querySelectorAll('.wa-ppt-page[draggable="true"]')
+      .forEach((page) => {
+        page.addEventListener('dragstart', (e) => {
+          this.dragSrcIndex = parseInt(page.dataset.index);
+          page.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        page.addEventListener('dragend', () => {
+          page.classList.remove('dragging');
+          this.container
+            .querySelectorAll('.wa-ppt-page')
+            .forEach((p) => p.classList.remove('drag-over'));
+        });
+        page.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          page.classList.add('drag-over');
+        });
+        page.addEventListener('dragleave', () => {
+          page.classList.remove('drag-over');
+        });
+        page.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const srcIndex = this.dragSrcIndex;
+          const targetIndex = parseInt(page.dataset.index);
+          if (srcIndex === targetIndex) return;
+          const [moved] = result.pages.splice(srcIndex, 1);
+          result.pages.splice(targetIndex, 0, moved);
+          this.pptCurrentPage = targetIndex;
+          refreshPPTView();
+          this.showToast('已调整页面顺序');
+        });
       });
-      page.addEventListener('dragend', () => {
-        page.classList.remove('dragging');
-        this.container.querySelectorAll('.wa-ppt-page').forEach((p) => p.classList.remove('drag-over'));
-      });
-      page.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        page.classList.add('drag-over');
-      });
-      page.addEventListener('dragleave', () => {
-        page.classList.remove('drag-over');
-      });
-      page.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const srcIndex = this.dragSrcIndex;
-        const targetIndex = parseInt(page.dataset.index);
-        if (srcIndex === targetIndex) return;
-        const [moved] = result.pages.splice(srcIndex, 1);
-        result.pages.splice(targetIndex, 0, moved);
-        this.pptCurrentPage = targetIndex;
-        refreshPPTView();
-        this.showToast('已调整页面顺序');
-      });
-    });
   }
 
   updatePPTPageFromEditable(result, el) {
@@ -5083,7 +7450,10 @@ export class WorkAssistant {
     if (!page) return;
 
     const html = el.innerHTML;
-    const text = html.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+    const text = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .trim();
 
     if (field === 'title') page.title = text;
     if (field === 'subtitle') page.subtitle = text;
@@ -5104,16 +7474,22 @@ export class WorkAssistant {
 
     const close = () => modal.remove();
 
-    document.getElementById('wa-kb-modal-close')?.addEventListener('click', close);
-    document.getElementById('wa-kb-modal-cancel')?.addEventListener('click', close);
+    document
+      .getElementById('wa-kb-modal-close')
+      ?.addEventListener('click', close);
+    document
+      .getElementById('wa-kb-modal-cancel')
+      ?.addEventListener('click', close);
 
-    document.getElementById('wa-kb-modal-confirm')?.addEventListener('click', () => {
-      const selected = modal.querySelectorAll('.wa-kb-option.selected');
-      const ids = Array.from(selected).map((el) => el.dataset.id);
-      this.setSelectedKBs(ids);
-      this.updateKBPanel();
-      close();
-    });
+    document
+      .getElementById('wa-kb-modal-confirm')
+      ?.addEventListener('click', () => {
+        const selected = modal.querySelectorAll('.wa-kb-option.selected');
+        const ids = Array.from(selected).map((el) => el.dataset.id);
+        this.setSelectedKBs(ids);
+        this.updateKBPanel();
+        close();
+      });
 
     modal.querySelectorAll('.wa-kb-option').forEach((option) => {
       option.addEventListener('click', () => {
@@ -5134,9 +7510,14 @@ export class WorkAssistant {
       searchInput.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
         modal.querySelectorAll('.wa-kb-option').forEach((option) => {
-          const name = option.querySelector('.wa-kb-option-name').textContent.toLowerCase();
-          const desc = option.querySelector('.wa-kb-option-desc').textContent.toLowerCase();
-          option.style.display = name.includes(query) || desc.includes(query) ? 'flex' : 'none';
+          const name = option
+            .querySelector('.wa-kb-option-name')
+            .textContent.toLowerCase();
+          const desc = option
+            .querySelector('.wa-kb-option-desc')
+            .textContent.toLowerCase();
+          option.style.display =
+            name.includes(query) || desc.includes(query) ? 'flex' : 'none';
         });
       });
     }
@@ -5172,7 +7553,10 @@ export class WorkAssistant {
     } else if (mode === 'kb' && ability.supportsKB) {
       const leftPanel = this.container.querySelector('.wa-editor-left');
       const modeSelector = leftPanel.querySelector('.wa-panel');
-      modeSelector.insertAdjacentHTML('afterend', this.renderKBSelector(mode, ability));
+      modeSelector.insertAdjacentHTML(
+        'afterend',
+        this.renderKBSelector(mode, ability)
+      );
     }
   }
 
@@ -5186,7 +7570,9 @@ export class WorkAssistant {
       const removeBtn = e.target.closest('.wa-kb-remove');
       if (removeBtn) {
         const kbId = removeBtn.dataset.id;
-        const selectedIds = this.getSelectedKBs().map((kb) => kb.id).filter((id) => id !== kbId);
+        const selectedIds = this.getSelectedKBs()
+          .map((kb) => kb.id)
+          .filter((id) => id !== kbId);
         this.setSelectedKBs(selectedIds);
         this.updateKBPanel();
       }
@@ -5197,8 +7583,13 @@ export class WorkAssistant {
     const fileInput = document.getElementById('wa-ppt-template-file');
     const uploadZone = document.getElementById('wa-ppt-template-upload-zone');
     uploadZone?.addEventListener('click', () => fileInput?.click());
-    uploadZone?.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-    uploadZone?.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    uploadZone?.addEventListener('dragleave', () =>
+      uploadZone.classList.remove('dragover')
+    );
     uploadZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       uploadZone.classList.remove('dragover');
@@ -5215,8 +7606,13 @@ export class WorkAssistant {
     const masterFileInput = document.getElementById('wa-master-file');
     const masterUploadZone = document.getElementById('wa-master-upload-zone');
     masterUploadZone?.addEventListener('click', () => masterFileInput?.click());
-    masterUploadZone?.addEventListener('dragover', (e) => { e.preventDefault(); masterUploadZone.classList.add('dragover'); });
-    masterUploadZone?.addEventListener('dragleave', () => masterUploadZone.classList.remove('dragover'));
+    masterUploadZone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      masterUploadZone.classList.add('dragover');
+    });
+    masterUploadZone?.addEventListener('dragleave', () =>
+      masterUploadZone.classList.remove('dragover')
+    );
     masterUploadZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       masterUploadZone.classList.remove('dragover');
@@ -5238,17 +7634,29 @@ export class WorkAssistant {
     } else if (mode === 'free' && ability.supportsFree) {
       const leftPanel = this.container.querySelector('.wa-editor-left');
       const modeSelector = leftPanel.querySelector('.wa-panel');
-      modeSelector.insertAdjacentHTML('afterend', this.renderAttachmentPanel(mode, ability));
+      modeSelector.insertAdjacentHTML(
+        'afterend',
+        this.renderAttachmentPanel(mode, ability)
+      );
     }
     this.bindAttachmentEvents();
   }
 
   bindAttachmentEvents() {
     const attachmentFileInput = document.getElementById('wa-attachment-file');
-    const attachmentUploadZone = document.getElementById('wa-attachment-upload-zone');
-    attachmentUploadZone?.addEventListener('click', () => attachmentFileInput?.click());
-    attachmentUploadZone?.addEventListener('dragover', (e) => { e.preventDefault(); attachmentUploadZone.classList.add('dragover'); });
-    attachmentUploadZone?.addEventListener('dragleave', () => attachmentUploadZone.classList.remove('dragover'));
+    const attachmentUploadZone = document.getElementById(
+      'wa-attachment-upload-zone'
+    );
+    attachmentUploadZone?.addEventListener('click', () =>
+      attachmentFileInput?.click()
+    );
+    attachmentUploadZone?.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      attachmentUploadZone.classList.add('dragover');
+    });
+    attachmentUploadZone?.addEventListener('dragleave', () =>
+      attachmentUploadZone.classList.remove('dragover')
+    );
     attachmentUploadZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       attachmentUploadZone.classList.remove('dragover');
@@ -5290,7 +7698,8 @@ export class WorkAssistant {
 
     const mode = this.getCurrentMode();
     const ability = getAbilityById(template.abilityId);
-    const selectedKBs = mode === 'free' || !ability.supportsKB ? [] : this.getSelectedKBs();
+    const selectedKBs =
+      mode === 'free' || !ability.supportsKB ? [] : this.getSelectedKBs();
     const attachments = mode === 'free' ? this.freeAttachments : [];
 
     if (mode === 'kb' && ability.supportsKB && selectedKBs.length === 0) {
@@ -5300,7 +7709,12 @@ export class WorkAssistant {
 
     this.renderGenerating();
 
-    const statusTexts = ['正在分析输入信息', '正在检索知识库...', '正在整理生成思路...', '正在生成内容...'];
+    const statusTexts = [
+      '正在分析输入信息',
+      '正在检索知识库...',
+      '正在整理生成思路...',
+      '正在生成内容...',
+    ];
     let step = 0;
     const statusEl = this.container.querySelector('.wa-generating-status');
     const interval = setInterval(() => {
@@ -5310,14 +7724,21 @@ export class WorkAssistant {
 
     setTimeout(() => {
       clearInterval(interval);
-      const useMaster = this.useMaster && !!(template.masterData || this.currentMasterData);
+      const useMaster =
+        this.useMaster && !!(template.masterData || this.currentMasterData);
       const isPPT = template.outputType === outputTypes.PPT;
       const stage = isPPT ? this.pptStage : 'content';
       const contentTemplate = this.selectedContentTemplateId
         ? getContentTemplateById(this.selectedContentTemplateId)
         : null;
       const options = { useMaster, stage, attachments, contentTemplate };
-      const result = mockGenerateContent(template, formData, mode, selectedKBs, options);
+      const result = mockGenerateContent(
+        template,
+        formData,
+        mode,
+        selectedKBs,
+        options
+      );
       if (result && (template.masterData || this.currentMasterData)) {
         result.masterData = template.masterData || this.currentMasterData;
       }
@@ -5336,7 +7757,11 @@ export class WorkAssistant {
     this.pptStage = 'content';
     this.renderGenerating();
 
-    const statusTexts = ['正在确认大纲结构', '正在生成每页详细内容', '正在完善演讲备注与配图建议...'];
+    const statusTexts = [
+      '正在确认大纲结构',
+      '正在生成每页详细内容',
+      '正在完善演讲备注与配图建议...',
+    ];
     let step = 0;
     const statusEl = this.container.querySelector('.wa-generating-status');
     const interval = setInterval(() => {
@@ -5348,7 +7773,8 @@ export class WorkAssistant {
       clearInterval(interval);
       const mode = this.currentMode || this.getCurrentMode();
       const selectedKBs = this.currentKBs || this.getSelectedKBs();
-      const useMaster = this.useMaster && !!(template.masterData || this.currentMasterData);
+      const useMaster =
+        this.useMaster && !!(template.masterData || this.currentMasterData);
       const attachments = this.currentAttachments || [];
       const options = { useMaster, attachments };
       const result = generatePPTContentFromOutline(
@@ -5393,11 +7819,15 @@ export class WorkAssistant {
       return;
     }
 
-    const typeLabel = template?.outputType === outputTypes.PPT ? 'PPT'
-      : template?.outputType === outputTypes.TABLE ? '表格'
-      : '文档';
+    const typeLabel =
+      template?.outputType === outputTypes.PPT
+        ? 'PPT'
+        : template?.outputType === outputTypes.TABLE
+          ? '表格'
+          : '文档';
     const preview = this.resultToMarkdown(result);
-    const previewShort = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
+    const previewShort =
+      preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
 
     const overlay = document.createElement('div');
     overlay.id = 'wa-kb-modal';
@@ -5422,7 +7852,9 @@ export class WorkAssistant {
           <div class="wa-kb-modal-section">
             <div class="wa-kb-modal-section-label">选择目标知识库</div>
             <div class="wa-kb-modal-list">
-              ${kbs.map((kb) => `
+              ${kbs
+                .map(
+                  (kb) => `
                 <label class="wa-kb-modal-item" data-kb-id="${kb.id}">
                   <input type="radio" name="wa-kb-target" value="${kb.id}" ${kbs.length === 1 ? 'checked' : ''}>
                   <div class="wa-kb-modal-item-icon"><i class="fa-solid fa-${kb.type === '问答' ? 'message' : kb.type === '网页' ? 'globe' : 'folder-open'}"></i></div>
@@ -5432,7 +7864,9 @@ export class WorkAssistant {
                     <div class="wa-kb-modal-item-meta">${kb.type} · ${kb.documentCount || 0} 篇文档 · 更新于 ${kb.lastUpdate || '-'}</div>
                   </div>
                 </label>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
           <div class="wa-kb-modal-section">
@@ -5453,27 +7887,41 @@ export class WorkAssistant {
 
     // 绑定事件
     overlay.addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-close').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-cancel').addEventListener('click', () => overlay.remove());
-    overlay.querySelector('#wa-kb-modal-confirm').addEventListener('click', () => {
-      const selected = overlay.querySelector('input[name="wa-kb-target"]:checked');
-      if (!selected) {
-        this.showToast('请选择一个知识库');
-        return;
-      }
-      const kbId = selected.value;
-      const kb = kbs.find((k) => k.id === kbId);
-      const includeMeta = overlay.querySelector('#wa-kb-include-meta').checked;
-      overlay.remove();
-      this.addResultToKnowledgeBase(result, template, kb, includeMeta);
-    });
+    overlay
+      .querySelector('#wa-kb-modal-close')
+      .addEventListener('click', () => overlay.remove());
+    overlay
+      .querySelector('#wa-kb-modal-cancel')
+      .addEventListener('click', () => overlay.remove());
+    overlay
+      .querySelector('#wa-kb-modal-confirm')
+      .addEventListener('click', () => {
+        const selected = overlay.querySelector(
+          'input[name="wa-kb-target"]:checked'
+        );
+        if (!selected) {
+          this.showToast('请选择一个知识库');
+          return;
+        }
+        const kbId = selected.value;
+        const kb = kbs.find((k) => k.id === kbId);
+        const includeMeta = overlay.querySelector(
+          '#wa-kb-include-meta'
+        ).checked;
+        overlay.remove();
+        this.addResultToKnowledgeBase(result, template, kb, includeMeta);
+      });
   }
 
   getAvailableKnowledgeBases() {
     try {
       const raw = localStorage.getItem('knowledgeBases');
       const kbs = raw ? JSON.parse(raw) : [];
-      return Array.isArray(kbs) ? kbs.filter((kb) => kb.status !== 'disabled' && kb.status !== 'inactive') : [];
+      return Array.isArray(kbs)
+        ? kbs.filter(
+            (kb) => kb.status !== 'disabled' && kb.status !== 'inactive'
+          )
+        : [];
     } catch {
       return [];
     }
@@ -5516,7 +7964,9 @@ export class WorkAssistant {
 
   autoSaveDraft(template) {
     const formData = this.getFormData();
-    const hasValue = Object.values(formData).some((v) => v && v.trim && v.trim());
+    const hasValue = Object.values(formData).some(
+      (v) => v && v.trim && v.trim()
+    );
     if (hasValue) {
       saveDraft(template.id, {
         templateId: template.id,
@@ -5536,7 +7986,12 @@ export class WorkAssistant {
 
   pptToText(result) {
     if (!result.pages) return '';
-    return result.pages.map((p, i) => `${i + 1}. ${p.title}\n${p.bullets ? p.bullets.join('\n') : p.content}\n备注：${p.note || ''}`).join('\n\n');
+    return result.pages
+      .map(
+        (p, i) =>
+          `${i + 1}. ${p.title}\n${p.bullets ? p.bullets.join('\n') : p.content}\n备注：${p.note || ''}`
+      )
+      .join('\n\n');
   }
 
   resultToMarkdown(result) {
@@ -5562,7 +8017,9 @@ export class WorkAssistant {
       result.pages.forEach((page, index) => {
         md += `## 第 ${index + 1} 页 · ${page.title}\n\n`;
         if (page.subtitle) md += `**${page.subtitle}**\n\n`;
-        (page.bullets || []).forEach((b) => { md += `- ${b}\n`; });
+        (page.bullets || []).forEach((b) => {
+          md += `- ${b}\n`;
+        });
         if (page.note) md += `\n**演讲备注**：${page.note}\n`;
         md += '\n---\n\n';
       });
@@ -5617,7 +8074,8 @@ export class WorkAssistant {
     const theme = master?.fileType === 'pptx' ? master.theme : null;
     const themeFonts = theme?.fonts || {};
     const majorFont = themeFonts.major || result.masterTheme?.fonts?.major;
-    const minorFont = themeFonts.minor || result.masterTheme?.fonts?.minor || majorFont;
+    const minorFont =
+      themeFonts.minor || result.masterTheme?.fonts?.minor || majorFont;
 
     const colorHex = result.colorHex || '0E9F6E';
     const titleColor = colorHex;
@@ -5633,47 +8091,86 @@ export class WorkAssistant {
 
       if (page.type === 'cover') {
         slide.addText(page.title, {
-          x: 0.5, y: 2, w: 9, h: 1.5,
-          fontSize: 36, bold: true, color: titleColor, align: 'center',
+          x: 0.5,
+          y: 2,
+          w: 9,
+          h: 1.5,
+          fontSize: 36,
+          bold: true,
+          color: titleColor,
+          align: 'center',
           fontFace: majorFont,
         });
         if (page.subtitle) {
           slide.addText(page.subtitle, {
-            x: 0.5, y: 3.5, w: 9, h: 0.8,
-            fontSize: 18, color: '666666', align: 'center',
+            x: 0.5,
+            y: 3.5,
+            w: 9,
+            h: 0.8,
+            fontSize: 18,
+            color: '666666',
+            align: 'center',
             fontFace: minorFont,
           });
         }
       } else if (page.type === 'end') {
         slide.addText(page.title, {
-          x: 0.5, y: 2.5, w: 9, h: 1,
-          fontSize: 32, bold: true, color: titleColor, align: 'center',
+          x: 0.5,
+          y: 2.5,
+          w: 9,
+          h: 1,
+          fontSize: 32,
+          bold: true,
+          color: titleColor,
+          align: 'center',
           fontFace: majorFont,
         });
         if (page.subtitle) {
           slide.addText(page.subtitle, {
-            x: 0.5, y: 3.5, w: 9, h: 0.8,
-            fontSize: 16, color: '666666', align: 'center',
+            x: 0.5,
+            y: 3.5,
+            w: 9,
+            h: 0.8,
+            fontSize: 16,
+            color: '666666',
+            align: 'center',
             fontFace: minorFont,
           });
         }
       } else {
         slide.addText(page.title, {
-          x: 0.5, y: 0.4, w: 9, h: 0.8,
-          fontSize: 24, bold: true, color: titleColor,
+          x: 0.5,
+          y: 0.4,
+          w: 9,
+          h: 0.8,
+          fontSize: 24,
+          bold: true,
+          color: titleColor,
           fontFace: majorFont,
         });
         if (page.subtitle) {
           slide.addText(page.subtitle, {
-            x: 0.5, y: 1.1, w: 9, h: 0.4,
-            fontSize: 14, color: '888888',
+            x: 0.5,
+            y: 1.1,
+            w: 9,
+            h: 0.4,
+            fontSize: 14,
+            color: '888888',
             fontFace: minorFont,
           });
         }
-        const bulletText = page.bullets.map((b) => `• ${b.replace(/\[\d+\]/g, '')}`).join('\n');
+        const bulletText = page.bullets
+          .map((b) => `• ${b.replace(/\[\d+\]/g, '')}`)
+          .join('\n');
         slide.addText(bulletText, {
-          x: 0.5, y: 1.7, w: 9, h: 4,
-          fontSize: 14, color: '333333', bullet: true, lineSpacing: 28,
+          x: 0.5,
+          y: 1.7,
+          w: 9,
+          h: 4,
+          fontSize: 14,
+          color: '333333',
+          bullet: true,
+          lineSpacing: 28,
           fontFace: minorFont,
         });
       }
@@ -5702,35 +8199,45 @@ export class WorkAssistant {
         continue;
       }
       if (trimmed.startsWith('# ')) {
-        children.push(new Paragraph({
-          text: trimmed.replace(/^#\s+/, ''),
-          heading: HeadingLevel.HEADING_1,
-          spacing: { after: 200 },
-        }));
+        children.push(
+          new Paragraph({
+            text: trimmed.replace(/^#\s+/, ''),
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 200 },
+          })
+        );
       } else if (trimmed.startsWith('## ')) {
-        children.push(new Paragraph({
-          text: trimmed.replace(/^##\s+/, ''),
-          heading: HeadingLevel.HEADING_2,
-          spacing: { after: 150 },
-        }));
+        children.push(
+          new Paragraph({
+            text: trimmed.replace(/^##\s+/, ''),
+            heading: HeadingLevel.HEADING_2,
+            spacing: { after: 150 },
+          })
+        );
       } else if (trimmed.startsWith('### ')) {
-        children.push(new Paragraph({
-          text: trimmed.replace(/^###\s+/, ''),
-          heading: HeadingLevel.HEADING_3,
-          spacing: { after: 100 },
-        }));
+        children.push(
+          new Paragraph({
+            text: trimmed.replace(/^###\s+/, ''),
+            heading: HeadingLevel.HEADING_3,
+            spacing: { after: 100 },
+          })
+        );
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        children.push(new Paragraph({
-          text: trimmed.replace(/^[-*]\s+/, ''),
-          bullet: { level: 0 },
-          spacing: { after: 80 },
-        }));
+        children.push(
+          new Paragraph({
+            text: trimmed.replace(/^[-*]\s+/, ''),
+            bullet: { level: 0 },
+            spacing: { after: 80 },
+          })
+        );
       } else if (/^\d+\.\s/.test(trimmed)) {
-        children.push(new Paragraph({
-          text: trimmed,
-          bullet: { level: 0 },
-          spacing: { after: 80 },
-        }));
+        children.push(
+          new Paragraph({
+            text: trimmed,
+            bullet: { level: 0 },
+            spacing: { after: 80 },
+          })
+        );
       } else {
         const parts = trimmed.split(/(\*\*.*?\*\*)/g).filter(Boolean);
         const runs = parts.map((p) => {
@@ -5739,15 +8246,19 @@ export class WorkAssistant {
           }
           return new TextRun({ text: p });
         });
-        children.push(new Paragraph({ children: runs, spacing: { after: 100 } }));
+        children.push(
+          new Paragraph({ children: runs, spacing: { after: 100 } })
+        );
       }
     }
 
     const doc = new Document({
-      sections: [{
-        properties: {},
-        children,
-      }],
+      sections: [
+        {
+          properties: {},
+          children,
+        },
+      ],
     });
 
     const blob = await Packer.toBlob(doc);
@@ -5762,10 +8273,59 @@ export class WorkAssistant {
 
   async exportToXLSX(result, template) {
     const XLSX = await import('xlsx');
-    const rows = [result.columns, ...result.rows];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    const sheets =
+      result.sheets?.length > 0
+        ? result.sheets
+        : [
+            {
+              name: result.title || 'Sheet1',
+              columns: result.columns,
+              rows: result.rows,
+            },
+          ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, result.title || 'Sheet1');
+    sheets.forEach((sheet) => {
+      const rows = [sheet.columns || [], ...(sheet.rows || [])];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+
+      // 列宽、行高
+      if (sheet.colWidths?.length > 0) {
+        ws['!cols'] = sheet.colWidths.map((w) => ({ wpx: w }));
+      }
+      if (sheet.rowHeights?.length > 0) {
+        ws['!rows'] = sheet.rowHeights.map((h) => ({ hpx: h }));
+      }
+
+      // 合并单元格
+      if (sheet.merges?.length > 0) {
+        ws['!merges'] = sheet.merges.map((m) => ({
+          s: { r: m.r, c: m.c },
+          e: { r: m.r + m.rowspan - 1, c: m.c + m.colspan - 1 },
+        }));
+      }
+
+      // 单元格样式（尽力而为）
+      if (sheet.formats?.length > 0) {
+        sheet.formats.forEach((row, r) => {
+          row.forEach((fmt, c) => {
+            if (!fmt) return;
+            const cellRef = XLSX.utils.encode_cell({ r, c });
+            if (ws[cellRef]) {
+              try {
+                ws[cellRef].s = buildXlsxStyle(fmt);
+              } catch (e) {
+                // xlsx 社区版样式支持有限，忽略失败
+              }
+            }
+          });
+        });
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, sheet.name || 'Sheet1');
+    });
+
     XLSX.writeFile(wb, `${result.title || '表格'}.xlsx`);
     this.showToast('XLSX 文件已导出');
   }
@@ -5783,10 +8343,22 @@ export class WorkAssistant {
       description: '',
       defaultMode: 'kb',
       fields: [
-        { id: 'topic', type: fieldTypes.TEXT, label: '主题', placeholder: '请输入主题', required: true, description: '', example: '', defaultValue: '', _expanded: false },
+        {
+          id: 'topic',
+          type: fieldTypes.TEXT,
+          label: '主题',
+          placeholder: '请输入主题',
+          required: true,
+          description: '',
+          example: '',
+          defaultValue: '',
+          _expanded: false,
+        },
       ],
       outputConfig: { columns: [] },
-      promptTemplate: this.getDefaultPromptTemplate('writing', [{ id: 'topic', label: '主题' }]),
+      promptTemplate: this.getDefaultPromptTemplate('writing', [
+        { id: 'topic', label: '主题' },
+      ]),
       activePromptStyle: '通用生成',
       contentTemplateId: null,
       promptGenerationIndex: 0,
@@ -5983,7 +8555,11 @@ export class WorkAssistant {
     const searchKey = this.iconModalSearch?.toLowerCase().trim() || '';
 
     let displayIcons = searchKey
-      ? this.getIconList().filter((icon) => icon.name.toLowerCase().includes(searchKey) || icon.cat.includes(searchKey))
+      ? this.getIconList().filter(
+          (icon) =>
+            icon.name.toLowerCase().includes(searchKey) ||
+            icon.cat.includes(searchKey)
+        )
       : iconCats[activeCat] || [];
 
     return `
@@ -6001,28 +8577,40 @@ export class WorkAssistant {
           </div>
           <div class="wa-icon-modal-body">
             <div class="wa-icon-modal-sidebar">
-              ${catList.map((cat) => `
+              ${catList
+                .map(
+                  (cat) => `
                 <div class="wa-icon-modal-cat-item ${cat === activeCat ? 'active' : ''}" data-icon-cat="${cat}">
                   <span>${cat}</span>
                   <span class="wa-icon-modal-cat-count">${iconCats[cat].length}</span>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
             <div class="wa-icon-modal-content">
               <div class="wa-icon-grid">
-                ${displayIcons.map((icon) => `
+                ${displayIcons
+                  .map(
+                    (icon) => `
                   <div class="wa-icon-grid-item ${this.creatorForm.icon === icon.name ? 'selected' : ''}" data-icon="${icon.name}" title="${icon.name}">
                     <i class="fa-solid fa-${icon.name}"></i>
                     <span class="wa-icon-name">${icon.name}</span>
                   </div>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>
-              ${displayIcons.length === 0 ? `
+              ${
+                displayIcons.length === 0
+                  ? `
                 <div class="wa-icon-empty">
                   <i class="fa-regular fa-face-frown"></i>
                   <span>未找到匹配的图标</span>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
           </div>
         </div>
@@ -6047,12 +8635,16 @@ export class WorkAssistant {
         <div class="pv-real-doc">
           <div class="pv-real-title" style="color:${themeColor};border-left:3px solid ${themeColor}">${template.name}</div>
           <div class="pv-real-body">
-            ${sections.map((s) => `
+            ${sections
+              .map(
+                (s) => `
               <div class="pv-real-section">
                 <div class="pv-real-h">${truncate(s.title, 16)}</div>
                 ${s.guide ? `<div class="pv-real-p">${truncate(s.guide, 22)}</div>` : ''}
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       `;
@@ -6069,11 +8661,15 @@ export class WorkAssistant {
             <div class="pv-real-thead">
               ${columns.map((c) => `<div class="pv-real-th">${truncate(c.title || c, 6)}</div>`).join('')}
             </div>
-            ${sampleRows.map(() => `
+            ${sampleRows
+              .map(
+                () => `
               <div class="pv-real-tr">
                 ${columns.map(() => `<div class="pv-real-td"><span></span></div>`).join('')}
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       `;
@@ -6105,12 +8701,16 @@ export class WorkAssistant {
         <div class="pv-real-list">
           <div class="pv-real-list-title" style="color:${themeColor}">${template.name}</div>
           <div class="pv-real-list-body">
-            ${items.map((item) => `
+            ${items
+              .map(
+                (item) => `
               <div class="pv-real-list-item">
                 <div class="pv-real-list-check" style="border-color:${themeColor}"></div>
                 <div class="pv-real-list-text">${truncate(item, 14)}</div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       `;
@@ -6122,12 +8722,16 @@ export class WorkAssistant {
         <div class="pv-real-steps">
           <div class="pv-real-steps-title" style="color:${themeColor}">${template.name}</div>
           <div class="pv-real-steps-body">
-            ${steps.map((s, i) => `
+            ${steps
+              .map(
+                (s, i) => `
               <div class="pv-real-step-item">
                 <div class="pv-real-step-num" style="background:${themeColor}">${i + 1}</div>
                 <div class="pv-real-step-text">${truncate(typeof s === 'string' ? s : s.title, 14)}</div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       `;
@@ -6208,7 +8812,9 @@ export class WorkAssistant {
     const allTemplates = this.ctModalForCreator
       ? this.getContentTemplatesForCreator(this.creatorForm.outputType)
       : this.ctModalForReview
-        ? this.getContentTemplatesForCreator(this.creatorReviewState.draftTemplate?.outputType)
+        ? this.getContentTemplatesForCreator(
+            this.creatorReviewState.draftTemplate?.outputType
+          )
         : getAllContentTemplates();
 
     let filteredTemplates = allTemplates;
@@ -6216,7 +8822,9 @@ export class WorkAssistant {
     if (this.ctModalCategory === 'featured') {
       filteredTemplates = allTemplates.filter((t) => t.featured);
     } else if (this.ctModalCategory !== 'all') {
-      filteredTemplates = allTemplates.filter((t) => t.category && t.category.includes(this.ctModalCategory));
+      filteredTemplates = allTemplates.filter(
+        (t) => t.category && t.category.includes(this.ctModalCategory)
+      );
     }
 
     if (this.ctModalSearch) {
@@ -6254,15 +8862,19 @@ export class WorkAssistant {
           <div class="wa-ct-modal-body">
             <div class="wa-ct-modal-sidebar">
               <div class="wa-ct-modal-sidebar-title">分类</div>
-              ${sceneCategories.map((cat) => {
-                const isActive = this.ctModalCategory === cat.id;
-                const color = sceneCategoryColors[cat.id] || '#6b7280';
-                const count = cat.id === 'all' 
-                  ? allTemplates.length 
-                  : cat.id === 'featured'
-                    ? allTemplates.filter((t) => t.featured).length
-                    : allTemplates.filter((t) => t.category && t.category.includes(cat.id)).length;
-                return `
+              ${sceneCategories
+                .map((cat) => {
+                  const isActive = this.ctModalCategory === cat.id;
+                  const color = sceneCategoryColors[cat.id] || '#6b7280';
+                  const count =
+                    cat.id === 'all'
+                      ? allTemplates.length
+                      : cat.id === 'featured'
+                        ? allTemplates.filter((t) => t.featured).length
+                        : allTemplates.filter(
+                            (t) => t.category && t.category.includes(cat.id)
+                          ).length;
+                  return `
                   <div class="wa-ct-modal-cat-item ${isActive ? 'active' : ''}" data-cat="${cat.id}">
                     <div class="wa-ct-modal-cat-icon" style="background: ${isActive ? color : '#f3f4f6'}; color: ${isActive ? '#fff' : color};">
                       <i class="fa-solid ${cat.icon}"></i>
@@ -6271,7 +8883,8 @@ export class WorkAssistant {
                     <span class="wa-ct-modal-cat-count">${count}</span>
                   </div>
                 `;
-              }).join('')}
+                })
+                .join('')}
             </div>
             <div class="wa-ct-modal-content">
               <div class="wa-ct-modal-content-header">
@@ -6281,12 +8894,16 @@ export class WorkAssistant {
                 ${this.renderModalFreeCard(selectedId)}
                 ${filteredTemplates.map((t) => this.renderModalTemplateCard(t, selectedId)).join('')}
               </div>
-              ${filteredTemplates.length === 0 ? `
+              ${
+                filteredTemplates.length === 0
+                  ? `
                 <div class="wa-ct-modal-empty">
                   <i class="fa-regular fa-file-lines"></i>
                   <div>暂无匹配的模板</div>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
           </div>
           <div class="wa-ct-modal-footer">
@@ -6303,22 +8920,28 @@ export class WorkAssistant {
   bindContentTemplateModalEvents() {
     if (!this.ctModalOpen) return;
 
-    document.getElementById('wa-ct-modal-close')?.addEventListener('click', () => {
-      this.ctModalOpen = false;
-      this.render();
-    });
-
-    document.getElementById('wa-ct-modal-cancel')?.addEventListener('click', () => {
-      this.ctModalOpen = false;
-      this.render();
-    });
-
-    document.getElementById('wa-ct-modal-overlay')?.addEventListener('click', (e) => {
-      if (e.target.id === 'wa-ct-modal-overlay') {
+    document
+      .getElementById('wa-ct-modal-close')
+      ?.addEventListener('click', () => {
         this.ctModalOpen = false;
         this.render();
-      }
-    });
+      });
+
+    document
+      .getElementById('wa-ct-modal-cancel')
+      ?.addEventListener('click', () => {
+        this.ctModalOpen = false;
+        this.render();
+      });
+
+    document
+      .getElementById('wa-ct-modal-overlay')
+      ?.addEventListener('click', (e) => {
+        if (e.target.id === 'wa-ct-modal-overlay') {
+          this.ctModalOpen = false;
+          this.render();
+        }
+      });
 
     document.querySelectorAll('.wa-ct-modal-cat-item').forEach((item) => {
       item.addEventListener('click', () => {
@@ -6327,10 +8950,12 @@ export class WorkAssistant {
       });
     });
 
-    document.getElementById('wa-ct-modal-search-input')?.addEventListener('input', (e) => {
-      this.ctModalSearch = e.target.value;
-      this.updateModalContent();
-    });
+    document
+      .getElementById('wa-ct-modal-search-input')
+      ?.addEventListener('input', (e) => {
+        this.ctModalSearch = e.target.value;
+        this.updateModalContent();
+      });
 
     document.querySelectorAll('.wa-ct-modal-card').forEach((card) => {
       card.addEventListener('click', () => {
@@ -6339,7 +8964,8 @@ export class WorkAssistant {
           this.creatorForm.contentTemplateId = ctId || null;
         } else if (this.ctModalForReview) {
           if (this.creatorReviewState.draftTemplate) {
-            this.creatorReviewState.draftTemplate.contentTemplateId = ctId || null;
+            this.creatorReviewState.draftTemplate.contentTemplateId =
+              ctId || null;
           }
         } else {
           this.selectedContentTemplateId = ctId || null;
@@ -6351,22 +8977,26 @@ export class WorkAssistant {
       });
     });
 
-    document.getElementById('wa-ct-modal-confirm')?.addEventListener('click', () => {
-      this.ctModalOpen = false;
-      if (this.ctModalForCreator) {
-        this.updateCreatorPreview();
-      } else if (this.ctModalForReview) {
-        this.creatorReviewState.structureType = 'free';
-      }
-      this.render();
-    });
+    document
+      .getElementById('wa-ct-modal-confirm')
+      ?.addEventListener('click', () => {
+        this.ctModalOpen = false;
+        if (this.ctModalForCreator) {
+          this.updateCreatorPreview();
+        } else if (this.ctModalForReview) {
+          this.creatorReviewState.structureType = 'free';
+        }
+        this.render();
+      });
   }
 
   updateModalContent() {
     const allTemplates = this.ctModalForCreator
       ? this.getContentTemplatesForCreator(this.creatorForm.outputType)
       : this.ctModalForReview
-        ? this.getContentTemplatesForCreator(this.creatorReviewState.draftTemplate?.outputType)
+        ? this.getContentTemplatesForCreator(
+            this.creatorReviewState.draftTemplate?.outputType
+          )
         : getAllContentTemplates();
 
     let filteredTemplates = allTemplates;
@@ -6374,7 +9004,9 @@ export class WorkAssistant {
     if (this.ctModalCategory === 'featured') {
       filteredTemplates = allTemplates.filter((t) => t.featured);
     } else if (this.ctModalCategory !== 'all') {
-      filteredTemplates = allTemplates.filter((t) => t.category && t.category.includes(this.ctModalCategory));
+      filteredTemplates = allTemplates.filter(
+        (t) => t.category && t.category.includes(this.ctModalCategory)
+      );
     }
 
     if (this.ctModalSearch) {
@@ -6403,7 +9035,9 @@ export class WorkAssistant {
 
     if (grid) {
       let html = this.renderModalFreeCard(selectedId);
-      html += filteredTemplates.map((t) => this.renderModalTemplateCard(t, selectedId)).join('');
+      html += filteredTemplates
+        .map((t) => this.renderModalTemplateCard(t, selectedId))
+        .join('');
       grid.innerHTML = html;
 
       grid.querySelectorAll('.wa-ct-modal-card').forEach((card) => {
@@ -6413,7 +9047,8 @@ export class WorkAssistant {
             this.creatorForm.contentTemplateId = ctId || null;
           } else if (this.ctModalForReview) {
             if (this.creatorReviewState.draftTemplate) {
-              this.creatorReviewState.draftTemplate.contentTemplateId = ctId || null;
+              this.creatorReviewState.draftTemplate.contentTemplateId =
+                ctId || null;
             }
           } else {
             this.selectedContentTemplateId = ctId || null;
@@ -6434,17 +9069,21 @@ export class WorkAssistant {
   bindIconPickerModalEvents() {
     if (!this.iconModalOpen) return;
 
-    document.getElementById('wa-icon-modal-close')?.addEventListener('click', () => {
-      this.iconModalOpen = false;
-      this.render();
-    });
-
-    document.getElementById('wa-icon-modal-overlay')?.addEventListener('click', (e) => {
-      if (e.target.id === 'wa-icon-modal-overlay') {
+    document
+      .getElementById('wa-icon-modal-close')
+      ?.addEventListener('click', () => {
         this.iconModalOpen = false;
         this.render();
-      }
-    });
+      });
+
+    document
+      .getElementById('wa-icon-modal-overlay')
+      ?.addEventListener('click', (e) => {
+        if (e.target.id === 'wa-icon-modal-overlay') {
+          this.iconModalOpen = false;
+          this.render();
+        }
+      });
 
     document.querySelectorAll('.wa-icon-modal-cat-item').forEach((item) => {
       item.addEventListener('click', () => {
@@ -6453,10 +9092,12 @@ export class WorkAssistant {
       });
     });
 
-    document.getElementById('wa-icon-search-input')?.addEventListener('input', (e) => {
-      this.iconModalSearch = e.target.value;
-      this.updateIconModalContent();
-    });
+    document
+      .getElementById('wa-icon-search-input')
+      ?.addEventListener('input', (e) => {
+        this.iconModalSearch = e.target.value;
+        this.updateIconModalContent();
+      });
 
     document.querySelectorAll('.wa-icon-grid-item').forEach((item) => {
       item.addEventListener('click', () => {
@@ -6476,17 +9117,25 @@ export class WorkAssistant {
     const searchKey = this.iconModalSearch?.toLowerCase().trim() || '';
 
     let displayIcons = searchKey
-      ? this.getIconList().filter((icon) => icon.name.toLowerCase().includes(searchKey) || icon.cat.includes(searchKey))
+      ? this.getIconList().filter(
+          (icon) =>
+            icon.name.toLowerCase().includes(searchKey) ||
+            icon.cat.includes(searchKey)
+        )
       : iconCats[activeCat] || [];
 
     const grid = document.querySelector('.wa-icon-grid');
     if (grid) {
-      grid.innerHTML = displayIcons.map((icon) => `
+      grid.innerHTML = displayIcons
+        .map(
+          (icon) => `
         <div class="wa-icon-grid-item ${this.creatorForm.icon === icon.name ? 'selected' : ''}" data-icon="${icon.name}" title="${icon.name}">
           <i class="fa-solid fa-${icon.name}"></i>
           <span class="wa-icon-name">${icon.name}</span>
         </div>
-      `).join('');
+      `
+        )
+        .join('');
 
       grid.querySelectorAll('.wa-icon-grid-item').forEach((item) => {
         item.addEventListener('click', () => {
@@ -6643,7 +9292,12 @@ export class WorkAssistant {
         break;
       case 'confirm': {
         const lower = text.toLowerCase();
-        if (lower.includes('重新') || lower.includes('再来') || lower.includes('不对') || lower.includes('改')) {
+        if (
+          lower.includes('重新') ||
+          lower.includes('再来') ||
+          lower.includes('不对') ||
+          lower.includes('改')
+        ) {
           state.step = 'start';
           state.collected = {};
           state.messages = [];
@@ -6661,11 +9315,16 @@ export class WorkAssistant {
     const seen = new Set();
 
     // 常见信息点模式：顿号、逗号、数字序号分隔
-    const segments = text.split(/[,，、;；。\n]/).map((s) => s.trim()).filter(Boolean);
+    const segments = text
+      .split(/[,，、;；。\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     segments.forEach((seg) => {
       // 去掉“例如”“比如”等前缀
-      let label = seg.replace(/^(例如|比如|如|像|包括|需要|涉及|的|有)/g, '').trim();
+      let label = seg
+        .replace(/^(例如|比如|如|像|包括|需要|涉及|的|有)/g, '')
+        .trim();
       if (!label || label.length < 2 || label.length > 20) return;
 
       // 去除示例值
@@ -6677,7 +9336,13 @@ export class WorkAssistant {
       seen.add(id);
 
       const type = this.inferFieldType(label);
-      const field = { id, label, type, required: true, placeholder: `请输入${label}` };
+      const field = {
+        id,
+        label,
+        type,
+        required: true,
+        placeholder: `请输入${label}`,
+      };
       if (type === fieldTypes.TEXTAREA) {
         field.rows = 3;
       }
@@ -6689,16 +9354,39 @@ export class WorkAssistant {
 
     // 兜底：如果没有提取到，生成一个主题字段
     if (fields.length === 0) {
-      fields.push({ id: 'topic', type: fieldTypes.TEXT, label: '主题', required: true, placeholder: '请输入主题' });
+      fields.push({
+        id: 'topic',
+        type: fieldTypes.TEXT,
+        label: '主题',
+        required: true,
+        placeholder: '请输入主题',
+      });
     }
 
     return fields;
   }
 
   inferFieldType(label) {
-    const textareaKeywords = ['需求', '描述', '场景', '背景', '痛点', '内容', '说明', '情况', '信息', '要求', '备注', '目的', '建议'];
+    const textareaKeywords = [
+      '需求',
+      '描述',
+      '场景',
+      '背景',
+      '痛点',
+      '内容',
+      '说明',
+      '情况',
+      '信息',
+      '要求',
+      '备注',
+      '目的',
+      '建议',
+    ];
     const selectKeywords = [
-      { kw: '风格', options: ['专业正式', '亲切自然', '简洁有力', '故事化', '活泼生动'] },
+      {
+        kw: '风格',
+        options: ['专业正式', '亲切自然', '简洁有力', '故事化', '活泼生动'],
+      },
       { kw: '情绪', options: ['平和', '着急', '不满', '满意', '质疑'] },
       { kw: '页数', options: ['5页', '8页', '10页', '15页'] },
       { kw: '渠道', options: ['微信公众号', '知乎', '小红书', '官网', '邮件'] },
@@ -6718,10 +9406,18 @@ export class WorkAssistant {
 
   inferAbilityAndOutput(text) {
     const lower = text.toLowerCase();
-    if (lower.includes('ppt') || lower.includes('幻灯片') || lower.includes('汇报')) {
+    if (
+      lower.includes('ppt') ||
+      lower.includes('幻灯片') ||
+      lower.includes('汇报')
+    ) {
       return { abilityId: 'ppt', outputType: outputTypes.PPT };
     }
-    if (lower.includes('表格') || lower.includes('对比表') || lower.includes('清单')) {
+    if (
+      lower.includes('表格') ||
+      lower.includes('对比表') ||
+      lower.includes('清单')
+    ) {
       return { abilityId: 'table', outputType: outputTypes.TABLE };
     }
     if (lower.includes('邮件') || lower.includes('email')) {
@@ -6730,10 +9426,18 @@ export class WorkAssistant {
     if (lower.includes('报告') || lower.includes('研究')) {
       return { abilityId: 'report', outputType: outputTypes.REPORT };
     }
-    if (lower.includes('步骤') || lower.includes('流程') || lower.includes('sop')) {
+    if (
+      lower.includes('步骤') ||
+      lower.includes('流程') ||
+      lower.includes('sop')
+    ) {
       return { abilityId: 'writing', outputType: outputTypes.STEPS };
     }
-    if (lower.includes('列表') || lower.includes('清单') || lower.includes('要点')) {
+    if (
+      lower.includes('列表') ||
+      lower.includes('清单') ||
+      lower.includes('要点')
+    ) {
       return { abilityId: 'writing', outputType: outputTypes.LIST };
     }
     if (lower.includes('markdown') || lower.includes('文章')) {
@@ -6744,12 +9448,18 @@ export class WorkAssistant {
 
   buildTemplateFromConversation() {
     const { collected } = this.conversationState;
-    const roleId = collected.roleId || this.matchRoleByText(collected.userRole) || 'sales';
-    const { abilityId, outputType } = this.inferAbilityAndOutput(collected.outputDescription || collected.templateType || '');
+    const roleId =
+      collected.roleId || this.matchRoleByText(collected.userRole) || 'sales';
+    const { abilityId, outputType } = this.inferAbilityAndOutput(
+      collected.outputDescription || collected.templateType || ''
+    );
     const finalAbilityId = collected.abilityId || abilityId;
     const finalOutputType = collected.outputType || outputType;
-    const fields = collected.fields || this.extractFieldsFromDescription(collected.infoDescription || '');
-    const name = collected.templateType?.split(/[,，、;；。]/)[0]?.trim() || '新建模板';
+    const fields =
+      collected.fields ||
+      this.extractFieldsFromDescription(collected.infoDescription || '');
+    const name =
+      collected.templateType?.split(/[,，、;；。]/)[0]?.trim() || '新建模板';
 
     return {
       id: generateId('tmpl'),
@@ -6776,7 +9486,10 @@ export class WorkAssistant {
     const template = this.buildTemplateFromConversation();
     saveCustomTemplate(template);
     this.conversationState.step = 'complete';
-    this.addConversationMessage('ai', `模板「${template.name}」已保存到「我的模板」，现在就可以去使用了。`);
+    this.addConversationMessage(
+      'ai',
+      `模板「${template.name}」已保存到「我的模板」，现在就可以去使用了。`
+    );
     this.render();
     this.scrollConversationToBottom();
     this.showToast('模板已保存');
@@ -6794,8 +9507,10 @@ export class WorkAssistant {
     };
 
     const ability = getAbilityById(draftTemplate.abilityId);
-    if (draftTemplate.defaultMode === 'kb' && !ability?.supportsKB) draftTemplate.defaultMode = 'free';
-    if (draftTemplate.defaultMode === 'free' && !ability?.supportsFree) draftTemplate.defaultMode = 'kb';
+    if (draftTemplate.defaultMode === 'kb' && !ability?.supportsKB)
+      draftTemplate.defaultMode = 'free';
+    if (draftTemplate.defaultMode === 'free' && !ability?.supportsFree)
+      draftTemplate.defaultMode = 'kb';
 
     this.creatorReviewState = {
       active: true,
@@ -6810,7 +9525,16 @@ export class WorkAssistant {
     this.render();
   }
 
-  renderCreatorPanel({ variant, title, desc, progress, config, preview, footer, extra }) {
+  renderCreatorPanel({
+    variant,
+    title,
+    desc,
+    progress,
+    config,
+    preview,
+    footer,
+    extra,
+  }) {
     return `
       <div class="wa-creator-form-new">
         <div class="wa-creator-panel wa-creator-panel--seamless wa-creator-${variant}-panel">
@@ -6868,23 +9592,30 @@ export class WorkAssistant {
       <div class="wa-conversation-messages" id="wa-conversation-messages">
         ${this.renderConversationMessages()}
       </div>
-      ${state.step === 'confirm' || state.step === 'complete' ? '' : `
+      ${
+        state.step === 'confirm' || state.step === 'complete'
+          ? ''
+          : `
         <div class="wa-conversation-input-wrapper">
           <div class="wa-conversation-input-capsule">
             <input type="text" class="wa-input" id="wa-conversation-input" placeholder="输入你的回答，按回车发送..." autocomplete="off">
             <button class="btn btn-primary btn-icon" id="wa-conversation-send"><i class="fa-solid fa-paper-plane"></i></button>
           </div>
         </div>
-      `}
+      `
+      }
     `;
 
-    const footer = state.step === 'confirm' || state.step === 'complete' ? `
+    const footer =
+      state.step === 'confirm' || state.step === 'complete'
+        ? `
       <div class="wa-preview-live"><span></span> Live</div>
       <div class="wa-creator-form-actions">
         <button class="btn btn-text" id="wa-conversation-restart"><i class="fa-solid fa-rotate-right"></i> 重新创建</button>
         <button class="btn btn-primary btn-pill" id="wa-conversation-confirm-review"><i class="fa-solid fa-arrow-right"></i> 进入提示词确认</button>
       </div>
-    ` : `
+    `
+        : `
       <div class="wa-preview-live"><span></span> Live</div>
       <div class="wa-preview-hint"><i class="fa-regular fa-lightbulb"></i><span>继续对话以完善模板结构</span></div>
     `;
@@ -6902,23 +9633,25 @@ export class WorkAssistant {
 
   renderConversationMessages() {
     const state = this.conversationState;
-    return state.messages
-      .map((msg) => {
-        if (msg.role === 'ai') {
-          return `
+    return (
+      state.messages
+        .map((msg) => {
+          if (msg.role === 'ai') {
+            return `
             <div class="wa-message wa-message-ai">
               <div class="wa-message-avatar"><i class="fa-solid fa-robot"></i></div>
               <div class="wa-message-content">${this.formatMessageContent(msg.content)}</div>
             </div>
           `;
-        }
-        return `
+          }
+          return `
           <div class="wa-message wa-message-user">
             <div class="wa-message-content">${this.escapeHtml(msg.content)}</div>
           </div>
         `;
-      })
-      .join('') + (state.isTyping ? this.renderTypingIndicator() : '');
+        })
+        .join('') + (state.isTyping ? this.renderTypingIndicator() : '')
+    );
   }
 
   renderTypingIndicator() {
@@ -6968,7 +9701,9 @@ export class WorkAssistant {
       </div>
       <div class="wa-creator-preview-fields">
         ${fields.length === 0 ? '<div class="wa-preview-empty"><i class="fa-regular fa-lightbulb"></i><span>还没有收集到信息点，继续对话即可自动生成。</span></div>' : ''}
-        ${fields.map((f) => `
+        ${fields
+          .map(
+            (f) => `
           <div class="wa-creator-preview-field">
             <div class="wa-preview-field-main">
               <span class="wa-field-status wa-field-status--collected"></span>
@@ -6976,7 +9711,9 @@ export class WorkAssistant {
             </div>
             <span class="wa-creator-preview-type">${this.getFieldTypeLabel(f.type)}${f.required ? ' *' : ''}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
     `;
   }
@@ -7016,13 +9753,17 @@ export class WorkAssistant {
       }
     });
 
-    document.getElementById('wa-conversation-restart')?.addEventListener('click', () => {
-      this.resetConversation();
-    });
+    document
+      .getElementById('wa-conversation-restart')
+      ?.addEventListener('click', () => {
+        this.resetConversation();
+      });
 
-    document.getElementById('wa-conversation-confirm-review')?.addEventListener('click', () => {
-      this.enterReviewFromConversation();
-    });
+    document
+      .getElementById('wa-conversation-confirm-review')
+      ?.addEventListener('click', () => {
+        this.enterReviewFromConversation();
+      });
 
     // 自动聚焦
     this.focusConversationInput();
@@ -7057,7 +9798,13 @@ export class WorkAssistant {
 
   getAbilityOutputTypes(abilityId) {
     const map = {
-      writing: [outputTypes.MARKDOWN, outputTypes.TEXT, outputTypes.EMAIL, outputTypes.LIST, outputTypes.STEPS],
+      writing: [
+        outputTypes.MARKDOWN,
+        outputTypes.TEXT,
+        outputTypes.EMAIL,
+        outputTypes.LIST,
+        outputTypes.STEPS,
+      ],
       table: [outputTypes.TABLE],
       ppt: [outputTypes.PPT],
       report: [outputTypes.REPORT, outputTypes.MARKDOWN],
@@ -7095,40 +9842,149 @@ export class WorkAssistant {
 
   getContentTypeCards() {
     return [
-      { id: 'writing', name: '文档写作', icon: 'file-lines', desc: '方案、话术、邮件等文字内容', color: '#3b82f6' },
-      { id: 'table', name: '表格生成', icon: 'table', desc: '对比表、清单表、报价单等', color: '#10b981' },
-      { id: 'ppt', name: 'PPT 制作', icon: 'presentation-screen', desc: '演示文稿大纲与内容生成', color: '#f59e0b' },
-      { id: 'report', name: '研究报告', icon: 'file-waveform', desc: '行业研究、市场调研报告', color: '#f97316' },
-      { id: 'translate', name: '内容翻译', icon: 'language', desc: '多语言文本翻译', color: '#06b6d4' },
-      { id: 'transcribe', name: '录音转写', icon: 'microphone-lines', desc: '音频转写并提取要点', color: '#ec4899' },
-      { id: 'image', name: '图像生成', icon: 'image', desc: '海报、配图、图片生成', color: '#f43f5e' },
-      { id: 'video', name: '视频生成', icon: 'video', desc: '短视频脚本与数字人视频', color: '#0ea5e9' },
-      { id: 'music', name: '音乐生成', icon: 'music', desc: '背景音乐、音效生成', color: '#14b8a6' },
+      {
+        id: 'writing',
+        name: '文档写作',
+        icon: 'file-lines',
+        desc: '方案、话术、邮件等文字内容',
+        color: '#3b82f6',
+      },
+      {
+        id: 'table',
+        name: '表格生成',
+        icon: 'table',
+        desc: '对比表、清单表、报价单等',
+        color: '#10b981',
+      },
+      {
+        id: 'ppt',
+        name: 'PPT 制作',
+        icon: 'presentation-screen',
+        desc: '演示文稿大纲与内容生成',
+        color: '#f59e0b',
+      },
+      {
+        id: 'report',
+        name: '研究报告',
+        icon: 'file-waveform',
+        desc: '行业研究、市场调研报告',
+        color: '#f97316',
+      },
+      {
+        id: 'translate',
+        name: '内容翻译',
+        icon: 'language',
+        desc: '多语言文本翻译',
+        color: '#06b6d4',
+      },
+      {
+        id: 'transcribe',
+        name: '录音转写',
+        icon: 'microphone-lines',
+        desc: '音频转写并提取要点',
+        color: '#ec4899',
+      },
+      {
+        id: 'image',
+        name: '图像生成',
+        icon: 'image',
+        desc: '海报、配图、图片生成',
+        color: '#f43f5e',
+      },
+      {
+        id: 'video',
+        name: '视频生成',
+        icon: 'video',
+        desc: '短视频脚本与数字人视频',
+        color: '#0ea5e9',
+      },
+      {
+        id: 'music',
+        name: '音乐生成',
+        icon: 'music',
+        desc: '背景音乐、音效生成',
+        color: '#14b8a6',
+      },
     ];
   }
 
   generateFieldId(label) {
     if (!label) return '';
     // 英文直接转小写下划线
-    const english = label.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const english = label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fa5]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
     if (/^[a-z0-9_]+$/.test(english)) return english;
 
     // 常见中文词映射
     const dict = {
-      主题: 'topic', 内容: 'content', 客户: 'customer', 产品: 'product', 行业: 'industry',
-      预算: 'budget', 竞品: 'competitor', 问题: 'question', 场景: 'scenario', 风格: 'style',
-      名称: 'name', 描述: 'description', 需求: 'needs', 痛点: 'pain', 目标: 'goal',
-      渠道: 'channel', 角度: 'angle', 重点: 'focus', 要点: 'points', 页数: 'pages',
-      配色: 'color', 对象: 'audience', 情绪: 'emotion', 回复: 'reply', 范围: 'scope',
-      模块: 'module', 标题: 'title', 摘要: 'summary', 备注: 'notes', 建议: 'suggestions',
-      公司: 'company', 部门: 'department', 岗位: 'role', 时间: 'time', 日期: 'date',
-      数量: 'quantity', 价格: 'price', 方案: 'solution', 优势: 'advantages', 劣势: 'disadvantages',
-      结论: 'conclusion', 背景: 'background', 方法: 'method', 结果: 'results', 行动: 'actions',
-      汇报主题: 'topic', 汇报对象: 'audience', 核心信息: 'coreMessage', 邮件主题: 'subject',
-      收件人: 'recipient', 邮件目的: 'purpose', 表格主题: 'topic', 对比维度: 'dimensions',
-      报告主题: 'topic', 关注重点: 'focus', 客户名称: 'customerName', 客户需求: 'customerNeeds',
-      推广产品: 'product', 投放渠道: 'channel', 切入角度: 'angle', 客户问题: 'customerQuestion',
-      详细程度: 'detailLevel', 话术风格: 'tone', 回复风格: 'replyStyle',
+      主题: 'topic',
+      内容: 'content',
+      客户: 'customer',
+      产品: 'product',
+      行业: 'industry',
+      预算: 'budget',
+      竞品: 'competitor',
+      问题: 'question',
+      场景: 'scenario',
+      风格: 'style',
+      名称: 'name',
+      描述: 'description',
+      需求: 'needs',
+      痛点: 'pain',
+      目标: 'goal',
+      渠道: 'channel',
+      角度: 'angle',
+      重点: 'focus',
+      要点: 'points',
+      页数: 'pages',
+      配色: 'color',
+      对象: 'audience',
+      情绪: 'emotion',
+      回复: 'reply',
+      范围: 'scope',
+      模块: 'module',
+      标题: 'title',
+      摘要: 'summary',
+      备注: 'notes',
+      建议: 'suggestions',
+      公司: 'company',
+      部门: 'department',
+      岗位: 'role',
+      时间: 'time',
+      日期: 'date',
+      数量: 'quantity',
+      价格: 'price',
+      方案: 'solution',
+      优势: 'advantages',
+      劣势: 'disadvantages',
+      结论: 'conclusion',
+      背景: 'background',
+      方法: 'method',
+      结果: 'results',
+      行动: 'actions',
+      汇报主题: 'topic',
+      汇报对象: 'audience',
+      核心信息: 'coreMessage',
+      邮件主题: 'subject',
+      收件人: 'recipient',
+      邮件目的: 'purpose',
+      表格主题: 'topic',
+      对比维度: 'dimensions',
+      报告主题: 'topic',
+      关注重点: 'focus',
+      客户名称: 'customerName',
+      客户需求: 'customerNeeds',
+      推广产品: 'product',
+      投放渠道: 'channel',
+      切入角度: 'angle',
+      客户问题: 'customerQuestion',
+      详细程度: 'detailLevel',
+      话术风格: 'tone',
+      回复风格: 'replyStyle',
     };
     for (const [cn, en] of Object.entries(dict)) {
       if (label.includes(cn)) return en;
@@ -7136,20 +9992,101 @@ export class WorkAssistant {
 
     // 兜底：按中文字数生成 pinyin 首字母风格的 ID
     const pinyinMap = {
-      主: 'zhu', 题: 'ti', 内: 'nei', 容: 'rong', 客: 'ke', 户: 'hu', 产: 'chan', 品: 'pin',
-      行: 'hang', 业: 'ye', 预: 'yu', 算: 'suan', 竞: 'jing', 问: 'wen', 场: 'chang',
-      景: 'jing', 风: 'feng', 格: 'ge', 名: 'ming', 描: 'miao', 述: 'shu', 需: 'xu',
-      求: 'qiu', 痛: 'tong', 目: 'mu', 标: 'biao', 渠: 'qu', 道: 'dao', 角: 'jiao',
-      重: 'zhong', 点: 'dian', 要: 'yao', 页: 'ye', 配: 'pei', 色: 'se', 对: 'dui',
-      象: 'xiang', 情: 'qing', 绪: 'xu', 回: 'hui', 复: 'fu', 范: 'fan', 围: 'wei',
-      模: 'mo', 块: 'kuai', 标: 'biao', 摘: 'zhai', 备: 'bei', 注: 'zhu', 建: 'jian',
-      议: 'yi', 公: 'gong', 司: 'si', 部: 'bu', 门: 'men', 岗: 'gang', 位: 'wei',
-      时: 'shi', 间: 'jian', 日: 'ri', 期: 'qi', 数: 'shu', 量: 'liang', 价: 'jia',
-      格: 'ge', 方: 'fang', 案: 'an', 优: 'you', 势: 'shi', 劣: 'lie', 结: 'jie',
-      论: 'lun', 背: 'bei', 法: 'fa', 果: 'guo', 动: 'dong', 邮: 'you', 件: 'jian',
-      收: 'shou', 明: 'ming', 细: 'xi', 总: 'zong', 类: 'lei', 型: 'xing', 语: 'yu',
-      气: 'qi', 调: 'tiao', 文: 'wen', 字: 'zi', 图: 'tu', 片: 'pian', 视: 'shi',
-      频: 'pin', 音: 'yin', 乐: 'yue',
+      主: 'zhu',
+      题: 'ti',
+      内: 'nei',
+      容: 'rong',
+      客: 'ke',
+      户: 'hu',
+      产: 'chan',
+      品: 'pin',
+      行: 'hang',
+      业: 'ye',
+      预: 'yu',
+      算: 'suan',
+      竞: 'jing',
+      问: 'wen',
+      场: 'chang',
+      景: 'jing',
+      风: 'feng',
+      格: 'ge',
+      名: 'ming',
+      描: 'miao',
+      述: 'shu',
+      需: 'xu',
+      求: 'qiu',
+      痛: 'tong',
+      目: 'mu',
+      标: 'biao',
+      渠: 'qu',
+      道: 'dao',
+      角: 'jiao',
+      重: 'zhong',
+      点: 'dian',
+      要: 'yao',
+      页: 'ye',
+      配: 'pei',
+      色: 'se',
+      对: 'dui',
+      象: 'xiang',
+      情: 'qing',
+      绪: 'xu',
+      回: 'hui',
+      复: 'fu',
+      范: 'fan',
+      围: 'wei',
+      模: 'mo',
+      块: 'kuai',
+      标: 'biao',
+      摘: 'zhai',
+      备: 'bei',
+      注: 'zhu',
+      建: 'jian',
+      议: 'yi',
+      公: 'gong',
+      司: 'si',
+      部: 'bu',
+      门: 'men',
+      岗: 'gang',
+      位: 'wei',
+      时: 'shi',
+      间: 'jian',
+      日: 'ri',
+      期: 'qi',
+      数: 'shu',
+      量: 'liang',
+      价: 'jia',
+      格: 'ge',
+      方: 'fang',
+      案: 'an',
+      优: 'you',
+      势: 'shi',
+      劣: 'lie',
+      结: 'jie',
+      论: 'lun',
+      背: 'bei',
+      法: 'fa',
+      果: 'guo',
+      动: 'dong',
+      邮: 'you',
+      件: 'jian',
+      收: 'shou',
+      明: 'ming',
+      细: 'xi',
+      总: 'zong',
+      类: 'lei',
+      型: 'xing',
+      语: 'yu',
+      气: 'qi',
+      调: 'tiao',
+      文: 'wen',
+      字: 'zi',
+      图: 'tu',
+      片: 'pian',
+      视: 'shi',
+      频: 'pin',
+      音: 'yin',
+      乐: 'yue',
     };
     const chars = label.split('').filter((c) => /[\u4e00-\u9fa5]/.test(c));
     if (chars.length === 0) return english || `field_${Date.now()}`;
@@ -7169,30 +10106,132 @@ export class WorkAssistant {
     switch (outputType) {
       case outputTypes.PPT:
         return [
-          { id: 'topic', label: '汇报主题', placeholder: '例如：DmtPlat 企业知识库解决方案', required: true, description: '', example: '', defaultValue: '' },
-          { id: 'audience', label: '汇报对象', placeholder: '例如：客户 IT 负责人', required: false, description: '', example: '', defaultValue: '' },
-          { id: 'pages', label: '预计页数', placeholder: '例如：8页', required: false, type: fieldTypes.SELECT, options: ['5页', '8页', '10页', '15页'], description: '', example: '', defaultValue: '' },
-          { id: 'coreMessage', label: '核心信息', placeholder: '一句话总结最想传递的信息', required: false, type: fieldTypes.TEXTAREA, description: '', example: '', defaultValue: '' },
+          {
+            id: 'topic',
+            label: '汇报主题',
+            placeholder: '例如：DmtPlat 企业知识库解决方案',
+            required: true,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'audience',
+            label: '汇报对象',
+            placeholder: '例如：客户 IT 负责人',
+            required: false,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'pages',
+            label: '预计页数',
+            placeholder: '例如：8页',
+            required: false,
+            type: fieldTypes.SELECT,
+            options: ['5页', '8页', '10页', '15页'],
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'coreMessage',
+            label: '核心信息',
+            placeholder: '一句话总结最想传递的信息',
+            required: false,
+            type: fieldTypes.TEXTAREA,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
         ];
       case outputTypes.TABLE:
         return [
-          { id: 'topic', label: '表格主题', placeholder: '例如：竞品对比', required: true, description: '', example: '', defaultValue: '' },
-          { id: 'dimensions', label: '对比维度', placeholder: '例如：价格、功能、服务', required: false, type: fieldTypes.TEXTAREA, description: '', example: '', defaultValue: '' },
+          {
+            id: 'topic',
+            label: '表格主题',
+            placeholder: '例如：竞品对比',
+            required: true,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'dimensions',
+            label: '对比维度',
+            placeholder: '例如：价格、功能、服务',
+            required: false,
+            type: fieldTypes.TEXTAREA,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
         ];
       case outputTypes.REPORT:
         return [
-          { id: 'topic', label: '报告主题', placeholder: '例如：企业知识管理市场趋势', required: true, description: '', example: '', defaultValue: '' },
-          { id: 'focus', label: '关注重点', placeholder: '例如：市场规模、竞争格局', required: false, type: fieldTypes.TEXTAREA, description: '', example: '', defaultValue: '' },
+          {
+            id: 'topic',
+            label: '报告主题',
+            placeholder: '例如：企业知识管理市场趋势',
+            required: true,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'focus',
+            label: '关注重点',
+            placeholder: '例如：市场规模、竞争格局',
+            required: false,
+            type: fieldTypes.TEXTAREA,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
         ];
       case outputTypes.EMAIL:
         return [
-          { id: 'recipient', label: '收件人', placeholder: '例如：客户负责人', required: false, description: '', example: '', defaultValue: '' },
-          { id: 'subject', label: '邮件主题', placeholder: '例如：合作方案沟通', required: true, description: '', example: '', defaultValue: '' },
-          { id: 'purpose', label: '邮件目的', placeholder: '例如：介绍产品、跟进进度', required: true, type: fieldTypes.TEXTAREA, description: '', example: '', defaultValue: '' },
+          {
+            id: 'recipient',
+            label: '收件人',
+            placeholder: '例如：客户负责人',
+            required: false,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'subject',
+            label: '邮件主题',
+            placeholder: '例如：合作方案沟通',
+            required: true,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
+          {
+            id: 'purpose',
+            label: '邮件目的',
+            placeholder: '例如：介绍产品、跟进进度',
+            required: true,
+            type: fieldTypes.TEXTAREA,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
         ];
       default:
         return [
-          { id: 'topic', label: '主题', placeholder: '请输入主题', required: true, description: '', example: '', defaultValue: '' },
+          {
+            id: 'topic',
+            label: '主题',
+            placeholder: '请输入主题',
+            required: true,
+            description: '',
+            example: '',
+            defaultValue: '',
+          },
         ];
     }
   }
@@ -7205,15 +10244,26 @@ export class WorkAssistant {
 
     // 保留滚动位置，避免重绘后跳回顶部
     const liveSnapshot = {
-      formConfig: document.querySelector('.wa-creator-form-config')?.scrollTop || 0,
-      extractConfig: document.querySelector('.wa-creator-extract-config')?.scrollTop || 0,
-      formPreview: document.querySelector('.wa-creator-form-panel .wa-creator-panel-preview')?.scrollTop || 0,
-      extractPreview: document.querySelector('.wa-creator-extract-panel .wa-creator-panel-preview')?.scrollTop || 0,
+      formConfig:
+        document.querySelector('.wa-creator-form-config')?.scrollTop || 0,
+      extractConfig:
+        document.querySelector('.wa-creator-extract-config')?.scrollTop || 0,
+      formPreview:
+        document.querySelector(
+          '.wa-creator-form-panel .wa-creator-panel-preview'
+        )?.scrollTop || 0,
+      extractPreview:
+        document.querySelector(
+          '.wa-creator-extract-panel .wa-creator-panel-preview'
+        )?.scrollTop || 0,
     };
     const usedLast = !!this._lastCreatorScroll;
     const scrollSnapshot = this._lastCreatorScroll || liveSnapshot;
     this._lastCreatorScroll = null;
-    console.log('SCROLL_SNAPSHOT', JSON.stringify({ usedLast, live: liveSnapshot, restored: scrollSnapshot }));
+    console.log(
+      'SCROLL_SNAPSHOT',
+      JSON.stringify({ usedLast, live: liveSnapshot, restored: scrollSnapshot })
+    );
 
     this.container.innerHTML = `
       <header class="header">
@@ -7255,12 +10305,19 @@ export class WorkAssistant {
     const restore = () => {
       const formConfig = document.querySelector('.wa-creator-form-config');
       if (formConfig) formConfig.scrollTop = scrollSnapshot.formConfig;
-      const extractConfig = document.querySelector('.wa-creator-extract-config');
+      const extractConfig = document.querySelector(
+        '.wa-creator-extract-config'
+      );
       if (extractConfig) extractConfig.scrollTop = scrollSnapshot.extractConfig;
-      const formPreview = document.querySelector('.wa-creator-form-panel .wa-creator-panel-preview');
+      const formPreview = document.querySelector(
+        '.wa-creator-form-panel .wa-creator-panel-preview'
+      );
       if (formPreview) formPreview.scrollTop = scrollSnapshot.formPreview;
-      const extractPreview = document.querySelector('.wa-creator-extract-panel .wa-creator-panel-preview');
-      if (extractPreview) extractPreview.scrollTop = scrollSnapshot.extractPreview;
+      const extractPreview = document.querySelector(
+        '.wa-creator-extract-panel .wa-creator-panel-preview'
+      );
+      if (extractPreview)
+        extractPreview.scrollTop = scrollSnapshot.extractPreview;
     };
     restore();
     // 浏览器在重绘/焦点后可能还会自动滚动，再强制恢复一次
@@ -7269,10 +10326,18 @@ export class WorkAssistant {
 
   captureCreatorScroll() {
     return {
-      formConfig: document.querySelector('.wa-creator-form-config')?.scrollTop || 0,
-      extractConfig: document.querySelector('.wa-creator-extract-config')?.scrollTop || 0,
-      formPreview: document.querySelector('.wa-creator-form-panel .wa-creator-panel-preview')?.scrollTop || 0,
-      extractPreview: document.querySelector('.wa-creator-extract-panel .wa-creator-panel-preview')?.scrollTop || 0,
+      formConfig:
+        document.querySelector('.wa-creator-form-config')?.scrollTop || 0,
+      extractConfig:
+        document.querySelector('.wa-creator-extract-config')?.scrollTop || 0,
+      formPreview:
+        document.querySelector(
+          '.wa-creator-form-panel .wa-creator-panel-preview'
+        )?.scrollTop || 0,
+      extractPreview:
+        document.querySelector(
+          '.wa-creator-extract-panel .wa-creator-panel-preview'
+        )?.scrollTop || 0,
     };
   }
 
@@ -7280,10 +10345,34 @@ export class WorkAssistant {
 
   getReviewStructures() {
     return [
-      { id: 'free', type: 'builtin', name: '自由结构', icon: 'wand-magic-sparkles', meta: '无约束' },
-      { id: 'scheme', type: 'builtin', name: '方案文档', icon: 'file-lines', meta: '5 个主章节' },
-      { id: 'weekly', type: 'builtin', name: '周报', icon: 'calendar-week', meta: '5 个主章节' },
-      { id: 'meeting', type: 'builtin', name: '会议纪要', icon: 'handshake', meta: '5 个主章节' },
+      {
+        id: 'free',
+        type: 'builtin',
+        name: '自由结构',
+        icon: 'wand-magic-sparkles',
+        meta: '无约束',
+      },
+      {
+        id: 'scheme',
+        type: 'builtin',
+        name: '方案文档',
+        icon: 'file-lines',
+        meta: '5 个主章节',
+      },
+      {
+        id: 'weekly',
+        type: 'builtin',
+        name: '周报',
+        icon: 'calendar-week',
+        meta: '5 个主章节',
+      },
+      {
+        id: 'meeting',
+        type: 'builtin',
+        name: '会议纪要',
+        icon: 'handshake',
+        meta: '5 个主章节',
+      },
     ];
   }
 
@@ -7320,7 +10409,9 @@ export class WorkAssistant {
     const ability = getAbilityById(draft.abilityId);
     const abilityName = ability?.name || '内容';
     const verb = abilityName.endsWith('生成') ? '' : '生成';
-    const fieldList = draft.fields.map((f) => `${f.label}：{${f.id}}`).join('\n');
+    const fieldList = draft.fields
+      .map((f) => `${f.label}：{${f.id}}`)
+      .join('\n');
     const outputTypeLabel = this.getOutputTypeLabel(draft.outputType);
 
     let prompt = `请根据以下信息${verb}${abilityName}（${outputTypeLabel}）：\n${fieldList ? `\n${fieldList}\n` : ''}\n要求：结构清晰、语言专业、贴合场景。`;
@@ -7362,16 +10453,18 @@ export class WorkAssistant {
 
     // 保留滚动位置，避免重绘后跳回顶部
     const liveSnapshot = {
-      reviewSidebar: document.querySelector('.wa-creator-review-sidebar')?.scrollTop || 0,
+      reviewSidebar:
+        document.querySelector('.wa-creator-review-sidebar')?.scrollTop || 0,
     };
     const usedLast = !!this._lastReviewScroll;
     const scrollSnapshot = this._lastReviewScroll || liveSnapshot;
     this._lastReviewScroll = null;
 
     const structures = this.getReviewStructures();
-    const structureHtml = structures.map((s) => {
-      const isActive = state.structureType === s.id;
-      return `
+    const structureHtml = structures
+      .map((s) => {
+        const isActive = state.structureType === s.id;
+        return `
         <div class="wa-review-structure-card ${isActive ? 'active' : ''} ${s.id === 'free' ? 'wa-review-structure-free' : ''}" data-structure="${s.id}">
           ${isActive ? '<div class="wa-review-structure-check"><i class="fa-solid fa-check"></i></div>' : ''}
           <div class="wa-review-structure-icon"><i class="fa-solid ${s.icon}"></i></div>
@@ -7379,11 +10472,16 @@ export class WorkAssistant {
           <div class="wa-review-structure-meta">${s.meta}</div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
-    const varTags = draft.fields.map((f) => `
+    const varTags = draft.fields
+      .map(
+        (f) => `
       <span class="wa-review-var-tag" data-field="${f.id}">{${f.id}}</span>
-    `).join('');
+    `
+      )
+      .join('');
 
     const promptEditorHtml = this.renderReviewPromptEditor(draft, state);
     const formPreviewHtml = this.renderReviewFormPreview(draft);
@@ -7420,13 +10518,17 @@ export class WorkAssistant {
               <button class="btn btn-text wa-review-ct-btn" style="width:100%;margin-top:10px;">
                 <i class="fa-solid fa-layer-group"></i> 从内容模板库选择
               </button>
-              ${draft.contentTemplateId ? `
+              ${
+                draft.contentTemplateId
+                  ? `
                 <div class="wa-review-ct-selected">
                   <i class="fa-solid fa-file-lines"></i>
                   <span>${getContentTemplateById(draft.contentTemplateId)?.name || '已选择模板'}</span>
                   <button class="wa-review-ct-clear" title="清除"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
 
             <div class="wa-review-section">
@@ -7497,7 +10599,9 @@ export class WorkAssistant {
 
     // 恢复滚动位置
     const restore = () => {
-      const reviewSidebar = document.querySelector('.wa-creator-review-sidebar');
+      const reviewSidebar = document.querySelector(
+        '.wa-creator-review-sidebar'
+      );
       if (reviewSidebar) reviewSidebar.scrollTop = scrollSnapshot.reviewSidebar;
     };
     restore();
@@ -7506,13 +10610,21 @@ export class WorkAssistant {
 
   captureReviewScroll() {
     return {
-      reviewSidebar: document.querySelector('.wa-creator-review-sidebar')?.scrollTop || 0,
+      reviewSidebar:
+        document.querySelector('.wa-creator-review-sidebar')?.scrollTop || 0,
     };
   }
 
   renderReviewFieldItem(field, index) {
-    const typeOptions = Object.entries(fieldTypes).map(([key, value]) => `<option value="${value}" ${field.type === value ? 'selected' : ''}>${this.getReviewFieldTypeLabel(value)}</option>`).join('');
-    const showOptions = field.type === fieldTypes.SELECT || field.type === fieldTypes.MULTI_SELECT;
+    const typeOptions = Object.entries(fieldTypes)
+      .map(
+        ([key, value]) =>
+          `<option value="${value}" ${field.type === value ? 'selected' : ''}>${this.getReviewFieldTypeLabel(value)}</option>`
+      )
+      .join('');
+    const showOptions =
+      field.type === fieldTypes.SELECT ||
+      field.type === fieldTypes.MULTI_SELECT;
     const expanded = field._reviewExpanded === true;
     return `
       <div class="wa-review-field-item ${expanded ? 'expanded' : ''}" data-index="${index}">
@@ -7584,7 +10696,8 @@ export class WorkAssistant {
   }
 
   renderPromptHighlights(text) {
-    if (!text) return '<span style="color:var(--kb-text-muted);">暂无提示词</span>';
+    if (!text)
+      return '<span style="color:var(--kb-text-muted);">暂无提示词</span>';
     return this.escapeHtml(text)
       .replace(/^(# .+)$/gm, '<span class="wa-review-prompt-section">$1</span>')
       .replace(/(\{[^}]+\})/g, '<span class="wa-review-prompt-var">$1</span>');
@@ -7620,17 +10733,24 @@ export class WorkAssistant {
       input = `<div class="wa-review-form-preview-input"><i class="fa-regular fa-calendar"></i> ${field.placeholder || '请选择日期'}</div>`;
     } else if (field.type === fieldTypes.FILE) {
       input = `<div class="wa-review-form-preview-input"><i class="fa-solid fa-paperclip"></i> ${field.placeholder || '点击上传文件'}</div>`;
-    } else if (field.type === fieldTypes.SELECT || field.type === fieldTypes.MULTI_SELECT) {
+    } else if (
+      field.type === fieldTypes.SELECT ||
+      field.type === fieldTypes.MULTI_SELECT
+    ) {
       const opts = (field.options || []).slice(0, 3);
       if (opts.length === 0) {
         input = `<div class="wa-review-form-preview-input">${field.placeholder || '请选择'}</div>`;
       } else {
-        input = `<div class="wa-review-form-preview-options">${opts.map((o) => `
+        input = `<div class="wa-review-form-preview-options">${opts
+          .map(
+            (o) => `
           <div class="wa-review-form-preview-option">
             <div class="wa-review-form-preview-option-box" style="border-radius:${field.type === fieldTypes.SELECT ? '50%' : '3px'};"></div>
             <span>${o}</span>
           </div>
-        `).join('')}</div>`;
+        `
+          )
+          .join('')}</div>`;
       }
     } else {
       input = `<div class="wa-review-form-preview-input">${field.placeholder || '请输入'}</div>`;
@@ -7676,7 +10796,10 @@ export class WorkAssistant {
     if (field.type === fieldTypes.FILE) {
       return `<div class="wa-review-test-field"><label class="wa-review-test-label">${field.label}</label><input type="file" class="wa-input wa-review-test-input" data-id="${field.id}" style="padding:8px 12px;"></div>`;
     }
-    if (field.type === fieldTypes.SELECT || field.type === fieldTypes.MULTI_SELECT) {
+    if (
+      field.type === fieldTypes.SELECT ||
+      field.type === fieldTypes.MULTI_SELECT
+    ) {
       const opts = field.options || [];
       if (opts.length === 0) {
         return `<div class="wa-review-test-field"><label class="wa-review-test-label">${field.label}</label><div style="padding:10px 12px;border:1.5px solid var(--kb-border);border-radius:8px;font-size:12px;color:var(--kb-text-muted);">未配置选项</div></div>`;
@@ -7695,7 +10818,11 @@ export class WorkAssistant {
       'mousedown',
       (e) => {
         this._lastReviewScroll = this.captureReviewScroll();
-        if (e.target.closest('.wa-review-field-header, .wa-review-field-toggle, .wa-review-add-field, .wa-review-field-remove, .wa-review-field-move')) {
+        if (
+          e.target.closest(
+            '.wa-review-field-header, .wa-review-field-toggle, .wa-review-add-field, .wa-review-field-remove, .wa-review-field-move'
+          )
+        ) {
           e.preventDefault();
         }
       },
@@ -7707,25 +10834,29 @@ export class WorkAssistant {
       this.render();
     });
 
-    document.getElementById('wa-review-back-edit')?.addEventListener('click', () => {
-      this.creatorReviewState.active = false;
-      this.render();
-    });
-
-    document.getElementById('wa-review-cancel')?.addEventListener('click', () => {
-      if (confirm('确定要取消创建吗？已填写的内容将不会保存。')) {
-        this.creatorReviewState = {
-          active: false,
-          source: 'form',
-          draftTemplate: null,
-          currentTab: 'prompt',
-          promptMode: 'preview',
-          promptTemplate: '',
-          structureType: 'free',
-        };
+    document
+      .getElementById('wa-review-back-edit')
+      ?.addEventListener('click', () => {
+        this.creatorReviewState.active = false;
         this.render();
-      }
-    });
+      });
+
+    document
+      .getElementById('wa-review-cancel')
+      ?.addEventListener('click', () => {
+        if (confirm('确定要取消创建吗？已填写的内容将不会保存。')) {
+          this.creatorReviewState = {
+            active: false,
+            source: 'form',
+            draftTemplate: null,
+            currentTab: 'prompt',
+            promptMode: 'preview',
+            promptTemplate: '',
+            structureType: 'free',
+          };
+          this.render();
+        }
+      });
 
     document.getElementById('wa-review-save')?.addEventListener('click', () => {
       this.confirmSaveTemplate();
@@ -7749,39 +10880,49 @@ export class WorkAssistant {
       btn.addEventListener('click', () => {
         this.creatorReviewState.promptMode = btn.dataset.mode;
         if (btn.dataset.mode === 'edit') {
-          this.creatorReviewState.promptTemplate = document.getElementById('wa-review-prompt-textarea')?.value || this.creatorReviewState.promptTemplate;
+          this.creatorReviewState.promptTemplate =
+            document.getElementById('wa-review-prompt-textarea')?.value ||
+            this.creatorReviewState.promptTemplate;
         }
         this.render();
       });
     });
 
-    this.container.querySelector('.wa-review-copy-prompt')?.addEventListener('click', () => {
-      navigator.clipboard.writeText(this.creatorReviewState.promptTemplate);
-      this.showToast('提示词已复制');
-    });
+    this.container
+      .querySelector('.wa-review-copy-prompt')
+      ?.addEventListener('click', () => {
+        navigator.clipboard.writeText(this.creatorReviewState.promptTemplate);
+        this.showToast('提示词已复制');
+      });
 
-    this.container.querySelectorAll('.wa-review-structure-card').forEach((card) => {
-      card.addEventListener('click', () => {
-        this.creatorReviewState.structureType = card.dataset.structure;
+    this.container
+      .querySelectorAll('.wa-review-structure-card')
+      .forEach((card) => {
+        card.addEventListener('click', () => {
+          this.creatorReviewState.structureType = card.dataset.structure;
+          this.creatorReviewState.draftTemplate.contentTemplateId = null;
+          this.render();
+        });
+      });
+
+    document
+      .querySelector('.wa-review-ct-btn')
+      ?.addEventListener('click', () => {
+        this.ctModalOpen = true;
+        this.ctModalForCreator = false;
+        this.ctModalForReview = true;
+        this.ctModalCategory = 'all';
+        this.ctModalSearch = '';
+        this.render();
+      });
+
+    this.container
+      .querySelector('.wa-review-ct-clear')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
         this.creatorReviewState.draftTemplate.contentTemplateId = null;
         this.render();
       });
-    });
-
-    document.querySelector('.wa-review-ct-btn')?.addEventListener('click', () => {
-      this.ctModalOpen = true;
-      this.ctModalForCreator = false;
-      this.ctModalForReview = true;
-      this.ctModalCategory = 'all';
-      this.ctModalSearch = '';
-      this.render();
-    });
-
-    this.container.querySelector('.wa-review-ct-clear')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.creatorReviewState.draftTemplate.contentTemplateId = null;
-      this.render();
-    });
 
     this.container.querySelectorAll('.wa-review-var-tag').forEach((tag) => {
       tag.addEventListener('click', () => {
@@ -7791,7 +10932,10 @@ export class WorkAssistant {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         const insert = `{${fieldId}}`;
-        textarea.value = textarea.value.substring(0, start) + insert + textarea.value.substring(end);
+        textarea.value =
+          textarea.value.substring(0, start) +
+          insert +
+          textarea.value.substring(end);
         textarea.selectionStart = textarea.selectionEnd = start + insert.length;
         textarea.focus();
         this.creatorReviewState.promptTemplate = textarea.value;
@@ -7800,130 +10944,164 @@ export class WorkAssistant {
       });
     });
 
-    document.querySelector('.wa-review-regenerate')?.addEventListener('click', () => {
-      this.regenerateReviewPrompt();
-    });
+    document
+      .querySelector('.wa-review-regenerate')
+      ?.addEventListener('click', () => {
+        this.regenerateReviewPrompt();
+      });
 
-    this.container.querySelectorAll('.wa-review-field-header').forEach((header) => {
-      header.addEventListener('click', (e) => {
-        if (e.target.closest('.wa-review-field-actions')) return;
-        e.preventDefault();
-        const index = parseInt(header.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (!field) return;
-        // 只允许展开一个字段；展开新字段时合上其他字段
-        const willExpand = !field._reviewExpanded;
-        this.creatorReviewState.draftTemplate.fields.forEach((f) => {
-          f._reviewExpanded = false;
+    this.container
+      .querySelectorAll('.wa-review-field-header')
+      .forEach((header) => {
+        header.addEventListener('click', (e) => {
+          if (e.target.closest('.wa-review-field-actions')) return;
+          e.preventDefault();
+          const index = parseInt(header.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (!field) return;
+          // 只允许展开一个字段；展开新字段时合上其他字段
+          const willExpand = !field._reviewExpanded;
+          this.creatorReviewState.draftTemplate.fields.forEach((f) => {
+            f._reviewExpanded = false;
+          });
+          if (willExpand) {
+            field._reviewExpanded = true;
+          }
+          this.render();
         });
-        if (willExpand) {
-          field._reviewExpanded = true;
-        }
-        this.render();
       });
-    });
 
-    this.container.querySelectorAll('.wa-review-field-toggle').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const index = parseInt(btn.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (!field) return;
-        // 只允许展开一个字段；展开新字段时合上其他字段
-        const willExpand = !field._reviewExpanded;
-        this.creatorReviewState.draftTemplate.fields.forEach((f) => {
-          f._reviewExpanded = false;
+    this.container
+      .querySelectorAll('.wa-review-field-toggle')
+      .forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const index = parseInt(btn.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (!field) return;
+          // 只允许展开一个字段；展开新字段时合上其他字段
+          const willExpand = !field._reviewExpanded;
+          this.creatorReviewState.draftTemplate.fields.forEach((f) => {
+            f._reviewExpanded = false;
+          });
+          if (willExpand) {
+            field._reviewExpanded = true;
+          }
+          this.render();
         });
-        if (willExpand) {
-          field._reviewExpanded = true;
-        }
+      });
+
+    this.container
+      .querySelectorAll('.wa-review-field-remove')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const index = parseInt(btn.dataset.index);
+          if (this.creatorReviewState.draftTemplate.fields.length <= 1) {
+            this.showToast('至少保留一个字段', 'error');
+            return;
+          }
+          this.creatorReviewState.draftTemplate.fields.splice(index, 1);
+          this.render();
+        });
+      });
+
+    document
+      .querySelector('.wa-review-add-field')
+      ?.addEventListener('click', () => {
+        const fields = this.creatorReviewState.draftTemplate.fields;
+        const index = fields.length + 1;
+        fields.push({
+          id: `field_${Date.now()}`,
+          type: fieldTypes.TEXT,
+          label: `新字段 ${index}`,
+          placeholder: '',
+          required: false,
+          _reviewExpanded: true,
+        });
         this.render();
       });
-    });
 
-    this.container.querySelectorAll('.wa-review-field-remove').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const index = parseInt(btn.dataset.index);
-        if (this.creatorReviewState.draftTemplate.fields.length <= 1) {
-          this.showToast('至少保留一个字段', 'error');
-          return;
-        }
-        this.creatorReviewState.draftTemplate.fields.splice(index, 1);
-        this.render();
+    this.container
+      .querySelectorAll('.wa-review-field-label')
+      .forEach((input) => {
+        input.addEventListener('input', () => {
+          const index = parseInt(input.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (!field) return;
+          const prevLabel = field.label;
+          field.label = input.value;
+          if (
+            input.value.trim() &&
+            (!field.id ||
+              field.id === this.generateFieldId(prevLabel) ||
+              field.id.startsWith('field_'))
+          ) {
+            field.id = this.generateFieldId(input.value);
+          }
+          this.updateReviewVarTags();
+          this.updateReviewFormPreview();
+        });
       });
-    });
 
-    document.querySelector('.wa-review-add-field')?.addEventListener('click', () => {
-      const fields = this.creatorReviewState.draftTemplate.fields;
-      const index = fields.length + 1;
-      fields.push({
-        id: `field_${Date.now()}`,
-        type: fieldTypes.TEXT,
-        label: `新字段 ${index}`,
-        placeholder: '',
-        required: false,
-        _reviewExpanded: true,
+    this.container
+      .querySelectorAll('.wa-review-field-type')
+      .forEach((select) => {
+        select.addEventListener('change', () => {
+          const index = parseInt(select.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (!field) return;
+          field.type = select.value;
+          if (
+            field.type === fieldTypes.SELECT ||
+            field.type === fieldTypes.MULTI_SELECT
+          ) {
+            if (!field.options) field.options = [];
+          }
+          this.render();
+        });
       });
-      this.render();
-    });
 
-    this.container.querySelectorAll('.wa-review-field-label').forEach((input) => {
-      input.addEventListener('input', () => {
-        const index = parseInt(input.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (!field) return;
-        const prevLabel = field.label;
-        field.label = input.value;
-        if (input.value.trim() && (!field.id || field.id === this.generateFieldId(prevLabel) || field.id.startsWith('field_'))) {
-          field.id = this.generateFieldId(input.value);
-        }
-        this.updateReviewVarTags();
-        this.updateReviewFormPreview();
+    this.container
+      .querySelectorAll('.wa-review-field-required')
+      .forEach((checkbox) => {
+        checkbox.addEventListener('change', () => {
+          const index = parseInt(checkbox.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (field) field.required = checkbox.checked;
+          this.updateReviewFormPreview();
+        });
       });
-    });
 
-    this.container.querySelectorAll('.wa-review-field-type').forEach((select) => {
-      select.addEventListener('change', () => {
-        const index = parseInt(select.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (!field) return;
-        field.type = select.value;
-        if (field.type === fieldTypes.SELECT || field.type === fieldTypes.MULTI_SELECT) {
-          if (!field.options) field.options = [];
-        }
-        this.render();
+    this.container
+      .querySelectorAll('.wa-review-field-placeholder')
+      .forEach((input) => {
+        input.addEventListener('input', () => {
+          const index = parseInt(input.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (field) field.placeholder = input.value;
+          this.updateReviewFormPreview();
+        });
       });
-    });
 
-    this.container.querySelectorAll('.wa-review-field-required').forEach((checkbox) => {
-      checkbox.addEventListener('change', () => {
-        const index = parseInt(checkbox.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (field) field.required = checkbox.checked;
-        this.updateReviewFormPreview();
+    this.container
+      .querySelectorAll('.wa-review-field-options-input')
+      .forEach((textarea) => {
+        textarea.addEventListener('input', () => {
+          const index = parseInt(textarea.dataset.index);
+          const field = this.creatorReviewState.draftTemplate.fields[index];
+          if (field)
+            field.options = textarea.value
+              .split(/[,，\n]/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+        });
       });
-    });
 
-    this.container.querySelectorAll('.wa-review-field-placeholder').forEach((input) => {
-      input.addEventListener('input', () => {
-        const index = parseInt(input.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (field) field.placeholder = input.value;
-        this.updateReviewFormPreview();
+    document
+      .querySelector('.wa-review-run-test')
+      ?.addEventListener('click', () => {
+        this.runReviewTest();
       });
-    });
-
-    this.container.querySelectorAll('.wa-review-field-options-input').forEach((textarea) => {
-      textarea.addEventListener('input', () => {
-        const index = parseInt(textarea.dataset.index);
-        const field = this.creatorReviewState.draftTemplate.fields[index];
-        if (field) field.options = textarea.value.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean);
-      });
-    });
-
-    document.querySelector('.wa-review-run-test')?.addEventListener('click', () => {
-      this.runReviewTest();
-    });
 
     this.bindContentTemplateModalEvents();
     this.bindIconPickerModalEvents();
@@ -7932,7 +11110,9 @@ export class WorkAssistant {
   updateReviewPromptRender() {
     const render = this.container.querySelector('.wa-review-prompt-render');
     if (render) {
-      render.innerHTML = this.renderPromptHighlights(this.creatorReviewState.promptTemplate);
+      render.innerHTML = this.renderPromptHighlights(
+        this.creatorReviewState.promptTemplate
+      );
     }
   }
 
@@ -7940,9 +11120,13 @@ export class WorkAssistant {
     const draft = this.creatorReviewState.draftTemplate;
     const container = this.container.querySelector('.wa-review-var-tags');
     if (container) {
-      container.innerHTML = draft.fields.map((f) => `
+      container.innerHTML = draft.fields
+        .map(
+          (f) => `
         <span class="wa-review-var-tag" data-field="${f.id}">{${f.id}}</span>
-      `).join('');
+      `
+        )
+        .join('');
       container.querySelectorAll('.wa-review-var-tag').forEach((tag) => {
         tag.addEventListener('click', () => {
           const fieldId = tag.dataset.field;
@@ -7951,8 +11135,12 @@ export class WorkAssistant {
           const start = textarea.selectionStart;
           const end = textarea.selectionEnd;
           const insert = `{${fieldId}}`;
-          textarea.value = textarea.value.substring(0, start) + insert + textarea.value.substring(end);
-          textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+          textarea.value =
+            textarea.value.substring(0, start) +
+            insert +
+            textarea.value.substring(end);
+          textarea.selectionStart = textarea.selectionEnd =
+            start + insert.length;
           textarea.focus();
           this.creatorReviewState.promptTemplate = textarea.value;
           this.creatorReviewState.promptMode = 'edit';
@@ -7964,9 +11152,13 @@ export class WorkAssistant {
 
   updateReviewFormPreview() {
     const draft = this.creatorReviewState.draftTemplate;
-    const container = this.container.querySelector('.wa-review-form-preview-body');
+    const container = this.container.querySelector(
+      '.wa-review-form-preview-body'
+    );
     if (container) {
-      container.innerHTML = draft.fields.map((f) => this.renderReviewFormPreviewField(f)).join('') + `
+      container.innerHTML =
+        draft.fields.map((f) => this.renderReviewFormPreviewField(f)).join('') +
+        `
         <button class="wa-review-form-preview-generate"><i class="fa-solid fa-wand-magic-sparkles"></i> 开始生成</button>
       `;
     }
@@ -7974,7 +11166,11 @@ export class WorkAssistant {
 
   regenerateReviewPrompt() {
     const draft = this.creatorReviewState.draftTemplate;
-    this.creatorReviewState.promptTemplate = this.generateReviewPrompt(draft, this.creatorReviewState.structureType, draft.contentTemplateId);
+    this.creatorReviewState.promptTemplate = this.generateReviewPrompt(
+      draft,
+      this.creatorReviewState.structureType,
+      draft.contentTemplateId
+    );
     this.creatorReviewState.promptMode = 'preview';
     this.render();
   }
@@ -7983,14 +11179,22 @@ export class WorkAssistant {
     const draft = this.creatorReviewState.draftTemplate;
     const values = draft.fields.map((f) => {
       if (f.type === fieldTypes.MULTI_SELECT) {
-        const checked = this.container.querySelectorAll(`input[type="checkbox"][data-id="${f.id}"]:checked`);
-        return Array.from(checked).map((c) => c.value).join(', ');
+        const checked = this.container.querySelectorAll(
+          `input[type="checkbox"][data-id="${f.id}"]:checked`
+        );
+        return Array.from(checked)
+          .map((c) => c.value)
+          .join(', ');
       }
       if (f.type === fieldTypes.FILE) {
-        const el = this.container.querySelector(`input[type="file"][data-id="${f.id}"]`);
+        const el = this.container.querySelector(
+          `input[type="file"][data-id="${f.id}"]`
+        );
         return el && el.files.length > 0 ? el.files[0].name : '';
       }
-      const el = this.container.querySelector(`.wa-review-test-input[data-id="${f.id}"]`);
+      const el = this.container.querySelector(
+        `.wa-review-test-input[data-id="${f.id}"]`
+      );
       return el ? (el.value || '').trim() : '';
     });
 
@@ -8014,31 +11218,45 @@ export class WorkAssistant {
 
   collectReviewFields() {
     const draft = this.creatorReviewState.draftTemplate;
-    this.container.querySelectorAll('.wa-review-field-label').forEach((input) => {
-      const index = parseInt(input.dataset.index);
-      const field = draft.fields[index];
-      if (field) field.label = input.value;
-    });
-    this.container.querySelectorAll('.wa-review-field-type').forEach((select) => {
-      const index = parseInt(select.dataset.index);
-      const field = draft.fields[index];
-      if (field) field.type = select.value;
-    });
-    this.container.querySelectorAll('.wa-review-field-required').forEach((checkbox) => {
-      const index = parseInt(checkbox.dataset.index);
-      const field = draft.fields[index];
-      if (field) field.required = checkbox.checked;
-    });
-    this.container.querySelectorAll('.wa-review-field-placeholder').forEach((input) => {
-      const index = parseInt(input.dataset.index);
-      const field = draft.fields[index];
-      if (field) field.placeholder = input.value;
-    });
-    this.container.querySelectorAll('.wa-review-field-options-input').forEach((textarea) => {
-      const index = parseInt(textarea.dataset.index);
-      const field = draft.fields[index];
-      if (field) field.options = textarea.value.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean);
-    });
+    this.container
+      .querySelectorAll('.wa-review-field-label')
+      .forEach((input) => {
+        const index = parseInt(input.dataset.index);
+        const field = draft.fields[index];
+        if (field) field.label = input.value;
+      });
+    this.container
+      .querySelectorAll('.wa-review-field-type')
+      .forEach((select) => {
+        const index = parseInt(select.dataset.index);
+        const field = draft.fields[index];
+        if (field) field.type = select.value;
+      });
+    this.container
+      .querySelectorAll('.wa-review-field-required')
+      .forEach((checkbox) => {
+        const index = parseInt(checkbox.dataset.index);
+        const field = draft.fields[index];
+        if (field) field.required = checkbox.checked;
+      });
+    this.container
+      .querySelectorAll('.wa-review-field-placeholder')
+      .forEach((input) => {
+        const index = parseInt(input.dataset.index);
+        const field = draft.fields[index];
+        if (field) field.placeholder = input.value;
+      });
+    this.container
+      .querySelectorAll('.wa-review-field-options-input')
+      .forEach((textarea) => {
+        const index = parseInt(textarea.dataset.index);
+        const field = draft.fields[index];
+        if (field)
+          field.options = textarea.value
+            .split(/[,，\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+      });
   }
 
   confirmSaveTemplate() {
@@ -8056,7 +11274,9 @@ export class WorkAssistant {
       this.showToast('请至少添加一个字段', 'error');
       return;
     }
-    const invalidField = draft.fields.find((f) => !f.id.trim() || !f.label.trim());
+    const invalidField = draft.fields.find(
+      (f) => !f.id.trim() || !f.label.trim()
+    );
     if (invalidField) {
       this.showToast('字段ID和名称不能为空', 'error');
       return;
@@ -8135,7 +11355,13 @@ export class WorkAssistant {
       return rest;
     });
 
-    const { activePromptStyle, currentStep, promptGenerationIndex, structureType, ...formRest } = this.creatorForm;
+    const {
+      activePromptStyle,
+      currentStep,
+      promptGenerationIndex,
+      structureType,
+      ...formRest
+    } = this.creatorForm;
     const draftTemplate = {
       ...formRest,
       fields: cleanFields,
@@ -8145,10 +11371,14 @@ export class WorkAssistant {
     };
 
     const ability = getAbilityById(draftTemplate.abilityId);
-    if (draftTemplate.defaultMode === 'kb' && !ability?.supportsKB) draftTemplate.defaultMode = 'free';
-    if (draftTemplate.defaultMode === 'free' && !ability?.supportsFree) draftTemplate.defaultMode = 'kb';
+    if (draftTemplate.defaultMode === 'kb' && !ability?.supportsKB)
+      draftTemplate.defaultMode = 'free';
+    if (draftTemplate.defaultMode === 'free' && !ability?.supportsFree)
+      draftTemplate.defaultMode = 'kb';
 
-    const reviewStructureType = draftTemplate.contentTemplateId ? 'free' : (structureType || 'free');
+    const reviewStructureType = draftTemplate.contentTemplateId
+      ? 'free'
+      : structureType || 'free';
 
     this.creatorReviewState = {
       active: true,
@@ -8156,7 +11386,11 @@ export class WorkAssistant {
       draftTemplate,
       currentTab: 'prompt',
       promptMode: 'preview',
-      promptTemplate: this.generateReviewPrompt(draftTemplate, reviewStructureType, draftTemplate.contentTemplateId),
+      promptTemplate: this.generateReviewPrompt(
+        draftTemplate,
+        reviewStructureType,
+        draftTemplate.contentTemplateId
+      ),
       structureType: reviewStructureType,
     };
 
@@ -8199,9 +11433,10 @@ export class WorkAssistant {
   renderCreatorStructureSection() {
     const structures = this.getReviewStructures();
     const state = this.creatorForm;
-    const structureHtml = structures.map((s) => {
-      const isActive = state.structureType === s.id;
-      return `
+    const structureHtml = structures
+      .map((s) => {
+        const isActive = state.structureType === s.id;
+        return `
         <div class="structure-card wa-creator-structure-card ${isActive ? 'active' : ''} ${s.id === 'free' ? 'structure-card-free' : ''}" data-structure="${s.id}">
           ${isActive ? '<div class="structure-card-check"><i class="fa-solid fa-check"></i></div>' : ''}
           <div class="structure-card-icon"><i class="fa-solid ${s.icon}"></i></div>
@@ -8209,7 +11444,8 @@ export class WorkAssistant {
           <div class="structure-card-meta">${s.meta}</div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
     return `
       <div class="wa-creator-section structure-section" id="creator-section-structure">
@@ -8222,13 +11458,17 @@ export class WorkAssistant {
         <div class="structure-cards">
           ${structureHtml}
         </div>
-        ${state.contentTemplateId ? `
+        ${
+          state.contentTemplateId
+            ? `
           <div class="wa-review-ct-selected">
             <i class="fa-solid fa-file-lines"></i>
             <span>${getContentTemplateById(state.contentTemplateId)?.name || '已选择模板'}</span>
             <button class="wa-review-ct-clear" id="wa-creator-ct-clear" title="清除"><i class="fa-solid fa-xmark"></i></button>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -8237,10 +11477,12 @@ export class WorkAssistant {
     const form = this.creatorForm;
     const allowedOutputs = this.getAbilityOutputTypes(form.abilityId);
 
-    const abilityOptions = workAbilities.map((a) => {
-      const isSelected = form.abilityId === a.id;
-      return `<option value="${a.id}" ${isSelected ? 'selected' : ''}>${a.name}</option>`;
-    }).join('');
+    const abilityOptions = workAbilities
+      .map((a) => {
+        const isSelected = form.abilityId === a.id;
+        return `<option value="${a.id}" ${isSelected ? 'selected' : ''}>${a.name}</option>`;
+      })
+      .join('');
 
     const outputFormatLabels = {
       [outputTypes.TEXT]: '纯文本',
@@ -8253,10 +11495,12 @@ export class WorkAssistant {
       [outputTypes.REPORT]: '报告',
     };
 
-    const outputOptions = allowedOutputs.map((ot) => {
-      const isSelected = form.outputType === ot;
-      return `<option value="${ot}" ${isSelected ? 'selected' : ''}>${outputFormatLabels[ot] || ot}</option>`;
-    }).join('');
+    const outputOptions = allowedOutputs
+      .map((ot) => {
+        const isSelected = form.outputType === ot;
+        return `<option value="${ot}" ${isSelected ? 'selected' : ''}>${outputFormatLabels[ot] || ot}</option>`;
+      })
+      .join('');
 
     return `
       <div class="wa-creator-section wa-creator-section-basic" id="creator-section-basic">
@@ -8299,8 +11543,15 @@ export class WorkAssistant {
   }
 
   renderCreatorFieldItem(field, index) {
-    const typeOptions = Object.entries(fieldTypes).map(([key, value]) => `<option value="${value}" ${field.type === value ? 'selected' : ''}>${this.getReviewFieldTypeLabel(value)}</option>`).join('');
-    const showOptions = field.type === fieldTypes.SELECT || field.type === fieldTypes.MULTI_SELECT;
+    const typeOptions = Object.entries(fieldTypes)
+      .map(
+        ([key, value]) =>
+          `<option value="${value}" ${field.type === value ? 'selected' : ''}>${this.getReviewFieldTypeLabel(value)}</option>`
+      )
+      .join('');
+    const showOptions =
+      field.type === fieldTypes.SELECT ||
+      field.type === fieldTypes.MULTI_SELECT;
     const expanded = field._expanded === true;
     const typeLabel = this.getReviewFieldTypeLabel(field.type);
     const initial = (field.label || '未').charAt(0);
@@ -8319,7 +11570,9 @@ export class WorkAssistant {
             <button class="field-action wa-creator-field-remove" data-index="${index}" title="删除"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
-        ${expanded ? `
+        ${
+          expanded
+            ? `
         <div class="field-editor" onclick="event.stopPropagation()">
           <div class="field-editor-header">
             <div class="field-editor-title">编辑字段：${field.label || '未命名'}</div>
@@ -8357,22 +11610,40 @@ export class WorkAssistant {
             </label>
           </div>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `;
   }
 
   renderCreatorPromptSection() {
     const form = this.creatorForm;
-    const fieldTags = form.fields.map((f) => ({ id: f.id, label: f.label })).filter((f) => f.id);
+    const fieldTags = form.fields
+      .map((f) => ({ id: f.id, label: f.label }))
+      .filter((f) => f.id);
     const abilityName = getAbilityById(form.abilityId)?.name || '内容';
     const verb = abilityName.endsWith('生成') ? '' : '生成';
-    const fieldList = form.fields.map((f) => `${f.label}：{${f.id}}`).join('\n');
+    const fieldList = form.fields
+      .map((f) => `${f.label}：{${f.id}}`)
+      .join('\n');
     const promptTemplates = [
-      { label: '通用生成', text: this.getDefaultPromptTemplate(form.abilityId, form.fields) },
-      { label: '专业正式', text: `请基于以下信息，以专业正式的语气${verb}${abilityName}：\n${fieldList}\n\n要求：措辞严谨、逻辑清晰、适合商务场景。` },
-      { label: '简洁有力', text: `请根据以下信息${verb}${abilityName}，要求简洁有力、重点突出：\n${fieldList}` },
-      { label: '详细展开', text: `请根据以下信息详细${verb}${abilityName}，每个要点都要充分展开：\n${fieldList}\n\n要求：结构完整、论据充分、便于直接使用。` },
+      {
+        label: '通用生成',
+        text: this.getDefaultPromptTemplate(form.abilityId, form.fields),
+      },
+      {
+        label: '专业正式',
+        text: `请基于以下信息，以专业正式的语气${verb}${abilityName}：\n${fieldList}\n\n要求：措辞严谨、逻辑清晰、适合商务场景。`,
+      },
+      {
+        label: '简洁有力',
+        text: `请根据以下信息${verb}${abilityName}，要求简洁有力、重点突出：\n${fieldList}`,
+      },
+      {
+        label: '详细展开',
+        text: `请根据以下信息详细${verb}${abilityName}，每个要点都要充分展开：\n${fieldList}\n\n要求：结构完整、论据充分、便于直接使用。`,
+      },
     ];
 
     const outputConfigHtml = this.renderCreatorOutputConfig();
@@ -8396,7 +11667,7 @@ export class WorkAssistant {
           <div class="wa-creator-prompt-label-row">
             <label class="wa-form-label">提示词模板</label>
             <button class="btn btn-sm btn-primary wa-creator-ai-generate-btn" type="button" ${form.aiGenerating ? 'disabled' : ''}>
-              ${form.aiGenerating ? '<i class="fa-solid fa-circle-notch fa-spin"></i> 生成中...' : (form.promptGenerationIndex > 0 ? '<i class="fa-solid fa-rotate"></i> 重新生成' : '<i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成')}
+              ${form.aiGenerating ? '<i class="fa-solid fa-circle-notch fa-spin"></i> 生成中...' : form.promptGenerationIndex > 0 ? '<i class="fa-solid fa-rotate"></i> 重新生成' : '<i class="fa-solid fa-wand-magic-sparkles"></i> AI 生成'}
             </button>
           </div>
           <textarea class="wa-input" id="creator-prompt-template" rows="10" placeholder="输入提示词模板，可用 {字段ID} 引用字段">${form.promptTemplate}</textarea>
@@ -8430,7 +11701,9 @@ export class WorkAssistant {
       const ability = getAbilityById(form.abilityId);
       const abilityName = ability?.name || '内容';
       const verb = abilityName.endsWith('生成') ? '' : '生成';
-      const fieldList = form.fields.map((f) => `${f.label}：{${f.id}}`).join('\n');
+      const fieldList = form.fields
+        .map((f) => `${f.label}：{${f.id}}`)
+        .join('\n');
       const fieldRefs = form.fields.map((f) => `{${f.id}}`).join('、');
       const outputTypeMap = {
         [outputTypes.TEXT]: '纯文本',
@@ -8443,7 +11716,10 @@ export class WorkAssistant {
       };
       const outputTypeLabel = outputTypeMap[form.outputType] || '内容';
       const columns = form.outputConfig?.columns || [];
-      const columnsHint = columns.length > 0 ? `，建议包含以下维度/章节：${columns.join('、')}` : '';
+      const columnsHint =
+        columns.length > 0
+          ? `，建议包含以下维度/章节：${columns.join('、')}`
+          : '';
 
       const styles = [
         {
@@ -8498,12 +11774,17 @@ ${fieldList}
       form.aiGenerating = false;
 
       this.render();
-      this.showToast(`已${form.promptGenerationIndex > 1 ? '重新' : ''}生成「${selected.label}」提示词`);
+      this.showToast(
+        `已${form.promptGenerationIndex > 1 ? '重新' : ''}生成「${selected.label}」提示词`
+      );
 
       const textarea = document.getElementById('creator-prompt-template');
       if (textarea) {
         textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        textarea.setSelectionRange(
+          textarea.value.length,
+          textarea.value.length
+        );
       }
     }, 800);
   }
@@ -8580,9 +11861,14 @@ ${fieldList}
     const form = this.creatorForm;
     const role = getRoleById(form.roleId);
     const ability = getAbilityById(form.abilityId);
-    const outputLabel = Object.entries(outputTypes).find(([k, v]) => v === form.outputType)?.[0] || form.outputType;
+    const outputLabel =
+      Object.entries(outputTypes).find(
+        ([k, v]) => v === form.outputType
+      )?.[0] || form.outputType;
     const contentTemplate = form.contentTemplateId
-      ? (this.getContentTemplatesForCreator(form.outputType).find((t) => t.id === form.contentTemplateId) || null)
+      ? this.getContentTemplatesForCreator(form.outputType).find(
+          (t) => t.id === form.contentTemplateId
+        ) || null
       : null;
 
     return `
@@ -8618,7 +11904,9 @@ ${fieldList}
     const ability = getAbilityById(form.abilityId);
     const outputLabel = this.getOutputTypeLabel(form.outputType);
     const contentTemplate = form.contentTemplateId
-      ? (this.getContentTemplatesForCreator(form.outputType).find((t) => t.id === form.contentTemplateId) || null)
+      ? this.getContentTemplatesForCreator(form.outputType).find(
+          (t) => t.id === form.contentTemplateId
+        ) || null
       : null;
 
     return `
@@ -8635,7 +11923,12 @@ ${fieldList}
         </div>
       </div>
       <div class="wa-creator-preview-fields">
-        ${form.fields.length === 0 ? '<div class="wa-preview-empty"><i class="fa-regular fa-pen-to-square"></i><span>暂无字段，添加字段后即可在此处预览。</span></div>' : form.fields.map((f) => `
+        ${
+          form.fields.length === 0
+            ? '<div class="wa-preview-empty"><i class="fa-regular fa-pen-to-square"></i><span>暂无字段，添加字段后即可在此处预览。</span></div>'
+            : form.fields
+                .map(
+                  (f) => `
           <div class="wa-creator-preview-field">
             <div class="wa-preview-field-main">
               <span class="wa-field-status ${f.label.trim() ? 'wa-field-status--collected' : 'wa-field-status--pending'}"></span>
@@ -8643,22 +11936,26 @@ ${fieldList}
             </div>
             <span class="wa-creator-preview-type">${this.getFieldTypeLabel(f.type)}</span>
           </div>
-        `).join('')}
+        `
+                )
+                .join('')
+        }
       </div>
       <div class="wa-preview-card-desc">${form.description || '暂无描述'}</div>
     `;
   }
 
   renderCreatorPreviewField(field) {
-    const typeLabel = {
-      [fieldTypes.TEXT]: 'text',
-      [fieldTypes.TEXTAREA]: 'textarea',
-      [fieldTypes.NUMBER]: 'number',
-      [fieldTypes.SELECT]: 'select',
-      [fieldTypes.MULTI_SELECT]: 'multi-select',
-      [fieldTypes.DATE]: 'date',
-      [fieldTypes.FILE]: 'file',
-    }[field.type] || field.type;
+    const typeLabel =
+      {
+        [fieldTypes.TEXT]: 'text',
+        [fieldTypes.TEXTAREA]: 'textarea',
+        [fieldTypes.NUMBER]: 'number',
+        [fieldTypes.SELECT]: 'select',
+        [fieldTypes.MULTI_SELECT]: 'multi-select',
+        [fieldTypes.DATE]: 'date',
+        [fieldTypes.FILE]: 'file',
+      }[field.type] || field.type;
 
     let input = '';
     if (field.type === fieldTypes.TEXTAREA) {
@@ -8700,7 +11997,9 @@ ${fieldList}
         </div>
       </div>
       <div class="wa-creator-preview-fields">
-        ${form.fields.map((f) => `
+        ${form.fields
+          .map(
+            (f) => `
           <div class="wa-creator-preview-field">
             <div class="wa-preview-field-main">
               <span class="wa-field-status wa-field-status--collected"></span>
@@ -8708,7 +12007,9 @@ ${fieldList}
             </div>
             <span class="wa-creator-preview-type">${this.getFieldTypeLabel(f.type)}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
       <div class="wa-preview-card-desc">${form.description || '暂无描述'}</div>
     `;
@@ -8743,7 +12044,12 @@ ${fieldList}
             <div class="wa-form-item">
               <label class="wa-form-label">输出形式</label>
               <select class="wa-input" id="extract-output-type">
-                ${Object.entries(outputTypes).map(([key, value]) => `<option value="${value}" ${this.extractForm.outputType === value ? 'selected' : ''}>${this.getOutputTypeLabel(value)}</option>`).join('')}
+                ${Object.entries(outputTypes)
+                  .map(
+                    ([key, value]) =>
+                      `<option value="${value}" ${this.extractForm.outputType === value ? 'selected' : ''}>${this.getOutputTypeLabel(value)}</option>`
+                  )
+                  .join('')}
               </select>
             </div>
           </div>
@@ -8756,7 +12062,9 @@ ${fieldList}
       </div>
     `;
 
-    const preview = hasPreview ? this.renderCreatorExtractPreview() : `
+    const preview = hasPreview
+      ? this.renderCreatorExtractPreview()
+      : `
       <div class="wa-preview-card-header">
         <div class="wa-creator-preview-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
         <div class="wa-creator-preview-info">
@@ -8772,13 +12080,15 @@ ${fieldList}
       </div>
     `;
 
-    const footer = hasPreview ? `
+    const footer = hasPreview
+      ? `
       <div class="wa-preview-live"><span></span> Live</div>
       <div class="wa-creator-form-actions">
         <button class="btn btn-text" id="wa-extract-cancel">取消</button>
         <button class="btn btn-primary btn-pill" id="wa-extract-confirm-review"><i class="fa-solid fa-arrow-right"></i> 进入确认页</button>
       </div>
-    ` : `
+    `
+      : `
       <div class="wa-preview-hint"><i class="fa-regular fa-lightbulb"></i><span>AI 将自动识别结构</span></div>
       <div></div>
     `;
@@ -8825,13 +12135,23 @@ ${fieldList}
   }
 
   getFileIcon(fileType) {
-    const map = { pptx: 'powerpoint', ppt: 'powerpoint', docx: 'word', doc: 'word', xlsx: 'excel', xls: 'excel', pdf: 'pdf' };
+    const map = {
+      pptx: 'powerpoint',
+      ppt: 'powerpoint',
+      docx: 'word',
+      doc: 'word',
+      xlsx: 'excel',
+      xls: 'excel',
+      pdf: 'pdf',
+    };
     return map[fileType] || 'lines';
   }
 
   renderCreatorExtractPreview() {
     const preview = this.extractPreview;
-    const fileSummary = preview.parsedFromFile ? this.renderFileParseSummary(preview) : '';
+    const fileSummary = preview.parsedFromFile
+      ? this.renderFileParseSummary(preview)
+      : '';
     return `
       <div class="wa-preview-card-header">
         <div class="wa-creator-preview-icon"><i class="fa-solid fa-${preview.icon || 'file-lines'}"></i></div>
@@ -8846,7 +12166,9 @@ ${fieldList}
       </div>
       ${fileSummary}
       <div class="wa-creator-preview-fields">
-        ${preview.fields.map((f) => `
+        ${preview.fields
+          .map(
+            (f) => `
           <div class="wa-creator-preview-field">
             <div class="wa-preview-field-main">
               <span class="wa-field-status wa-field-status--collected"></span>
@@ -8854,7 +12176,9 @@ ${fieldList}
             </div>
             <span class="wa-creator-preview-type">${this.getFieldTypeLabel(f.type)}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
       <div class="wa-preview-card-desc">${preview.description || '暂无描述'}</div>
     `;
@@ -8870,8 +12194,16 @@ ${fieldList}
     const typeDistribution = master.typeDistribution;
     const theme = master.theme || {};
 
-    const fileTypeLabel = { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[fileType] || fileType;
-    const countLabel = totalSlides ? `${totalSlides} 页` : pageCount ? `${pageCount} 页` : sheetCount ? `${sheetCount} 张表` : '';
+    const fileTypeLabel =
+      { pptx: 'PPT', docx: 'Word', xlsx: 'Excel', pdf: 'PDF' }[fileType] ||
+      fileType;
+    const countLabel = totalSlides
+      ? `${totalSlides} 页`
+      : pageCount
+        ? `${pageCount} 页`
+        : sheetCount
+          ? `${sheetCount} 张表`
+          : '';
 
     let themeHtml = '';
     if (theme.colors) {
@@ -8896,11 +12228,19 @@ ${fieldList}
 
     let structureHtml = '';
     if (typeDistribution) {
-      const labels = { cover: '封面', catalog: '目录', content: '内容', section: '章节', end: '结尾' };
+      const labels = {
+        cover: '封面',
+        catalog: '目录',
+        content: '内容',
+        section: '章节',
+        end: '结尾',
+      };
       structureHtml = `
         <div class="wa-extract-summary-row">
           <span class="wa-extract-summary-label">页面结构</span>
-          <span>${Object.entries(typeDistribution).map(([k, v]) => `${labels[k] || k} ${v} 页`).join(' / ')}</span>
+          <span>${Object.entries(typeDistribution)
+            .map(([k, v]) => `${labels[k] || k} ${v} 页`)
+            .join(' / ')}</span>
         </div>
       `;
     }
@@ -8923,7 +12263,11 @@ ${fieldList}
       'mousedown',
       (e) => {
         this._lastCreatorScroll = this.captureCreatorScroll();
-        if (e.target.closest('.wa-creator-field-header, .add-field-btn, .wa-creator-field-toggle, .wa-creator-field-done')) {
+        if (
+          e.target.closest(
+            '.wa-creator-field-header, .add-field-btn, .wa-creator-field-toggle, .wa-creator-field-done'
+          )
+        ) {
           e.preventDefault();
         }
       },
@@ -8931,10 +12275,12 @@ ${fieldList}
     );
 
     // 返回首页
-    document.getElementById('wa-creator-back')?.addEventListener('click', () => {
-      this.activeTab = 'home';
-      this.render();
-    });
+    document
+      .getElementById('wa-creator-back')
+      ?.addEventListener('click', () => {
+        this.activeTab = 'home';
+        this.render();
+      });
 
     // 标签切换
     this.container.querySelectorAll('.wa-creator-tab').forEach((tab) => {
@@ -8950,42 +12296,52 @@ ${fieldList}
 
     if (this.creatorTab === 'form') {
       // 取消创建
-      document.getElementById('wa-creator-cancel')?.addEventListener('click', () => {
-        this.activeTab = 'home';
-        this.creatorForm = this.getDefaultCreatorForm();
-        this.render();
-      });
+      document
+        .getElementById('wa-creator-cancel')
+        ?.addEventListener('click', () => {
+          this.activeTab = 'home';
+          this.creatorForm = this.getDefaultCreatorForm();
+          this.render();
+        });
 
       // 生成提示词并进入统一确认页
       const startReview = () => this.goToCreatorReviewFromForm();
-      document.getElementById('wa-creator-generate-review')?.addEventListener('click', startReview);
+      document
+        .getElementById('wa-creator-generate-review')
+        ?.addEventListener('click', startReview);
 
       // 输出结构卡片点击
-      this.container.querySelectorAll('.wa-creator-structure-card').forEach((card) => {
-        card.addEventListener('click', () => {
-          this.creatorForm.structureType = card.dataset.structure;
-          if (this.creatorForm.structureType !== 'free') {
-            this.creatorForm.contentTemplateId = null;
-          }
-          this.render();
+      this.container
+        .querySelectorAll('.wa-creator-structure-card')
+        .forEach((card) => {
+          card.addEventListener('click', () => {
+            this.creatorForm.structureType = card.dataset.structure;
+            if (this.creatorForm.structureType !== 'free') {
+              this.creatorForm.contentTemplateId = null;
+            }
+            this.render();
+          });
         });
-      });
 
       // 内容模板库选择
-      this.container.querySelector('.wa-creator-ct-link')?.addEventListener('click', () => {
-        this.ctModalOpen = true;
-        this.ctModalForCreator = true;
-        this.ctModalForReview = false;
-        this.ctModalCategory = 'all';
-        this.ctModalSearch = '';
-        this.render();
-      });
+      this.container
+        .querySelector('.wa-creator-ct-link')
+        ?.addEventListener('click', () => {
+          this.ctModalOpen = true;
+          this.ctModalForCreator = true;
+          this.ctModalForReview = false;
+          this.ctModalCategory = 'all';
+          this.ctModalSearch = '';
+          this.render();
+        });
 
-      this.container.querySelector('#wa-creator-ct-clear')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.creatorForm.contentTemplateId = null;
-        this.render();
-      });
+      this.container
+        .querySelector('#wa-creator-ct-clear')
+        ?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.creatorForm.contentTemplateId = null;
+          this.render();
+        });
 
       // 基本信息变更
       const nameInput = document.getElementById('creator-name');
@@ -9005,13 +12361,22 @@ ${fieldList}
           const ability = getAbilityById(typeId);
           const newOutputType = this.getDefaultOutputType(typeId);
           this.creatorForm.outputType = newOutputType;
-          this.creatorForm.icon = this.getRecommendedIcon(typeId, newOutputType);
+          this.creatorForm.icon = this.getRecommendedIcon(
+            typeId,
+            newOutputType
+          );
           if (this.creatorForm.defaultMode === 'kb' && !ability?.supportsKB) {
             this.creatorForm.defaultMode = 'free';
-          } else if (this.creatorForm.defaultMode === 'free' && !ability?.supportsFree) {
+          } else if (
+            this.creatorForm.defaultMode === 'free' &&
+            !ability?.supportsFree
+          ) {
             this.creatorForm.defaultMode = 'kb';
           }
-          this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(typeId, this.creatorForm.fields);
+          this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(
+            typeId,
+            this.creatorForm.fields
+          );
           this.creatorForm.contentTemplateId = null;
           this.creatorForm.structureType = 'free';
           this.render();
@@ -9023,8 +12388,14 @@ ${fieldList}
         outputSelect.addEventListener('change', () => {
           const format = outputSelect.value;
           this.creatorForm.outputType = format;
-          this.creatorForm.icon = this.getRecommendedIcon(this.creatorForm.abilityId, format);
-          this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(this.creatorForm.abilityId, this.creatorForm.fields);
+          this.creatorForm.icon = this.getRecommendedIcon(
+            this.creatorForm.abilityId,
+            format
+          );
+          this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(
+            this.creatorForm.abilityId,
+            this.creatorForm.fields
+          );
           const matched = this.getContentTemplatesForCreator(format).find(
             (t) => t.id === this.creatorForm.contentTemplateId
           );
@@ -9036,29 +12407,37 @@ ${fieldList}
       }
 
       // 取消按钮
-      document.getElementById('wa-creator-cancel')?.addEventListener('click', () => {
-        this.resetCreatorForm();
-        this.activeTab = 'templateMarket';
-        this.render();
-      });
+      document
+        .getElementById('wa-creator-cancel')
+        ?.addEventListener('click', () => {
+          this.resetCreatorForm();
+          this.activeTab = 'templateMarket';
+          this.render();
+        });
 
       // 加载推荐字段
-      document.getElementById('wa-creator-load-default-fields')?.addEventListener('click', () => {
-        this.loadDefaultFields();
-      });
+      document
+        .getElementById('wa-creator-load-default-fields')
+        ?.addEventListener('click', () => {
+          this.loadDefaultFields();
+        });
 
       // 添加字段
-      document.getElementById('wa-creator-add-field')?.addEventListener('click', () => {
-        this.addCreatorField();
-      });
+      document
+        .getElementById('wa-creator-add-field')
+        ?.addEventListener('click', () => {
+          this.addCreatorField();
+        });
 
       // 字段操作
-      this.container.querySelectorAll('.wa-creator-field-remove').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const index = parseInt(btn.dataset.index);
-          this.removeCreatorField(index);
+      this.container
+        .querySelectorAll('.wa-creator-field-remove')
+        .forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index);
+            this.removeCreatorField(index);
+          });
         });
-      });
 
       this.container.querySelectorAll('.wa-creator-field-up').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -9067,63 +12446,73 @@ ${fieldList}
         });
       });
 
-      this.container.querySelectorAll('.wa-creator-field-down').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const index = parseInt(btn.dataset.index);
-          this.moveCreatorField(index, 1);
-        });
-      });
-
-      this.container.querySelectorAll('.wa-creator-field-clone').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const index = parseInt(btn.dataset.index);
-          this.cloneCreatorField(index);
-        });
-      });
-
-      this.container.querySelectorAll('.wa-creator-field-toggle').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const index = parseInt(btn.dataset.index);
-          const field = this.creatorForm.fields[index];
-          if (field) {
-            field._expanded = !field._expanded;
-            this.render();
-          }
-        });
-      });
-
-      this.container.querySelectorAll('.wa-creator-field-done').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const index = parseInt(btn.dataset.index);
-          const field = this.creatorForm.fields[index];
-          if (field) {
-            field._expanded = false;
-            this.render();
-          }
-        });
-      });
-
-      this.container.querySelectorAll('.wa-creator-field-header').forEach((header) => {
-        header.addEventListener('click', (e) => {
-          if (e.target.closest('.field-actions')) return;
-          e.preventDefault();
-          const index = parseInt(header.dataset.index);
-          const field = this.creatorForm.fields[index];
-          if (!field) return;
-
-          // 只允许展开一个字段；展开新字段时合上其他字段
-          const willExpand = !field._expanded;
-          this.creatorForm.fields.forEach((f) => {
-            f._expanded = false;
+      this.container
+        .querySelectorAll('.wa-creator-field-down')
+        .forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index);
+            this.moveCreatorField(index, 1);
           });
-          if (willExpand) {
-            field._expanded = true;
-          }
-          this.render();
         });
-      });
+
+      this.container
+        .querySelectorAll('.wa-creator-field-clone')
+        .forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const index = parseInt(btn.dataset.index);
+            this.cloneCreatorField(index);
+          });
+        });
+
+      this.container
+        .querySelectorAll('.wa-creator-field-toggle')
+        .forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            const field = this.creatorForm.fields[index];
+            if (field) {
+              field._expanded = !field._expanded;
+              this.render();
+            }
+          });
+        });
+
+      this.container
+        .querySelectorAll('.wa-creator-field-done')
+        .forEach((btn) => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            const field = this.creatorForm.fields[index];
+            if (field) {
+              field._expanded = false;
+              this.render();
+            }
+          });
+        });
+
+      this.container
+        .querySelectorAll('.wa-creator-field-header')
+        .forEach((header) => {
+          header.addEventListener('click', (e) => {
+            if (e.target.closest('.field-actions')) return;
+            e.preventDefault();
+            const index = parseInt(header.dataset.index);
+            const field = this.creatorForm.fields[index];
+            if (!field) return;
+
+            // 只允许展开一个字段；展开新字段时合上其他字段
+            const willExpand = !field._expanded;
+            this.creatorForm.fields.forEach((f) => {
+              f._expanded = false;
+            });
+            if (willExpand) {
+              field._expanded = true;
+            }
+            this.render();
+          });
+        });
 
       // 字段输入同步
       this.container.querySelectorAll('[data-prop]').forEach((el) => {
@@ -9158,28 +12547,42 @@ ${fieldList}
         }
       });
 
-      ['extract-role', 'extract-ability', 'extract-output-type'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('change', () => {
-            this.extractForm[id.split('-')[1]] = el.value;
-          });
+      ['extract-role', 'extract-ability', 'extract-output-type'].forEach(
+        (id) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener('change', () => {
+              this.extractForm[id.split('-')[1]] = el.value;
+            });
+          }
         }
-      });
+      );
 
-      document.getElementById('wa-extract-start')?.addEventListener('click', () => {
-        this.startExtractTemplate();
-      });
+      document
+        .getElementById('wa-extract-start')
+        ?.addEventListener('click', () => {
+          this.startExtractTemplate();
+        });
 
-      document.getElementById('wa-extract-cancel')?.addEventListener('click', () => {
-        this.extractPreview = null;
-        this.extractForm = { name: '', roleId: 'sales', abilityId: 'writing', outputType: outputTypes.TEXT, exampleText: '' };
-        this.render();
-      });
+      document
+        .getElementById('wa-extract-cancel')
+        ?.addEventListener('click', () => {
+          this.extractPreview = null;
+          this.extractForm = {
+            name: '',
+            roleId: 'sales',
+            abilityId: 'writing',
+            outputType: outputTypes.TEXT,
+            exampleText: '',
+          };
+          this.render();
+        });
 
-      document.getElementById('wa-extract-confirm-review')?.addEventListener('click', () => {
-        this.enterReviewFromExtract();
-      });
+      document
+        .getElementById('wa-extract-confirm-review')
+        ?.addEventListener('click', () => {
+          this.enterReviewFromExtract();
+        });
 
       // 文件上传事件
       const fileInput = document.getElementById('wa-extract-file');
@@ -9208,15 +12611,19 @@ ${fieldList}
         if (file) this.handleExtractFileSelect(file);
       });
 
-      document.getElementById('wa-extract-file-start')?.addEventListener('click', () => {
-        this.startFileExtract();
-      });
+      document
+        .getElementById('wa-extract-file-start')
+        ?.addEventListener('click', () => {
+          this.startFileExtract();
+        });
 
-      document.getElementById('wa-extract-file-clear')?.addEventListener('click', () => {
-        this.extractFile = null;
-        this.extractPreview = null;
-        this.render();
-      });
+      document
+        .getElementById('wa-extract-file-clear')
+        ?.addEventListener('click', () => {
+          this.extractFile = null;
+          this.extractPreview = null;
+          this.render();
+        });
     }
 
     // 内容模板选择弹窗事件
@@ -9253,7 +12660,9 @@ ${fieldList}
         this.showToast('请至少添加一个字段', 'error');
         return false;
       }
-      const invalidField = this.creatorForm.fields.find((f) => !f.id.trim() || !f.label.trim());
+      const invalidField = this.creatorForm.fields.find(
+        (f) => !f.id.trim() || !f.label.trim()
+      );
       if (invalidField) {
         this.showToast('字段ID和名称不能为空', 'error');
         // 高亮并展开有问题的字段
@@ -9269,11 +12678,20 @@ ${fieldList}
   }
 
   collectCreatorBasic() {
-    const name = document.getElementById('creator-name')?.value || this.creatorForm.name || '';
+    const name =
+      document.getElementById('creator-name')?.value ||
+      this.creatorForm.name ||
+      '';
     const icon = this.creatorForm.icon || 'file-lines';
     const roleId = this.creatorForm.roleId || 'sales';
-    const abilityId = document.getElementById('creator-ability')?.value || this.creatorForm.abilityId || 'writing';
-    const outputType = document.getElementById('creator-output-type')?.value || this.creatorForm.outputType || this.getDefaultOutputType(abilityId);
+    const abilityId =
+      document.getElementById('creator-ability')?.value ||
+      this.creatorForm.abilityId ||
+      'writing';
+    const outputType =
+      document.getElementById('creator-output-type')?.value ||
+      this.creatorForm.outputType ||
+      this.getDefaultOutputType(abilityId);
     const defaultMode = this.creatorForm.defaultMode || 'kb';
     const contentTemplateId = this.creatorForm.contentTemplateId;
     const description = this.creatorForm.description || '';
@@ -9302,23 +12720,34 @@ ${fieldList}
     const config = { ...(this.creatorForm.outputConfig || {}) };
 
     if (outputType === outputTypes.TABLE || outputType === outputTypes.REPORT) {
-      const columnsInput = document.getElementById('creator-output-columns')?.value || '';
-      config.columns = columnsInput.split(/[,，]/).map((c) => c.trim()).filter(Boolean);
+      const columnsInput =
+        document.getElementById('creator-output-columns')?.value || '';
+      config.columns = columnsInput
+        .split(/[,，]/)
+        .map((c) => c.trim())
+        .filter(Boolean);
     } else if (outputType === outputTypes.PPT) {
-      config.style = document.getElementById('creator-output-style')?.value || '商务正式';
-      config.color = document.getElementById('creator-output-color')?.value || '品牌绿';
-      config.pages = document.getElementById('creator-output-pages')?.value || '8页';
-      config.includeNotes = document.getElementById('creator-output-notes')?.checked ?? true;
-      config.includeImageSuggestions = document.getElementById('creator-output-images')?.checked ?? true;
+      config.style =
+        document.getElementById('creator-output-style')?.value || '商务正式';
+      config.color =
+        document.getElementById('creator-output-color')?.value || '品牌绿';
+      config.pages =
+        document.getElementById('creator-output-pages')?.value || '8页';
+      config.includeNotes =
+        document.getElementById('creator-output-notes')?.checked ?? true;
+      config.includeImageSuggestions =
+        document.getElementById('creator-output-images')?.checked ?? true;
     } else if (outputType === outputTypes.EMAIL) {
-      config.tone = document.getElementById('creator-output-tone')?.value || '正式';
+      config.tone =
+        document.getElementById('creator-output-tone')?.value || '正式';
     }
 
     this.creatorForm.outputConfig = config;
   }
 
   collectCreatorPrompt() {
-    const promptTemplate = document.getElementById('creator-prompt-template')?.value || '';
+    const promptTemplate =
+      document.getElementById('creator-prompt-template')?.value || '';
     if (promptTemplate !== this.creatorForm.promptTemplate) {
       this.creatorForm.activePromptStyle = '自定义';
     }
@@ -9336,7 +12765,10 @@ ${fieldList}
     if (prop === 'required') {
       field[prop] = el.checked;
     } else if (prop === 'options') {
-      field[prop] = el.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+      field[prop] = el.value
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
     } else if (prop === 'rows') {
       field[prop] = parseInt(el.value) || 3;
     } else {
@@ -9344,13 +12776,22 @@ ${fieldList}
     }
 
     // 字段名称变化时自动生成 ID
-    if (prop === 'label' && el.value.trim() && (!field.id || field.id === this.generateFieldId(prevLabel) || field.id.startsWith('field_'))) {
+    if (
+      prop === 'label' &&
+      el.value.trim() &&
+      (!field.id ||
+        field.id === this.generateFieldId(prevLabel) ||
+        field.id.startsWith('field_'))
+    ) {
       field.id = this.generateFieldId(el.value);
     }
 
     // 类型变化时清理或初始化相关属性
     if (prop === 'type') {
-      if (el.value === fieldTypes.SELECT || el.value === fieldTypes.MULTI_SELECT) {
+      if (
+        el.value === fieldTypes.SELECT ||
+        el.value === fieldTypes.MULTI_SELECT
+      ) {
         if (!field.options) field.options = [];
       } else if (el.value === fieldTypes.TEXTAREA) {
         if (!field.rows) field.rows = 3;
@@ -9359,7 +12800,9 @@ ${fieldList}
   }
 
   loadDefaultFields() {
-    const defaultFields = this.getDefaultFieldByOutputType(this.creatorForm.outputType);
+    const defaultFields = this.getDefaultFieldByOutputType(
+      this.creatorForm.outputType
+    );
     this.creatorForm.fields = defaultFields.map((f) => {
       const label = f.label;
       return {
@@ -9372,7 +12815,10 @@ ${fieldList}
         _expanded: false,
       };
     });
-    this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(this.creatorForm.abilityId, this.creatorForm.fields);
+    this.creatorForm.promptTemplate = this.getDefaultPromptTemplate(
+      this.creatorForm.abilityId,
+      this.creatorForm.fields
+    );
     this.render();
     this.showToast('已加载推荐字段');
   }
@@ -9397,7 +12843,10 @@ ${fieldList}
   }
 
   updateStep1GenerateButton() {
-    const name = document.getElementById('creator-name')?.value || this.creatorForm.name || '';
+    const name =
+      document.getElementById('creator-name')?.value ||
+      this.creatorForm.name ||
+      '';
     const hasFields = this.creatorForm.fields.length > 0;
     const allFieldsValid = this.creatorForm.fields.every((f) => f.label.trim());
     const btn = document.getElementById('wa-creator-generate-review');
@@ -9406,17 +12855,21 @@ ${fieldList}
     if (btn) btn.disabled = !valid;
     if (hint) {
       if (valid) {
-        hint.innerHTML = '<i class="fa-solid fa-check-circle"></i><span>信息已完善，可以生成提示词</span>';
+        hint.innerHTML =
+          '<i class="fa-solid fa-check-circle"></i><span>信息已完善，可以生成提示词</span>';
         hint.classList.add('valid');
       } else {
-        hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>请填写模板名称和至少一个输入字段</span>';
+        hint.innerHTML =
+          '<i class="fa-solid fa-circle-info"></i><span>请填写模板名称和至少一个输入字段</span>';
         hint.classList.remove('valid');
       }
     }
   }
 
   updateCreatorFormPreview() {
-    const container = document.getElementById('wa-creator-form-preview-content');
+    const container = document.getElementById(
+      'wa-creator-form-preview-content'
+    );
     if (container) {
       container.innerHTML = this.renderCreatorPreview();
     }
@@ -9451,10 +12904,15 @@ ${fieldList}
   }
 
   updateCreatorPreview() {
-    const container = document.getElementById('wa-creator-form-preview-content');
+    const container = document.getElementById(
+      'wa-creator-form-preview-content'
+    );
     if (container) {
       const current = this.creatorForm.currentStep;
-      container.innerHTML = current === 3 ? this.renderCreatorFinalPreview() : this.renderCreatorPreview();
+      container.innerHTML =
+        current === 3
+          ? this.renderCreatorFinalPreview()
+          : this.renderCreatorPreview();
     }
   }
 
@@ -9475,7 +12933,9 @@ ${fieldList}
       return;
     }
 
-    const invalidField = this.creatorForm.fields.find((f) => !f.id.trim() || !f.label.trim());
+    const invalidField = this.creatorForm.fields.find(
+      (f) => !f.id.trim() || !f.label.trim()
+    );
     if (invalidField) {
       this.showToast('字段ID和名称不能为空', 'error');
       this.creatorForm.currentStep = 2;
@@ -9494,7 +12954,8 @@ ${fieldList}
       return rest;
     });
 
-    const { activePromptStyle, currentStep, ...templateRest } = this.creatorForm;
+    const { activePromptStyle, currentStep, ...templateRest } =
+      this.creatorForm;
 
     const template = {
       ...templateRest,
@@ -9565,24 +13026,79 @@ ${fieldList}
       }));
 
       const fileTypeMap = {
-        pptx: { abilityId: 'ppt', outputType: outputTypes.PPT, icon: 'presentation-screen' },
-        ppt: { abilityId: 'ppt', outputType: outputTypes.PPT, icon: 'presentation-screen' },
-        docx: { abilityId: 'writing', outputType: outputTypes.MARKDOWN, icon: 'file-word' },
-        doc: { abilityId: 'writing', outputType: outputTypes.MARKDOWN, icon: 'file-word' },
-        xlsx: { abilityId: 'table', outputType: outputTypes.TABLE, icon: 'file-excel' },
-        xls: { abilityId: 'table', outputType: outputTypes.TABLE, icon: 'file-excel' },
-        pdf: { abilityId: 'report', outputType: outputTypes.REPORT, icon: 'file-pdf' },
+        pptx: {
+          abilityId: 'ppt',
+          outputType: outputTypes.PPT,
+          icon: 'presentation-screen',
+        },
+        ppt: {
+          abilityId: 'ppt',
+          outputType: outputTypes.PPT,
+          icon: 'presentation-screen',
+        },
+        docx: {
+          abilityId: 'writing',
+          outputType: outputTypes.MARKDOWN,
+          icon: 'file-word',
+        },
+        doc: {
+          abilityId: 'writing',
+          outputType: outputTypes.MARKDOWN,
+          icon: 'file-word',
+        },
+        xlsx: {
+          abilityId: 'table',
+          outputType: outputTypes.TABLE,
+          icon: 'file-excel',
+        },
+        xls: {
+          abilityId: 'table',
+          outputType: outputTypes.TABLE,
+          icon: 'file-excel',
+        },
+        pdf: {
+          abilityId: 'report',
+          outputType: outputTypes.REPORT,
+          icon: 'file-pdf',
+        },
       };
-      const fileMapping = fileTypeMap[data.fileType] || { abilityId: this.extractForm.abilityId, outputType: this.extractForm.outputType, icon: 'file-lines' };
+      const fileMapping = fileTypeMap[data.fileType] || {
+        abilityId: this.extractForm.abilityId,
+        outputType: this.extractForm.outputType,
+        icon: 'file-lines',
+      };
 
       const masterData = {
         fileType: data.fileType,
         fileName: data.fileName,
         title: data.title,
-        ...(data.fileType === 'pptx' ? { theme: data.theme, slides: data.slides, typeDistribution: data.typeDistribution, totalSlides: data.totalSlides } : {}),
-        ...(data.fileType === 'docx' ? { headings: data.headings, tables: data.tables, paragraphs: data.paragraphs, wordCount: data.wordCount } : {}),
-        ...(data.fileType === 'xlsx' ? { sheets: data.sheets, sheetCount: data.sheetCount } : {}),
-        ...(data.fileType === 'pdf' ? { headings: data.headings, paragraphs: data.paragraphs, pageCount: data.pageCount, author: data.author } : {}),
+        ...(data.fileType === 'pptx'
+          ? {
+              theme: data.theme,
+              slides: data.slides,
+              typeDistribution: data.typeDistribution,
+              totalSlides: data.totalSlides,
+            }
+          : {}),
+        ...(data.fileType === 'docx'
+          ? {
+              headings: data.headings,
+              tables: data.tables,
+              paragraphs: data.paragraphs,
+              wordCount: data.wordCount,
+            }
+          : {}),
+        ...(data.fileType === 'xlsx'
+          ? { sheets: data.sheets, sheetCount: data.sheetCount }
+          : {}),
+        ...(data.fileType === 'pdf'
+          ? {
+              headings: data.headings,
+              paragraphs: data.paragraphs,
+              pageCount: data.pageCount,
+              author: data.author,
+            }
+          : {}),
       };
 
       this.extractPreview = {
@@ -9612,10 +13128,24 @@ ${fieldList}
 
   buildFileExtractPrompt(data) {
     if (data.fileType === 'pptx') {
-      return `请根据以下信息，生成一份遵循原 PPT 结构（${Object.entries(data.typeDistribution || {}).map(([k, v]) => `${k} ${v} 页`).join('、')}）和视觉风格的 PPT：\n{fields}\n\n原 PPT 大纲参考：\n${(data.slides || []).slice(0, 5).map((s) => `第${s.index}页（${s.type}）：${s.title}`).join('\n')}`;
+      return `请根据以下信息，生成一份遵循原 PPT 结构（${Object.entries(
+        data.typeDistribution || {}
+      )
+        .map(([k, v]) => `${k} ${v} 页`)
+        .join('、')}）和视觉风格的 PPT：\n{fields}\n\n原 PPT 大纲参考：\n${(
+        data.slides || []
+      )
+        .slice(0, 5)
+        .map((s) => `第${s.index}页（${s.type}）：${s.title}`)
+        .join('\n')}`;
     }
     if (data.fileType === 'docx') {
-      return `请根据以下信息，参照原文档的章节结构和表格样式生成内容：\n{fields}\n\n原文档章节：\n${(data.headings || []).slice(0, 10).map((h) => h.text).join('\n')}`;
+      return `请根据以下信息，参照原文档的章节结构和表格样式生成内容：\n{fields}\n\n原文档章节：\n${(
+        data.headings || []
+      )
+        .slice(0, 10)
+        .map((h) => h.text)
+        .join('\n')}`;
     }
     if (data.fileType === 'xlsx') {
       return `请根据以下信息生成表格数据，列结构参考：\n{fields}\n\n原表格列：${(data.sheets?.[0]?.headers || []).join('、')}`;
@@ -9625,7 +13155,9 @@ ${fieldList}
 
   startExtractTemplate() {
     const name = document.getElementById('extract-name')?.value?.trim();
-    const exampleText = document.getElementById('extract-example')?.value?.trim();
+    const exampleText = document
+      .getElementById('extract-example')
+      ?.value?.trim();
 
     if (!name) {
       this.showToast('请填写模板名称', 'error');
@@ -9657,9 +13189,20 @@ ${fieldList}
     let defaultMode = this.extractPreview.defaultMode || 'kb';
     if (defaultMode === 'kb' && !ability?.supportsKB) defaultMode = 'free';
     if (defaultMode === 'free' && !ability?.supportsFree) defaultMode = 'kb';
-    saveCustomTemplate({ ...this.extractPreview, isCustom: true, recommendedKBs: [], defaultMode });
+    saveCustomTemplate({
+      ...this.extractPreview,
+      isCustom: true,
+      recommendedKBs: [],
+      defaultMode,
+    });
     this.extractPreview = null;
-    this.extractForm = { name: '', roleId: 'sales', abilityId: 'writing', outputType: outputTypes.TEXT, exampleText: '' };
+    this.extractForm = {
+      name: '',
+      roleId: 'sales',
+      abilityId: 'writing',
+      outputType: outputTypes.TEXT,
+      exampleText: '',
+    };
     this.showToast('模板已保存到「我的模板」');
     this.activeTab = 'templateMarket';
     this.marketTab = 'mine';
@@ -9689,7 +13232,9 @@ ${fieldList}
       draftTemplate,
       currentTab: 'prompt',
       promptMode: 'preview',
-      promptTemplate: draftTemplate.promptTemplate || this.generateReviewPrompt(draftTemplate, 'free', null),
+      promptTemplate:
+        draftTemplate.promptTemplate ||
+        this.generateReviewPrompt(draftTemplate, 'free', null),
       structureType: 'free',
     };
 
@@ -9725,10 +13270,31 @@ ${fieldList}
         fileType: data.fileType,
         fileName: data.fileName,
         title: data.title,
-        ...(data.fileType === 'pptx' ? { theme: data.theme, slides: data.slides, typeDistribution: data.typeDistribution } : {}),
-        ...(data.fileType === 'docx' ? { headings: data.headings, tables: data.tables, paragraphs: data.paragraphs } : {}),
-        ...(data.fileType === 'xlsx' ? { sheets: data.sheets, sheetCount: data.sheetCount } : {}),
-        ...(data.fileType === 'pdf' ? { headings: data.headings, paragraphs: data.paragraphs, pageCount: data.pageCount, author: data.author } : {}),
+        ...(data.fileType === 'pptx'
+          ? {
+              theme: data.theme,
+              slides: data.slides,
+              typeDistribution: data.typeDistribution,
+            }
+          : {}),
+        ...(data.fileType === 'docx'
+          ? {
+              headings: data.headings,
+              tables: data.tables,
+              paragraphs: data.paragraphs,
+            }
+          : {}),
+        ...(data.fileType === 'xlsx'
+          ? { sheets: data.sheets, sheetCount: data.sheetCount }
+          : {}),
+        ...(data.fileType === 'pdf'
+          ? {
+              headings: data.headings,
+              paragraphs: data.paragraphs,
+              pageCount: data.pageCount,
+              author: data.author,
+            }
+          : {}),
       };
       this.useMaster = true;
       this.showToast('母版文件已加载');
@@ -9741,9 +13307,22 @@ ${fieldList}
 
   handleAttachmentFileSelect(file) {
     const ext = file.name.split('.').pop().toLowerCase();
-    const allowed = ['pptx', 'ppt', 'docx', 'doc', 'xlsx', 'xls', 'pdf', 'txt', 'md'];
+    const allowed = [
+      'pptx',
+      'ppt',
+      'docx',
+      'doc',
+      'xlsx',
+      'xls',
+      'pdf',
+      'txt',
+      'md',
+    ];
     if (!allowed.includes(ext)) {
-      this.showToast('仅支持 PPT、Word、Excel、PDF、TXT、Markdown 文件', 'error');
+      this.showToast(
+        '仅支持 PPT、Word、Excel、PDF、TXT、Markdown 文件',
+        'error'
+      );
       return;
     }
     this.parseAttachmentFile(file);
@@ -9768,11 +13347,34 @@ ${fieldList}
         fileType: data.fileType,
         fileName: data.fileName,
         title: data.title,
-        ...(data.fileType === 'pptx' ? { theme: data.theme, slides: data.slides, typeDistribution: data.typeDistribution } : {}),
-        ...(data.fileType === 'docx' ? { headings: data.headings, tables: data.tables, paragraphs: data.paragraphs } : {}),
-        ...(data.fileType === 'xlsx' ? { sheets: data.sheets, sheetCount: data.sheetCount } : {}),
-        ...(data.fileType === 'pdf' ? { headings: data.headings, paragraphs: data.paragraphs, pageCount: data.pageCount, author: data.author } : {}),
-        ...(data.fileType === 'txt' || data.fileType === 'md' ? { text: data.text } : {}),
+        ...(data.fileType === 'pptx'
+          ? {
+              theme: data.theme,
+              slides: data.slides,
+              typeDistribution: data.typeDistribution,
+            }
+          : {}),
+        ...(data.fileType === 'docx'
+          ? {
+              headings: data.headings,
+              tables: data.tables,
+              paragraphs: data.paragraphs,
+            }
+          : {}),
+        ...(data.fileType === 'xlsx'
+          ? { sheets: data.sheets, sheetCount: data.sheetCount }
+          : {}),
+        ...(data.fileType === 'pdf'
+          ? {
+              headings: data.headings,
+              paragraphs: data.paragraphs,
+              pageCount: data.pageCount,
+              author: data.author,
+            }
+          : {}),
+        ...(data.fileType === 'txt' || data.fileType === 'md'
+          ? { text: data.text }
+          : {}),
       };
       this.freeAttachments.push(attachment);
       this.showToast('附件已上传');
@@ -9852,9 +13454,13 @@ ${fieldList}
     let templates = baseTemplates;
     if (this.marketCategory !== 'all') {
       if (this.marketCategoryMode === 'scene') {
-        templates = baseTemplates.filter((t) => getTemplateSceneIds(t).includes(this.marketCategory));
+        templates = baseTemplates.filter((t) =>
+          getTemplateSceneIds(t).includes(this.marketCategory)
+        );
       } else {
-        templates = baseTemplates.filter((t) => t.roleId === this.marketCategory);
+        templates = baseTemplates.filter(
+          (t) => t.roleId === this.marketCategory
+        );
       }
     }
 
@@ -9871,22 +13477,29 @@ ${fieldList}
       `;
     }
 
-    const contentHtml = this.marketViewMode === 'grid'
-      ? `<div class="wa-market-grid">${templates.map((template) => this.renderMarketCard(template, context)).join('')}</div>`
-      : `<div class="wa-market-list">${templates.map((template) => this.renderMarketListItem(template, context)).join('')}</div>`;
+    const contentHtml =
+      this.marketViewMode === 'grid'
+        ? `<div class="wa-market-grid">${templates.map((template) => this.renderMarketCard(template, context)).join('')}</div>`
+        : `<div class="wa-market-list">${templates.map((template) => this.renderMarketListItem(template, context)).join('')}</div>`;
 
     return `${filterBar}${contentHtml}`;
   }
 
   renderMarketFilterBar(baseTemplates) {
-    const categories = this.marketCategoryMode === 'scene'
-      ? sceneCategories
-      : [{ id: 'all', name: '全部', icon: 'fa-layer-group' }, ...workRoles.map((r) => ({ id: r.id, name: r.name, icon: r.icon }))];
+    const categories =
+      this.marketCategoryMode === 'scene'
+        ? sceneCategories
+        : [
+            { id: 'all', name: '全部', icon: 'fa-layer-group' },
+            ...workRoles.map((r) => ({ id: r.id, name: r.name, icon: r.icon })),
+          ];
 
     const getCount = (catId) => {
       if (catId === 'all') return baseTemplates.length;
       if (this.marketCategoryMode === 'scene') {
-        return baseTemplates.filter((t) => getTemplateSceneIds(t).includes(catId)).length;
+        return baseTemplates.filter((t) =>
+          getTemplateSceneIds(t).includes(catId)
+        ).length;
       }
       return baseTemplates.filter((t) => t.roleId === catId).length;
     };
@@ -9903,17 +13516,19 @@ ${fieldList}
             </div>
           </div>
           <div class="wa-market-category-nav">
-            ${categories.map((cat) => {
-              const isActive = this.marketCategory === cat.id;
-              const count = getCount(cat.id);
-              return `
+            ${categories
+              .map((cat) => {
+                const isActive = this.marketCategory === cat.id;
+                const count = getCount(cat.id);
+                return `
                 <div class="wa-market-category-pill ${isActive ? 'active' : ''}" data-cat="${cat.id}">
                   ${cat.icon ? `<i class="fa-solid ${cat.icon}"></i>` : ''}
                   <span>${cat.name}</span>
                   <span class="wa-market-category-count">${count}</span>
                 </div>
               `;
-            }).join('')}
+              })
+              .join('')}
           </div>
         </div>
         <div class="wa-market-view-toggle">
@@ -9929,12 +13544,15 @@ ${fieldList}
   }
 
   renderMarketCard(template, context) {
-    const { role, ability, outputLabel, status, isTeam, roleColor, cardColor } = this.getMarketTemplateMeta(template);
+    const { role, ability, outputLabel, status, isTeam, roleColor, cardColor } =
+      this.getMarketTemplateMeta(template);
     const sceneIds = getTemplateSceneIds(template);
-    const sceneNames = sceneIds.map((id) => {
-      const cat = sceneCategories.find((c) => c.id === id);
-      return cat?.name;
-    }).filter(Boolean);
+    const sceneNames = sceneIds
+      .map((id) => {
+        const cat = sceneCategories.find((c) => c.id === id);
+        return cat?.name;
+      })
+      .filter(Boolean);
 
     return `
       <div class="wa-market-card" data-id="${template.id}" data-source="${template.isCustom ? 'custom' : isTeam ? 'team' : 'official'}">
@@ -9952,7 +13570,13 @@ ${fieldList}
               <span class="wa-market-card-meta-tag role" style="background:${roleColor}15;color:${roleColor};border-color:${roleColor}30">
                 <i class="fa-solid fa-${role?.icon || 'user'}"></i> ${role?.name || '未知岗位'}
               </span>
-              ${sceneNames.slice(0, 1).map((name) => `<span class="wa-market-card-meta-tag scene"><i class="fa-solid fa-swatchbook"></i> ${name}</span>`).join('')}
+              ${sceneNames
+                .slice(0, 1)
+                .map(
+                  (name) =>
+                    `<span class="wa-market-card-meta-tag scene"><i class="fa-solid fa-swatchbook"></i> ${name}</span>`
+                )
+                .join('')}
               <span class="wa-market-card-meta-tag ability"><i class="fa-solid fa-bolt"></i> ${ability?.name || '通用'}</span>
               <span class="wa-market-card-meta-tag output"><i class="fa-solid fa-arrow-right-from-bracket"></i> ${outputLabel}</span>
             </div>
@@ -9966,12 +13590,15 @@ ${fieldList}
   }
 
   renderMarketListItem(template, context) {
-    const { role, ability, outputLabel, status, isTeam, roleColor, cardColor } = this.getMarketTemplateMeta(template);
+    const { role, ability, outputLabel, status, isTeam, roleColor, cardColor } =
+      this.getMarketTemplateMeta(template);
     const sceneIds = getTemplateSceneIds(template);
-    const sceneNames = sceneIds.map((id) => {
-      const cat = sceneCategories.find((c) => c.id === id);
-      return cat?.name;
-    }).filter(Boolean);
+    const sceneNames = sceneIds
+      .map((id) => {
+        const cat = sceneCategories.find((c) => c.id === id);
+        return cat?.name;
+      })
+      .filter(Boolean);
 
     return `
       <div class="wa-market-list-item" data-id="${template.id}" data-source="${template.isCustom ? 'custom' : isTeam ? 'team' : 'official'}">
@@ -9988,7 +13615,13 @@ ${fieldList}
             <span class="wa-market-list-meta-tag role" style="background:${roleColor}15;color:${roleColor};border-color:${roleColor}30">
               <i class="fa-solid fa-${role?.icon || 'user'}"></i> ${role?.name || '未知岗位'}
             </span>
-            ${sceneNames.slice(0, 2).map((name) => `<span class="wa-market-list-meta-tag scene"><i class="fa-solid fa-swatchbook"></i> ${name}</span>`).join('')}
+            ${sceneNames
+              .slice(0, 2)
+              .map(
+                (name) =>
+                  `<span class="wa-market-list-meta-tag scene"><i class="fa-solid fa-swatchbook"></i> ${name}</span>`
+              )
+              .join('')}
             <span class="wa-market-list-meta-tag ability"><i class="fa-solid fa-bolt"></i> ${ability?.name || '通用'}</span>
             <span class="wa-market-list-meta-tag output"><i class="fa-solid fa-arrow-right-from-bracket"></i> ${outputLabel}</span>
           </div>
@@ -10005,9 +13638,21 @@ ${fieldList}
     const ability = getAbilityById(template.abilityId);
     const isTeam = template.status !== undefined;
     const statusMap = {
-      pending: { label: '审核中', bg: 'rgba(245,158,11,0.12)', color: '#d97706' },
-      approved: { label: '已通过', bg: 'rgba(16,185,129,0.12)', color: '#059669' },
-      rejected: { label: '已拒绝', bg: 'rgba(239,68,68,0.12)', color: '#dc2626' },
+      pending: {
+        label: '审核中',
+        bg: 'rgba(245,158,11,0.12)',
+        color: '#d97706',
+      },
+      approved: {
+        label: '已通过',
+        bg: 'rgba(16,185,129,0.12)',
+        color: '#059669',
+      },
+      rejected: {
+        label: '已拒绝',
+        bg: 'rgba(239,68,68,0.12)',
+        color: '#dc2626',
+      },
     };
     const status = isTeam ? statusMap[template.status] : null;
     const outputLabel = this.getOutputTypeLabel(template.outputType);
@@ -10030,26 +13675,58 @@ ${fieldList}
         <i class="fa-solid fa-play"></i>
         <span>使用</span>
       </button>
-      ${template.isCustom ? `
+      ${
+        template.isCustom
+          ? `
         <button class="wa-market-action" data-action="edit" data-id="${template.id}" data-source="custom" title="编辑"><i class="fa-solid fa-pen-to-square"></i></button>
         <button class="wa-market-action" data-action="publish" data-id="${template.id}" title="发布"><i class="fa-solid fa-share-nodes"></i></button>
         <button class="wa-market-action wa-market-action--danger" data-action="delete" data-id="${template.id}" data-source="custom" title="删除"><i class="fa-solid fa-trash"></i></button>
-      ` : ''}
-      ${context === 'pending' && !template.isCustom ? `
+      `
+          : ''
+      }
+      ${
+        context === 'pending' && !template.isCustom
+          ? `
         <button class="${useClass}" data-action="approve" data-id="${template.id}"><i class="fa-solid fa-check"></i>通过</button>
         <button class="wa-market-action wa-market-action--danger" data-action="reject" data-id="${template.id}"><i class="fa-solid fa-xmark"></i>拒绝</button>
-      ` : ''}
+      `
+          : ''
+      }
     `;
   }
 
   getMarketCardColor(template) {
     const colors = [
-      { bg: 'rgba(16,185,129,0.12)', color: '#10b981', shadow: 'rgba(16,185,129,0.15)' },
-      { bg: 'rgba(59,130,246,0.12)', color: '#2563eb', shadow: 'rgba(59,130,246,0.15)' },
-      { bg: 'rgba(16,185,129,0.12)', color: '#059669', shadow: 'rgba(16,185,129,0.15)' },
-      { bg: 'rgba(245,158,11,0.12)', color: '#d97706', shadow: 'rgba(245,158,11,0.15)' },
-      { bg: 'rgba(236,72,153,0.12)', color: '#db2777', shadow: 'rgba(236,72,153,0.15)' },
-      { bg: 'rgba(6,182,212,0.12)', color: '#0891b2', shadow: 'rgba(6,182,212,0.15)' },
+      {
+        bg: 'rgba(16,185,129,0.12)',
+        color: '#10b981',
+        shadow: 'rgba(16,185,129,0.15)',
+      },
+      {
+        bg: 'rgba(59,130,246,0.12)',
+        color: '#2563eb',
+        shadow: 'rgba(59,130,246,0.15)',
+      },
+      {
+        bg: 'rgba(16,185,129,0.12)',
+        color: '#059669',
+        shadow: 'rgba(16,185,129,0.15)',
+      },
+      {
+        bg: 'rgba(245,158,11,0.12)',
+        color: '#d97706',
+        shadow: 'rgba(245,158,11,0.15)',
+      },
+      {
+        bg: 'rgba(236,72,153,0.12)',
+        color: '#db2777',
+        shadow: 'rgba(236,72,153,0.15)',
+      },
+      {
+        bg: 'rgba(6,182,212,0.12)',
+        color: '#0891b2',
+        shadow: 'rgba(6,182,212,0.15)',
+      },
     ];
     let idx = 0;
     if (template.outputType) {
@@ -10065,23 +13742,27 @@ ${fieldList}
       this.render();
     });
 
-    document.getElementById('wa-market-create')?.addEventListener('click', () => {
-      this.activeTab = 'templateCreator';
-      this.creatorTab = 'chat';
-      this.editingTemplateId = null;
-      this.creatorForm = this.getDefaultCreatorForm();
-      this.conversationState = this.getDefaultConversationState();
-      this.render();
-    });
+    document
+      .getElementById('wa-market-create')
+      ?.addEventListener('click', () => {
+        this.activeTab = 'templateCreator';
+        this.creatorTab = 'chat';
+        this.editingTemplateId = null;
+        this.creatorForm = this.getDefaultCreatorForm();
+        this.conversationState = this.getDefaultConversationState();
+        this.render();
+      });
 
-    document.getElementById('wa-market-empty-create')?.addEventListener('click', () => {
-      this.activeTab = 'templateCreator';
-      this.creatorTab = 'chat';
-      this.editingTemplateId = null;
-      this.creatorForm = this.getDefaultCreatorForm();
-      this.conversationState = this.getDefaultConversationState();
-      this.render();
-    });
+    document
+      .getElementById('wa-market-empty-create')
+      ?.addEventListener('click', () => {
+        this.activeTab = 'templateCreator';
+        this.creatorTab = 'chat';
+        this.editingTemplateId = null;
+        this.creatorForm = this.getDefaultCreatorForm();
+        this.conversationState = this.getDefaultConversationState();
+        this.render();
+      });
 
     this.container.querySelectorAll('.wa-market-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -10090,20 +13771,24 @@ ${fieldList}
       });
     });
 
-    this.container.querySelectorAll('.wa-market-category-mode-tab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        this.marketCategoryMode = tab.dataset.mode;
-        this.marketCategory = 'all';
-        this.render();
+    this.container
+      .querySelectorAll('.wa-market-category-mode-tab')
+      .forEach((tab) => {
+        tab.addEventListener('click', () => {
+          this.marketCategoryMode = tab.dataset.mode;
+          this.marketCategory = 'all';
+          this.render();
+        });
       });
-    });
 
-    this.container.querySelectorAll('.wa-market-category-pill').forEach((pill) => {
-      pill.addEventListener('click', () => {
-        this.marketCategory = pill.dataset.cat;
-        this.render();
+    this.container
+      .querySelectorAll('.wa-market-category-pill')
+      .forEach((pill) => {
+        pill.addEventListener('click', () => {
+          this.marketCategory = pill.dataset.cat;
+          this.render();
+        });
       });
-    });
 
     this.container.querySelectorAll('.wa-market-view-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -10129,9 +13814,10 @@ ${fieldList}
         const id = btn.dataset.id;
         const source = btn.dataset.source;
         if (action === 'edit') {
-          const template = source === 'custom'
-            ? getCustomTemplates().find((t) => t.id === id)
-            : getTeamTemplates().find((t) => t.id === id);
+          const template =
+            source === 'custom'
+              ? getCustomTemplates().find((t) => t.id === id)
+              : getTeamTemplates().find((t) => t.id === id);
           if (template) {
             this.editingTemplateId = template.id;
             this.creatorForm = {
@@ -10139,7 +13825,10 @@ ${fieldList}
               ...template,
               currentStep: 1,
               activePromptStyle: template.activePromptStyle || '通用生成',
-              fields: (template.fields || []).map((f) => ({ ...f, _expanded: false })),
+              fields: (template.fields || []).map((f) => ({
+                ...f,
+                _expanded: false,
+              })),
             };
             this.activeTab = 'templateCreator';
             this.creatorTab = 'form';
@@ -10162,14 +13851,16 @@ ${fieldList}
       });
     });
 
-    this.container.querySelectorAll('.wa-market-use[data-action="approve"]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.id;
-        approveTeamTemplate(id);
-        this.render();
-        this.showToast('已通过审核');
+    this.container
+      .querySelectorAll('.wa-market-use[data-action="approve"]')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          approveTeamTemplate(id);
+          this.render();
+          this.showToast('已通过审核');
+        });
       });
-    });
   }
 
   publishTemplateToTeam(templateId) {
