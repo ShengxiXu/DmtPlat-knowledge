@@ -349,6 +349,7 @@ export class WorkAssistant {
     }
     this.chatContentType = chatContentType;
     this.initChatContentConfig(this.chatContentType);
+    this.ensureModelForType(this.chatContentType);
 
     // 恢复知识库与模式
     this.currentKBs = (record.kbIds || [])
@@ -888,7 +889,6 @@ export class WorkAssistant {
             <div class="wa-chat-msg-bubble">
               <div class="wa-chat-context-tags">
               <span class="wa-chat-context-tag template"><i class="fa-solid fa-${template.icon || 'file-lines'}"></i> ${this.escapeHtml(template.name)}</span>
-                ${role ? `<span class="wa-chat-context-tag">${this.escapeHtml(role.name)}</span>` : ''}
                 ${selectedKBs.map((kb) => `<span class="wa-chat-context-tag kb"><i class="fa-solid fa-book"></i> ${this.escapeHtml(kb.name)}</span>`).join('')}
               </div>
               <div class="wa-chat-field-summary">${fieldRows}</div>
@@ -925,7 +925,7 @@ export class WorkAssistant {
     const stepsHtml = steps
       .map(
         (s) => `
-      <div class="wa-chat-thinking-step ${s.status === 'done' ? 'done' : 'show'}">
+      <div class="wa-chat-thinking-step ${s.status === 'done' ? 'done show' : 'show'}">
         ${
           s.status === 'done'
             ? '<i class="fa-solid fa-check check"></i>'
@@ -937,24 +937,29 @@ export class WorkAssistant {
       )
       .join('');
 
+    const allStepsDone = steps.length > 0 && steps.every((s) => s.status === 'done');
+
     const thinkingHtml =
       steps.length > 0
         ? `
-      <div class="wa-chat-thinking-header">
-        <i class="fa-solid fa-circle-notch"></i>
-        <span>${msg.done ? '思考完成' : '思考中...'}</span>
+      <div class="wa-chat-thinking">
+        <div class="wa-chat-thinking-header">
+          <i class="fa-solid fa-${allStepsDone ? 'check' : 'circle-notch'}"></i>
+          <span>${allStepsDone ? '思考完成' : '思考中...'}</span>
+        </div>
+        <div class="wa-chat-thinking-steps">${stepsHtml}</div>
       </div>
-      <div class="wa-chat-thinking-steps">${stepsHtml}</div>
     `
         : '';
 
     if (msg.done && msg.result && !msg.isFreeChat) {
-      return this.renderChatResultCard(msg);
+      return `${thinkingHtml}${this.renderChatResultCard(msg)}`;
     }
 
     const contentHtml = msg.content
-      ? `<div class="wa-chat-result-body">${msg.content}${msg.done ? '' : '<span class="wa-chat-cursor"></span>'}</div>`
+      ? `<div class="wa-chat-streaming-content"><div class="wa-chat-result-body">${msg.content}${msg.done ? '' : '<span class="wa-chat-cursor"></span>'}</div></div>`
       : '';
+
     return `${thinkingHtml}${contentHtml}`;
   }
 
@@ -1132,9 +1137,7 @@ export class WorkAssistant {
             <button class="wa-chat-summary-btn primary" data-action="preview-result" data-msg-id="${msg.id}">
               <i class="fa-solid fa-eye"></i> 预览 / 编辑
             </button>
-            <button class="wa-chat-summary-btn" data-action="copy" data-msg-id="${msg.id}">
-              <i class="fa-solid fa-copy"></i> 复制
-            </button>
+            ${template.outputType !== outputTypes.PPT ? `<button class="wa-chat-summary-btn" data-action="copy" data-msg-id="${msg.id}"><i class="fa-solid fa-copy"></i> 复制</button>` : ''}
             <button class="wa-chat-summary-btn" data-action="save" data-msg-id="${msg.id}" ${msg.saved ? 'disabled' : ''}>
               <i class="fa-solid fa-${msg.saved ? 'check' : 'floppy-disk'}"></i> ${msg.saved ? '已保存' : '保存'}
             </button>
@@ -2996,14 +2999,16 @@ export class WorkAssistant {
 
   // ===================== 模型选择（替代"深度思考"开关） =====================
 
-  getChatModels() {
-    return [
+  getChatModels(type = this.chatContentType) {
+    const all = [
+      // 语言/文本模型（通用对话、文档、PPT、表格）
       {
         id: 'glm-4-air',
         name: 'GLM-4 Air',
         vendor: '智谱',
         abbr: 'Z',
         tag: '快速',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'glm-4.6',
@@ -3011,14 +3016,23 @@ export class WorkAssistant {
         vendor: '智谱',
         abbr: 'Z',
         tag: '均衡',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
-      { id: 'glm-z1', name: 'GLM-Z1', vendor: '智谱', abbr: 'Z', tag: '推理' },
+      {
+        id: 'glm-z1',
+        name: 'GLM-Z1',
+        vendor: '智谱',
+        abbr: 'Z',
+        tag: '推理',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
+      },
       {
         id: 'gpt-4o',
         name: 'GPT-4o',
         vendor: 'OpenAI',
         abbr: 'O',
         tag: '多模态',
+        supports: ['chat', 'markdown', 'ppt', 'table', 'image', 'video'],
       },
       {
         id: 'gpt-4o-mini',
@@ -3026,6 +3040,7 @@ export class WorkAssistant {
         vendor: 'OpenAI',
         abbr: 'O',
         tag: '轻量',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'o3-mini',
@@ -3033,6 +3048,7 @@ export class WorkAssistant {
         vendor: 'OpenAI',
         abbr: 'O',
         tag: '推理',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'claude-sonnet',
@@ -3040,6 +3056,7 @@ export class WorkAssistant {
         vendor: 'Anthropic',
         abbr: 'A',
         tag: '长文',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'claude-haiku',
@@ -3047,6 +3064,7 @@ export class WorkAssistant {
         vendor: 'Anthropic',
         abbr: 'A',
         tag: '极速',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'gemini-pro',
@@ -3054,6 +3072,7 @@ export class WorkAssistant {
         vendor: 'Google',
         abbr: 'G',
         tag: '长上下文',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'gemini-flash',
@@ -3061,6 +3080,7 @@ export class WorkAssistant {
         vendor: 'Google',
         abbr: 'G',
         tag: '经济',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'deepseek-chat',
@@ -3068,6 +3088,7 @@ export class WorkAssistant {
         vendor: 'DeepSeek',
         abbr: 'D',
         tag: '高性价比',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
       },
       {
         id: 'deepseek-r1',
@@ -3075,15 +3096,95 @@ export class WorkAssistant {
         vendor: 'DeepSeek',
         abbr: 'D',
         tag: '代码',
+        supports: ['chat', 'markdown', 'ppt', 'table'],
+      },
+      // 视频模型
+      {
+        id: 'kling-video',
+        name: '可灵视频',
+        vendor: '快手',
+        abbr: 'K',
+        tag: '视频生成',
+        supports: ['video'],
+      },
+      {
+        id: 'runway-gen3',
+        name: 'Runway Gen-3',
+        vendor: 'Runway',
+        abbr: 'R',
+        tag: '视频生成',
+        supports: ['video'],
+      },
+      // 音乐模型
+      {
+        id: 'suno-v3',
+        name: 'Suno v3',
+        vendor: 'Suno',
+        abbr: 'S',
+        tag: '音乐生成',
+        supports: ['music'],
+      },
+      {
+        id: 'udio',
+        name: 'Udio',
+        vendor: 'Udio',
+        abbr: 'U',
+        tag: '音乐生成',
+        supports: ['music'],
+      },
+      // 图片模型（预留）
+      {
+        id: 'midjourney-v6',
+        name: 'Midjourney v6',
+        vendor: 'Midjourney',
+        abbr: 'M',
+        tag: '图片生成',
+        supports: ['image'],
+      },
+      {
+        id: 'dall-e-3',
+        name: 'DALL-E 3',
+        vendor: 'OpenAI',
+        abbr: 'O',
+        tag: '图片生成',
+        supports: ['image'],
       },
     ];
+    const t = type || 'chat';
+    return all.filter((m) => m.supports.includes(t));
   }
 
   getCurrentModel() {
-    return (
-      this.getChatModels().find((m) => m.id === this.homeModel) ||
-      this.getChatModels()[1]
-    );
+    const models = this.getChatModels(this.chatContentType);
+    return models.find((m) => m.id === this.homeModel) || models[0];
+  }
+
+  // 确保当前模型支持目标类型，否则切换到该类型的第一个可用模型
+  ensureModelForType(type) {
+    const models = this.getChatModels(type);
+    if (!models.length) return;
+    if (!models.some((m) => m.id === this.homeModel)) {
+      this.homeModel = models[0].id;
+    }
+  }
+
+  // 局部刷新模型选择器（切换内容类型后模型列表变化）
+  refreshModelSelector() {
+    const wrap = this.container.querySelector('.wa-chat-model-wrap');
+    if (!wrap) return;
+    wrap.outerHTML = this.renderModelSelector();
+    this.container
+      .querySelector('#wa-chat-model')
+      ?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleModelMenu(!this.homeModelOpen);
+      });
+    this.container.querySelectorAll('.wa-chat-model-item').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectModel(item.dataset.model);
+      });
+    });
   }
 
   renderModelSelector() {
@@ -3185,7 +3286,11 @@ export class WorkAssistant {
       configRow.classList.toggle('has-config', !!configRow.innerHTML.trim());
       this._bindConfigChips();
     }
-    // 3) 占位符
+    // 3) 模型列表按类型过滤：当前模型不支持新类型时切换到该类型默认模型
+    this.ensureModelForType(nextType);
+    this.refreshModelSelector();
+
+    // 4) 占位符
     const input = this.container.querySelector('#wa-chat-input');
     if (input) {
       input.placeholder = this.getChatInputPlaceholder();

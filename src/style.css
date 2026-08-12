@@ -19453,13 +19453,15 @@ html:not(.dark) .wa-chat-field-label { color: #a1a1aa; }
 .wa-chat-field-value { color: var(--text-primary, #f5f5f7); flex: 1; word-break: break-all; }
 html:not(.dark) .wa-chat-field-value { color: #18181b; }
 
+.wa-chat-thinking { margin-bottom: 12px; }
 .wa-chat-thinking-header {
   display: flex; align-items: center; gap: 8px;
   color: var(--wa-fm-accent-bright);
   font-size: 13px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .wa-chat-thinking-header i { animation: wa-chat-spin 1s linear infinite; }
+.wa-chat-thinking-header .fa-check { animation: none; }
 @keyframes wa-chat-spin { to { transform: rotate(360deg); } }
 .wa-chat-thinking-steps { display: flex; flex-direction: column; gap: 8px; }
 .wa-chat-thinking-step {
@@ -19485,6 +19487,20 @@ html:not(.dark) .wa-chat-thinking-step.done { color: #52525b; }
   animation: wa-chat-spin 0.8s linear infinite;
 }
 .wa-chat-thinking-step .check { color: var(--wa-fm-accent-bright); font-size: 12px; }
+
+.wa-chat-streaming-content {
+  padding: 12px 14px;
+  background: var(--bg-main, #0a0a0b);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+html:not(.dark) .wa-chat-streaming-content { background: #fafafa; }
+.wa-chat-streaming-content .wa-chat-result-body {
+  padding: 0;
+  line-height: 1.8;
+  color: var(--text-primary, #f5f5f7);
+}
+html:not(.dark) .wa-chat-streaming-content .wa-chat-result-body { color: #18181b; }
 
 .wa-chat-result-card {
   background: var(--bg-main, #0a0a0b);
